@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b" />
+      <stop offset="100%" stop-color="#022c22" />
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399" />
+      <stop offset="100%" stop-color="#10b981" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="#060911" />
+  <rect x="24" y="24" width="464" height="464" rx="112" fill="url(#bgGrad)" stroke="#10b981" stroke-width="8" stroke-opacity="0.3" />
+  <circle cx="256" cy="256" r="160" fill="none" stroke="#059669" stroke-width="6" stroke-dasharray="16 12" opacity="0.4" />
+  <text x="256" y="325" font-family="'Outfit', system-ui, -apple-system, sans-serif" font-size="220" font-weight="900" fill="url(#accentGrad)" text-anchor="middle">ọ</text>
+  <circle cx="256" cy="400" r="14" fill="#34d399" />
+</svg>

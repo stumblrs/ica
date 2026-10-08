@@ -1,0 +1,126 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 1. Client Device Profile (Registration-Free Identity)
+model Device {
+  id               String            @id // UUID generated client-side and verified
+  fingerprintHash  String?
+  trustScore       Int               @default(100)
+  createdAt        DateTime          @default(now())
+  lastActiveAt     DateTime          @updatedAt
+  votes            GovernanceVote[]
+  inquiriesCreated GovernanceInquiry[]
+  auditLogs        CommunityAuditLog[]
+  comments         Comment[]
+}
+
+// 2. Community with Lifecycle State
+model Community {
+  id                 String              @id @default(cuid())
+  name               String
+  type               String              @default("community") // city, town, village, clan, enclave
+  description        String?
+  latitude           Float
+  longitude          Float
+  stateId            String
+  stateName          String
+  lgaId              String
+  lgaName            String
+  identityStatus     String              @default("igbo") // igbo, igboid_neighbor, borderland_contact, non_igbo
+  verificationStatus String              @default("verified") // verified, pending, challenged
+  lifecycleStatus    String              @default("ACTIVE") // ACTIVE, CONTESTED_DELIST, DELISTED, CONTESTED_REINSTATE
+  confidence         Float               @default(0.95)
+  dialect            String?
+  dialectGreeting    String?
+  whySignificant     String?
+  languageStatus     String?
+  historicalStatus   String?
+  evidenceJson       String?             // Serialized JSON of evidence items
+  confirmationsCount Int                 @default(0)
+  challengesCount    Int                 @default(0)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  
+  inquiries          GovernanceInquiry[]
+  auditLogs          CommunityAuditLog[]
+  comments           Comment[]
+}
+
+// 3. Delisting / Reinstatement Quorum Inquiries
+model GovernanceInquiry {
+  id                 String            @id @default(cuid())
+  communityId        String
+  community          Community         @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  type               String            // "DELIST" | "REINSTATE"
+  petitionerDeviceId String
+  petitioner         Device            @relation(fields: [petitionerDeviceId], references: [id])
+  
+  reason             String            // Rationale (e.g. "Indigenous Igede territory")
+  citations          String?           // Archival / gazetteer sources
+  evidenceUrls       String?           // JSON array of evidence links/photos
+  clanLineage        String?           // For reinstatement: claimed clan/kindred
+  
+  status             String            @default("OPEN") // OPEN, APPROVED, REJECTED, EXPIRED
+  quorumThreshold    Int               @default(15) // Unique devices required
+  expiresAt          DateTime          // E.g. createdAt + 7 days
+  closedAt           DateTime?
+  
+  votesFor           Int               @default(0) // Delist (if DELIST) or Reinstate (if REINSTATE)
+  votesAgainst       Int               @default(0) // Retain (if DELIST) or Keep Delisted (if REINSTATE)
+  
+  createdAt          DateTime          @default(now())
+  votes              GovernanceVote[]
+
+  @@index([communityId, status])
+}
+
+// 4. Anonymous Device Votes (Anti-Duplicate Guarantee)
+model GovernanceVote {
+  id              String            @id @default(cuid())
+  inquiryId       String
+  inquiry         GovernanceInquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  deviceId        String
+  device          Device            @relation(fields: [deviceId], references: [id])
+  choice          String            // "FOR" | "AGAINST"
+  evidenceNote    String?
+  isLocalObserver Boolean           @default(false) // Browser geolocation proximity
+  createdAt       DateTime          @default(now())
+
+  @@unique([inquiryId, deviceId]) // Guarantee one vote per device per inquiry
+}
+
+// 5. Public Living Audit History
+model CommunityAuditLog {
+  id          String    @id @default(cuid())
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  deviceId    String?
+  device      Device?   @relation(fields: [deviceId], references: [id])
+  action      String    // "CREATED" | "CHALLENGED_DELIST" | "DELISTED" | "PETITION_REINSTATE" | "REINSTATED"
+  summary     String
+  createdAt   DateTime  @default(now())
+}
+
+// 6. Community Twitter-style Comments
+model Comment {
+  id          String    @id @default(cuid())
+  communityId String?
+  community   Community? @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  deviceId    String?
+  device      Device?   @relation(fields: [deviceId], references: [id])
+  author      String    @default("Anonymous Resident")
+  handle      String?
+  avatar      String?
+  content     String
+  location    String?
+  category    String    @default("General")
+  likes       Int       @default(0)
+  createdAt   DateTime  @default(now())
+}
