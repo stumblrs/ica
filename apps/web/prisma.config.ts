@@ -6,6 +6,6 @@ export default {
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"] || process.env["DIRECT_URL"] || "",
+    url: process.env["DIRECT_URL"] || process.env["DATABASE_URL"] || "",
   },
 };
