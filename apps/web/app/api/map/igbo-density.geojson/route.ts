@@ -4,6 +4,8 @@ import path from 'node:path';
 
 const DB_FILE = path.resolve(process.cwd(), 'public/data/communities_store.json');
 
+import { prisma } from '@/lib/prisma';
+
 /**
  * GET /api/map/igbo-density.geojson
  * Section 12.1: "Start with a heatmap or regular grid from approved/verified community points...
@@ -11,8 +13,33 @@ const DB_FILE = path.resolve(process.cwd(), 'public/data/communities_store.json'
  */
 export async function GET(req: NextRequest) {
   let communities: any[] = [];
-  if (fs.existsSync(DB_FILE)) {
-    communities = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+
+  try {
+    const dbCommunities = await prisma.community.findMany({
+      where: {
+        stateId: { notIn: ['NG032', 'NG002'] },
+        stateName: { notIn: ['Plateau', 'Adamawa'] },
+      },
+      select: {
+        id: true,
+        name: true,
+        verificationStatus: true,
+        confirmationsCount: true,
+        longitude: true,
+        latitude: true,
+      },
+    });
+    communities = dbCommunities;
+  } catch (err) {
+    if (fs.existsSync(DB_FILE)) {
+      communities = JSON.parse(fs.readFileSync(DB_FILE, 'utf8')).filter(
+        (c: any) =>
+          c.stateId !== 'NG032' &&
+          c.stateId !== 'NG002' &&
+          (c.stateName || '').toLowerCase() !== 'plateau' &&
+          (c.stateName || '').toLowerCase() !== 'adamawa'
+      );
+    }
   }
 
   // Weight point intensity based on verification and confirmations

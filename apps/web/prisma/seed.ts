@@ -141,6 +141,16 @@ async function main() {
       const rawId = p.id || `node-${coords[0]}-${coords[1]}`;
       const id = `settlement-${rawId.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
 
+      // Guard: strictly ignore any non-Igbo regions such as Plateau (NG032) or Adamawa (NG002)
+      if (
+        (p.adm1_name && /plateau|adamawa/i.test(p.adm1_name)) ||
+        p.adm1_pcode === 'NG032' ||
+        p.adm1_pcode === 'NG002' ||
+        (p.adm2_pcode && (p.adm2_pcode.startsWith('NG032') || p.adm2_pcode.startsWith('NG002')))
+      ) {
+        continue;
+      }
+
       if (existingIds.has(id)) continue;
       existingIds.add(id);
 

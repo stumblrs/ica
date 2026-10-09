@@ -146,6 +146,12 @@ export default function HomePage() {
         c.lgaId &&
         c.stateId &&
         !SE_STATE_CODES.includes(c.stateId) &&
+        !c.stateId.startsWith('NG032') && // Exclude Plateau State
+        !c.stateId.startsWith('NG002') && // Exclude Adamawa State
+        !c.lgaId.startsWith('NG032') &&
+        !c.lgaId.startsWith('NG002') &&
+        (c.stateName || '').toLowerCase() !== 'plateau' &&
+        (c.stateName || '').toLowerCase() !== 'adamawa' &&
         c.identityStatus === 'igbo' &&
         c.verificationStatus !== 'challenged'
       ) {
