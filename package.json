@@ -12,5 +12,10 @@
     "validate:data": "node scripts/validate-geojson.mjs",
     "normalize:data": "node scripts/normalize-geojson.mjs"
   },
-  "devDependencies": {}
+  "dependencies": {
+    "@prisma/client": "^7.10.0"
+  },
+  "devDependencies": {
+    "prisma": "^7.10.0"
+  }
 }
