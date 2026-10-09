@@ -54,9 +54,10 @@ export async function POST(
   try {
     const { id } = params;
     const body = await req.json();
-    const { authorName, comment, affiliation, category = 'general' } = body;
+    const { authorName, comment, content, text, affiliation, category = 'general' } = body;
+    const commentText = comment || content || text;
 
-    if (!comment || typeof comment !== 'string' || !comment.trim()) {
+    if (!commentText || typeof commentText !== 'string' || !commentText.trim()) {
       return NextResponse.json({ error: 'Comment text is required.' }, { status: 400 });
     }
 
@@ -89,7 +90,7 @@ export async function POST(
         deviceId: deviceId || null,
         author: cleanAuthor,
         handle: cleanHandle,
-        content: comment.trim(),
+        content: commentText.trim(),
         category,
         likes: 0,
       },
