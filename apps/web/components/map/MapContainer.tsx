@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
 import maplibregl from 'maplibre-gl';
-import { Layers, Crosshair, Loader2, X, Compass, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Layers, Crosshair, Loader2, X, Compass, ChevronLeft, ChevronRight, Plus, Minus } from 'lucide-react';
 import { AddCommunityModal } from '../forms/AddCommunityModal';
 import { SE_STATE_CODES, SE_STATES, ANIOMA_LGAS, IGBO_IDENTIFIED_LGAS, NIGERIA_BOUNDS, BEYOND_SOUTHEAST_REGIONS } from '@/lib/geo';
 import { calculateNearestWaterway, getDialectForLocation, type DialectCluster } from '@/lib/cultural';
@@ -709,7 +709,6 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
       console.error('MapLibre error:', e);
     });
 
-    mapInstance.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     mapInstance.addControl(new maplibregl.ScaleControl({ unit: 'metric', maxWidth: 90 }), 'bottom-right');
 
     mapInstance.on('load', () => {
@@ -2006,6 +2005,32 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           {(is3D || showDensity) && (
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
           )}
+        </button>
+
+        {/* Zoom In Button */}
+        <button
+          type="button"
+          onClick={() => {
+            if (map.current) map.current.zoomIn({ duration: 300 });
+          }}
+          className="h-9 w-9 rounded-xl bg-[#090e1c]/90 backdrop-blur-xl border border-white/15 text-slate-300 hover:text-white flex items-center justify-center shadow-xl active:scale-90 transition-all hover:border-emerald-500/40 hover:bg-[#0f172a]"
+          title="Zoom In (+)"
+          aria-label="Zoom In"
+        >
+          <Plus className="w-4 h-4 text-emerald-400" />
+        </button>
+
+        {/* Zoom Out Button */}
+        <button
+          type="button"
+          onClick={() => {
+            if (map.current) map.current.zoomOut({ duration: 300 });
+          }}
+          className="h-9 w-9 rounded-xl bg-[#090e1c]/90 backdrop-blur-xl border border-white/15 text-slate-300 hover:text-white flex items-center justify-center shadow-xl active:scale-90 transition-all hover:border-emerald-500/40 hover:bg-[#0f172a]"
+          title="Zoom Out (-)"
+          aria-label="Zoom Out"
+        >
+          <Minus className="w-4 h-4 text-emerald-400" />
         </button>
 
         {/* GPS Locate Me Button */}
