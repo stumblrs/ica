@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
 import maplibregl from 'maplibre-gl';
-import { Layers, Crosshair, Loader2, X, Compass } from 'lucide-react';
+import { Layers, Crosshair, Loader2, X, Compass, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AddCommunityModal } from '../forms/AddCommunityModal';
 import { SE_STATE_CODES, SE_STATES, ANIOMA_LGAS, IGBO_IDENTIFIED_LGAS, NIGERIA_BOUNDS, BEYOND_SOUTHEAST_REGIONS } from '@/lib/geo';
 import { calculateNearestWaterway, getDialectForLocation, type DialectCluster } from '@/lib/cultural';
@@ -84,6 +84,7 @@ interface MapContainerProps {
   onBasemapChange?: (mode: BasemapMode) => void;
   activeFilter?: FilterDotType;
   onFilterChange?: (filter: FilterDotType) => void;
+  isFiltersCollapsed?: boolean;
 }
 
 interface HoverInfo {
@@ -131,6 +132,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
     onBasemapChange,
     activeFilter = 'all',
     onFilterChange,
+    isFiltersCollapsed = false,
   },
   ref
 ) {
@@ -148,6 +150,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
   const [hover, setHover] = useState<HoverInfo | null>(null);
   const [cursorCoords, setCursorCoords] = useState<{ lat: number; lng: number; zoom: number } | null>(null);
   const [is3D, setIs3D] = useState(false);
+  const [isBasemapHudCollapsed, setIsBasemapHudCollapsed] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [showMobileLayersModal, setShowMobileLayersModal] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
@@ -1819,7 +1822,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
     <div className="relative w-full h-full min-h-[300px] overflow-hidden bg-[#060911]">
       {/* Placement mode banner */}
       {isAddMode && (
-        <div className="absolute top-[82px] sm:top-[86px] left-1/2 -translate-x-1/2 z-20 px-3.5 py-1.5 rounded-full bg-slate-950/95 border border-amber-400/50 text-amber-200 text-[11px] font-medium shadow-2xl flex items-center gap-2 whitespace-nowrap">
+        <div className={`absolute ${isFiltersCollapsed ? 'top-3' : 'top-[82px] sm:top-[86px]'} left-1/2 -translate-x-1/2 z-20 px-3.5 py-1.5 rounded-full bg-slate-950/95 border border-amber-400/50 text-amber-200 text-[11px] font-medium shadow-2xl flex items-center gap-2 whitespace-nowrap transition-all duration-200`}>
           <span className="h-2 w-2 rounded-full bg-amber-400 animate-ping" />
           Tap the map where the community is located
           <button type="button" onClick={() => setIsAddMode(false)} className="ml-1 text-amber-300/80 hover:text-white underline underline-offset-2">
@@ -1828,100 +1831,131 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         </div>
       )}
 
-      {/* Modern Basemap Style Toggle & 3D Tilt HUD (Desktop: positioned below top filter pills) */}
-      <div className="absolute top-[82px] right-3 sm:right-4 z-20 hidden sm:flex items-center p-0.5 rounded-xl bg-[#090e1c]/90 backdrop-blur-xl border border-white/10 shadow-2xl gap-0.5">
-        <button
-          type="button"
-          onClick={() => onBasemapChange?.('dark')}
-          className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all ${
-            basemapMode === 'dark'
-              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-          title="Dark midnight glassmorphic cartography"
-        >
-          Dark
-        </button>
-        <button
-          type="button"
-          onClick={() => onBasemapChange?.('satellite')}
-          className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all ${
-            basemapMode === 'satellite'
-              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-          title="High-resolution satellite imagery"
-        >
-          Satellite
-        </button>
-        <button
-          type="button"
-          onClick={() => onBasemapChange?.('topo')}
-          className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all ${
-            basemapMode === 'topo'
-              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-          title="Topographic physical relief (Udi Hills, Nsukka plateau)"
-        >
-          Topographic
-        </button>
-        <button
-          type="button"
-          onClick={() => onBasemapChange?.('light')}
-          className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all ${
-            basemapMode === 'light'
-              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-          title="Clean academic cartography"
-        >
-          Light
-        </button>
+      {/* Modern Basemap Style Toggle & 3D Tilt HUD (Desktop: Collapsible for clean map focus) */}
+      <div className={`absolute ${isFiltersCollapsed ? 'top-2.5 sm:top-3' : 'top-[82px] sm:top-[86px]'} right-3 sm:right-4 z-20 hidden sm:flex items-center transition-all duration-200`}>
+        {isBasemapHudCollapsed ? (
+          <button
+            type="button"
+            onClick={() => setIsBasemapHudCollapsed(false)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#090e1c]/90 hover:bg-[#0f172a] border border-white/15 text-slate-200 hover:text-white shadow-2xl backdrop-blur-xl transition-all active:scale-95 hover:border-emerald-500/40 group"
+            title="Expand Map Style, Density & 3D Controls"
+          >
+            <Layers className="w-3.5 h-3.5 text-emerald-400 group-hover:rotate-12 transition-transform" />
+            <span className="text-[10px] font-mono font-bold capitalize text-emerald-300">{basemapMode}</span>
+            {(is3D || showDensity) && (
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            )}
+            <ChevronLeft className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors" />
+          </button>
+        ) : (
+          <div className="flex items-center p-0.5 rounded-xl bg-[#090e1c]/90 backdrop-blur-xl border border-white/10 shadow-2xl gap-0.5 animate-in fade-in slide-in-from-right-2 duration-200">
+            <button
+              type="button"
+              onClick={() => onBasemapChange?.('dark')}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all ${
+                basemapMode === 'dark'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Dark midnight glassmorphic cartography"
+            >
+              Dark
+            </button>
+            <button
+              type="button"
+              onClick={() => onBasemapChange?.('satellite')}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all ${
+                basemapMode === 'satellite'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="High-resolution satellite imagery"
+            >
+              Satellite
+            </button>
+            <button
+              type="button"
+              onClick={() => onBasemapChange?.('topo')}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all ${
+                basemapMode === 'topo'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Topographic physical relief (Udi Hills, Nsukka plateau)"
+            >
+              Topographic
+            </button>
+            <button
+              type="button"
+              onClick={() => onBasemapChange?.('light')}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all ${
+                basemapMode === 'light'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Clean academic cartography"
+            >
+              Light
+            </button>
 
-        <div className="w-px h-4 bg-white/10 mx-0.5" />
+            <div className="w-px h-4 bg-white/10 mx-0.5" />
 
-        <button
-          type="button"
-          onClick={() => onToggleDensity?.(!showDensity)}
-          className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all flex items-center gap-1.5 ${
-            showDensity
-              ? 'bg-amber-500/25 text-amber-300 border border-amber-500/50 shadow-sm'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-          title="Toggle Derived Spatial Presence Heatmap"
-        >
-          <span className={`w-1.5 h-1.5 rounded-full ${showDensity ? 'bg-amber-400 animate-pulse' : 'bg-slate-500'}`} />
-          <span>Density Map</span>
-        </button>
+            <button
+              type="button"
+              onClick={() => onToggleDensity?.(!showDensity)}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all flex items-center gap-1.5 ${
+                showDensity
+                  ? 'bg-amber-500/25 text-amber-300 border border-amber-500/50 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Toggle Derived Spatial Presence Heatmap"
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${showDensity ? 'bg-amber-400 animate-pulse' : 'bg-slate-500'}`} />
+              <span>Density Map</span>
+            </button>
 
-        <button
-          type="button"
-          onClick={() => {
-            const next = !is3D;
-            setIs3D(next);
-            if (!map.current) return;
-            if (next) {
-              map.current.easeTo({ pitch: 52, bearing: -15, duration: 900 });
-            } else {
-              map.current.easeTo({ pitch: 0, bearing: 0, duration: 900 });
-            }
-          }}
-          className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all flex items-center gap-1.5 ${
-            is3D
-              ? 'bg-amber-500/25 text-amber-300 border border-amber-500/50 shadow-sm'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-          title="Toggle 3D Perspective Tilt"
-        >
-          <span className={`w-1.5 h-1.5 rounded-full ${is3D ? 'bg-amber-400 animate-pulse' : 'bg-slate-500'}`} />
-          <span>3D View</span>
-        </button>
+            <button
+              type="button"
+              onClick={() => {
+                const next = !is3D;
+                setIs3D(next);
+                if (!map.current) return;
+                if (next) {
+                  map.current.easeTo({ pitch: 52, bearing: -15, duration: 900 });
+                } else {
+                  map.current.easeTo({ pitch: 0, bearing: 0, duration: 900 });
+                }
+              }}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all flex items-center gap-1.5 ${
+                is3D
+                  ? 'bg-amber-500/25 text-amber-300 border border-amber-500/50 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Toggle 3D Perspective Tilt"
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${is3D ? 'bg-amber-400 animate-pulse' : 'bg-slate-500'}`} />
+              <span>3D View</span>
+            </button>
+
+            <div className="w-px h-4 bg-white/10 mx-0.5" />
+
+            {/* Collapse HUD Button */}
+            <button
+              type="button"
+              onClick={() => setIsBasemapHudCollapsed(true)}
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+              title="Collapse into compact icon (clean map view)"
+              aria-label="Collapse map style bar"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Dynamic Spatial Presence Heatmap Legend & Disclaimer Card */}
       {showDensity && (
-        <div className="absolute top-[82px] sm:top-[86px] left-3 sm:left-4 z-20 max-w-[280px] sm:max-w-xs rounded-2xl bg-[#090e1c]/90 backdrop-blur-xl border border-amber-500/30 p-3.5 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-300">
+        <div className={`absolute ${isFiltersCollapsed ? 'top-14 sm:top-16' : 'top-[82px] sm:top-[86px]'} left-3 sm:left-4 z-20 max-w-[280px] sm:max-w-xs rounded-2xl bg-[#090e1c]/90 backdrop-blur-xl border border-amber-500/30 p-3.5 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-300`}>
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
@@ -1957,8 +1991,8 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         </div>
       )}
 
-      {/* Floating Action Controls Stack on Map (Right edge: top-[82px] on mobile, top-[128px] on desktop below HUD) */}
-      <div className="absolute top-[82px] sm:top-[128px] right-3 sm:right-4 z-20 flex flex-col gap-2 items-center">
+      {/* Floating Action Controls Stack on Map */}
+      <div className={`absolute ${isFiltersCollapsed ? 'top-14 sm:top-14' : 'top-[82px] sm:top-[128px]'} right-3 sm:right-4 z-20 flex flex-col gap-2 items-center transition-all duration-200`}>
         {/* Mobile Basemap, Density & 3D Drawer Modal Trigger */}
         <button
           type="button"

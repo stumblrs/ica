@@ -57,6 +57,7 @@ export default function HomePage() {
   const [selectedFeature, setSelectedFeature] = useState<SelectedFeature | null>(null);
   const [communities, setCommunities] = useState<CommunitySummary[]>([]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isFiltersCollapsed, setIsFiltersCollapsed] = useState(false);
   const [mobileSheetState, setMobileSheetState] = useState<'peek' | 'half' | 'full'>('peek');
   const [activeTab, setActiveTab] = useState<AtlasTab>('explore');
   const [basemapMode, setBasemapMode] = useState<BasemapMode>('dark');
@@ -100,7 +101,7 @@ export default function HomePage() {
     loadCommunities();
   }, [loadCommunities]);
 
-  // Global Keyboard shortcuts: "[" or "]" toggles sidebar collapse, Esc clears selection
+  // Global Keyboard shortcuts: "[" or "]" toggles sidebar collapse, Esc clears selection, "f" toggles filters
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
@@ -115,6 +116,9 @@ export default function HomePage() {
       } else if (e.key.toLowerCase() === 'a' && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         setIsAddMode((prev) => !prev);
+      } else if (e.key.toLowerCase() === 'f' && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        setIsFiltersCollapsed((prev) => !prev);
       }
     }
     window.addEventListener('keydown', handleKeyDown);
@@ -197,21 +201,55 @@ export default function HomePage() {
         aria-label="Interactive Map of Nigeria"
         className="w-full h-full lg:flex-1 lg:order-2 relative min-h-0 overflow-hidden"
       >
-        {/* Floating Quick Filter Pills (Dual-row glassmorphic scrollers) */}
-        <div className="absolute top-2 left-0 right-0 z-20 px-3 py-1 flex flex-col gap-1.5 pointer-events-none">
-          {/* Row 1: Primary Status & Geographic Focal Zones */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pointer-events-auto w-full max-w-full pr-4 sm:pr-8">
+        {/* Floating Quick Filter Pills (Dual-row glassmorphic scrollers: Collapsible for clean map focus) */}
+        {isFiltersCollapsed ? (
+          <div className="absolute top-2 left-3 z-20 pointer-events-auto animate-in fade-in zoom-in-95 duration-200">
             <button
               type="button"
-              onClick={() => setActiveFilter('all')}
-              className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold backdrop-blur-md transition-all active:scale-95 ${
-                activeFilter === 'all'
-                  ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/30 font-bold'
-                  : 'bg-[#090e1c]/85 text-slate-300 border border-white/10 hover:border-white/20'
-              }`}
+              onClick={() => setIsFiltersCollapsed(false)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#090e1c]/90 hover:bg-[#0f172a] border border-white/15 text-xs font-semibold text-slate-200 shadow-2xl backdrop-blur-xl transition-all active:scale-95 hover:border-emerald-500/40 group"
+              title="Expand Quick Filters & Dialects (Shortcut: F)"
             >
-              ✨ All ({communities.length})
+              <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-400 group-hover:rotate-12 transition-transform" />
+              <span>Filters & Dialects</span>
+              {activeFilter !== 'all' && (
+                <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-mono capitalize">
+                  {activeFilter}
+                </span>
+              )}
+              {selectedDialect && (
+                <span className="px-1.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px] font-mono capitalize">
+                  {selectedDialect}
+                </span>
+              )}
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors ml-0.5" />
             </button>
+          </div>
+        ) : (
+          <div className="absolute top-2 left-0 right-0 z-20 px-3 py-1 flex flex-col gap-1.5 pointer-events-none animate-in fade-in slide-in-from-top-2 duration-200">
+            {/* Row 1: Primary Status & Geographic Focal Zones */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pointer-events-auto w-full max-w-full pr-4 sm:pr-8">
+              <button
+                type="button"
+                onClick={() => setIsFiltersCollapsed(true)}
+                className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#090e1c]/90 hover:bg-white/10 border border-white/15 text-slate-300 hover:text-white text-[11px] font-semibold backdrop-blur-md transition-all active:scale-95"
+                title="Collapse filters for clean map focus (Shortcut: F)"
+              >
+                <ChevronUp className="w-3 h-3 text-emerald-400" />
+                <span className="hidden sm:inline text-[10px] font-mono">Hide</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveFilter('all')}
+                className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold backdrop-blur-md transition-all active:scale-95 ${
+                  activeFilter === 'all'
+                    ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/30 font-bold'
+                    : 'bg-[#090e1c]/85 text-slate-300 border border-white/10 hover:border-white/20'
+                }`}
+              >
+                ✨ All ({communities.length})
+              </button>
             <button
               type="button"
               onClick={() => setActiveFilter('verified')}
@@ -381,6 +419,7 @@ export default function HomePage() {
             )}
           </div>
         </div>
+      )}
 
         <MapContainer
           ref={mapRef}
@@ -415,11 +454,12 @@ export default function HomePage() {
           onBasemapChange={setBasemapMode}
           activeFilter={activeFilter}
           onFilterChange={setActiveFilter}
+          isFiltersCollapsed={isFiltersCollapsed}
         />
 
         {/* Floating Quick Map HUD / Expand Trigger (visible on desktop when collapsed) */}
         {isSidebarCollapsed && (
-          <div className="hidden lg:flex absolute top-4 left-4 z-20 items-center gap-2">
+          <div className={`hidden lg:flex absolute ${isFiltersCollapsed ? 'top-14 left-3' : 'top-4 left-4'} z-20 items-center gap-2 transition-all duration-200`}>
             <button
               type="button"
               onClick={() => setIsSidebarCollapsed(false)}
@@ -481,7 +521,7 @@ export default function HomePage() {
               title="Document a Community (A key)"
               aria-label="Document Community"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-4 h-" />
             </button>
           </div>
 
