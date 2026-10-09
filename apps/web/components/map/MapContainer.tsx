@@ -1836,15 +1836,14 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           <button
             type="button"
             onClick={() => setIsBasemapHudCollapsed(false)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#090e1c]/90 hover:bg-[#0f172a] border border-white/15 text-slate-200 hover:text-white shadow-2xl backdrop-blur-xl transition-all active:scale-95 hover:border-emerald-500/40 group"
+            className="h-9 w-9 rounded-xl bg-[#090e1c]/90 hover:bg-[#0f172a] border border-white/15 text-slate-200 hover:text-white shadow-2xl backdrop-blur-xl transition-all active:scale-95 hover:border-emerald-500/40 flex items-center justify-center relative group"
             title="Expand Map Style, Density & 3D Controls"
+            aria-label="Expand Map Style Controls"
           >
-            <Layers className="w-3.5 h-3.5 text-emerald-400 group-hover:rotate-12 transition-transform" />
-            <span className="text-[10px] font-mono font-bold capitalize text-emerald-300">{basemapMode}</span>
+            <Layers className="w-4 h-4 text-emerald-400 group-hover:rotate-12 transition-transform" />
             {(is3D || showDensity) && (
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
             )}
-            <ChevronLeft className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors" />
           </button>
         ) : (
           <div className="flex items-center p-0.5 rounded-xl bg-[#090e1c]/90 backdrop-blur-xl border border-white/10 shadow-2xl gap-0.5 animate-in fade-in slide-in-from-right-2 duration-200">
@@ -1996,14 +1995,13 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         <button
           type="button"
           onClick={() => setShowMobileLayersModal(true)}
-          className="sm:hidden h-9 px-2.5 rounded-xl bg-[#090e1c]/90 backdrop-blur-xl border border-white/15 text-slate-300 hover:text-white flex items-center justify-center gap-1.5 shadow-xl active:scale-95 transition-all"
+          className="sm:hidden h-9 w-9 rounded-xl bg-[#090e1c]/90 backdrop-blur-xl border border-white/15 text-slate-300 hover:text-white flex items-center justify-center shadow-xl active:scale-95 transition-all relative"
           title="Change Basemap & Perspective"
           aria-label="Change Basemap"
         >
           <Layers className="w-4 h-4 text-emerald-400" />
-          <span className="text-[10px] font-mono font-bold capitalize text-emerald-300">{basemapMode}</span>
           {(is3D || showDensity) && (
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
           )}
         </button>
 
