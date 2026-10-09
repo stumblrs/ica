@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import maplibregl from 'maplibre-gl';
-import { Layers, Crosshair, Loader2, X, Compass, ChevronLeft, ChevronRight, Plus, Minus } from 'lucide-react';
+import { Layers, Crosshair, Loader2, X, Compass, ChevronLeft, ChevronRight, Plus, Minus, Mountain, Play, Pause } from 'lucide-react';
 import { AddCommunityModal } from '../forms/AddCommunityModal';
 import { SE_STATE_CODES, SE_STATES, ANIOMA_LGAS, IGBO_IDENTIFIED_LGAS, NIGERIA_BOUNDS, BEYOND_SOUTHEAST_REGIONS } from '@/lib/geo';
 import { calculateNearestWaterway, getDialectForLocation, type DialectCluster } from '@/lib/cultural';
@@ -56,6 +56,9 @@ export interface MapContainerHandle {
   inspectMigrationArc: (arc: any) => void;
   highlightDialectCluster: (cluster: any) => void;
   filterLandmarksByMarketDay: (dayName: string | null) => void;
+  start3DOrbit: () => void;
+  stop3DOrbit: () => void;
+  setPitchPreset: (pitch: number) => void;
   resize: () => void;
 }
 
@@ -150,6 +153,69 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
   const [hover, setHover] = useState<HoverInfo | null>(null);
   const [cursorCoords, setCursorCoords] = useState<{ lat: number; lng: number; zoom: number } | null>(null);
   const [is3D, setIs3D] = useState(false);
+  const [pitchPreset, setPitchPreset] = useState<number>(56);
+  const [isOrbiting, setIsOrbiting] = useState(false);
+  const isOrbitingRef = useRef(false);
+  const orbitAnimRef = useRef<number | null>(null);
+
+  const stopOrbit = useCallback(() => {
+    setIsOrbiting(false);
+    isOrbitingRef.current = false;
+    if (orbitAnimRef.current !== null) {
+      cancelAnimationFrame(orbitAnimRef.current);
+      orbitAnimRef.current = null;
+    }
+  }, []);
+
+  const startOrbit = useCallback(() => {
+    if (!map.current) return;
+    setIsOrbiting(true);
+    isOrbitingRef.current = true;
+    let lastTime = performance.now();
+    const step = (now: number) => {
+      if (!map.current || !isOrbitingRef.current) return;
+      const dt = (now - lastTime) / 1000;
+      lastTime = now;
+      const currentBearing = map.current.getBearing();
+      map.current.setBearing((currentBearing + dt * 6) % 360);
+      orbitAnimRef.current = requestAnimationFrame(step);
+    };
+    orbitAnimRef.current = requestAnimationFrame(step);
+  }, []);
+
+  const toggleOrbit = useCallback(() => {
+    if (isOrbitingRef.current) {
+      stopOrbit();
+    } else {
+      startOrbit();
+    }
+  }, [startOrbit, stopOrbit]);
+
+  const toggle3D = useCallback(() => {
+    if (!map.current) return;
+    const next = !is3D;
+    setIs3D(next);
+    if (next) {
+      if (map.current.getSource('terrain-dem')) {
+        map.current.setTerrain({ source: 'terrain-dem', exaggeration: 1.6 });
+      }
+      if (typeof map.current.setSky === 'function') {
+        map.current.setSky({
+          'sky-color': basemapMode === 'light' ? '#38bdf8' : '#030712',
+          'horizon-color': basemapMode === 'light' ? '#bae6fd' : '#0d1527',
+          'fog-color': basemapMode === 'light' ? '#e0f2fe' : '#090e1c',
+          'fog-ground-blend': 0.75,
+          'atmosphere-blend': 0.8,
+        });
+      }
+      map.current.easeTo({ pitch: pitchPreset, bearing: -15, duration: 1000 });
+    } else {
+      stopOrbit();
+      map.current.setTerrain(null);
+      map.current.easeTo({ pitch: 0, bearing: 0, duration: 900 });
+    }
+  }, [is3D, basemapMode, pitchPreset, stopOrbit]);
+
   const [isBasemapHudCollapsed, setIsBasemapHudCollapsed] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [showMobileLayersModal, setShowMobileLayersModal] = useState(false);
@@ -429,13 +495,18 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
       onFilterChange?.(filter);
     },
     toggle3D() {
-      if (!map.current) return;
-      const next = !is3D;
-      setIs3D(next);
-      if (next) {
-        map.current.easeTo({ pitch: 52, bearing: -15, duration: 900 });
-      } else {
-        map.current.easeTo({ pitch: 0, bearing: 0, duration: 900 });
+      toggle3D();
+    },
+    start3DOrbit() {
+      startOrbit();
+    },
+    stop3DOrbit() {
+      stopOrbit();
+    },
+    setPitchPreset(pitch: number) {
+      setPitchPreset(pitch);
+      if (map.current && is3D) {
+        map.current.easeTo({ pitch, duration: 600 });
       }
     },
     highlightLgas(codes) {
@@ -714,7 +785,8 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
       bounds: NIGERIA_BOUNDS,
       fitBoundsOptions: { padding: responsivePadding(mapContainer.current) },
       minZoom: 3.5,
-      maxZoom: 13,
+      maxZoom: 15,
+      maxPitch: 85,
       maxBounds: [-4.0, -2.0, 22.0, 21.0],
       attributionControl: false,
       dragRotate: true,
@@ -727,7 +799,30 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
 
     mapInstance.addControl(new maplibregl.ScaleControl({ unit: 'metric', maxWidth: 90 }), 'bottom-right');
 
+    mapInstance.on('dragstart', () => {
+      if (isOrbitingRef.current) stopOrbit();
+    });
+
     mapInstance.on('load', () => {
+      // ── 3D Terrain DEM & Atmospheric Horizon ──
+      mapInstance.addSource('terrain-dem', {
+        type: 'raster-dem',
+        tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+        encoding: 'terrarium',
+        tileSize: 256,
+        maxzoom: 13,
+      });
+
+      if (typeof mapInstance.setSky === 'function') {
+        mapInstance.setSky({
+          'sky-color': '#030712',
+          'horizon-color': '#0d1527',
+          'fog-color': '#090e1c',
+          'fog-ground-blend': 0.75,
+          'atmosphere-blend': 0.8,
+        });
+      }
+
       // ── States ──
       mapInstance.addSource('states-source', { type: 'geojson', data: '/data/states.geojson' });
 
@@ -772,6 +867,32 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           ],
           'line-width': ['interpolate', ['linear'], ['zoom'], 4, 0.3, 8, 0.9],
           'line-opacity': 0.8,
+        },
+      });
+
+      // ── 3D Volumetric Extrusions for LGAs / Settlement Clusters ──
+      mapInstance.addLayer({
+        id: 'lgas-3d-extrusion',
+        type: 'fill-extrusion',
+        source: 'lgas-source',
+        layout: {
+          visibility: 'none',
+        },
+        paint: {
+          'fill-extrusion-color': [
+            'case',
+            ['in', ['get', 'admin1Pcod'], ['literal', SE_STATE_CODES]], '#10b981',
+            ['in', ['get', 'admin2Pcod'], ['literal', identifiedRef.current]], '#059669',
+            '#0284c7',
+          ],
+          'fill-extrusion-height': [
+            'case',
+            ['in', ['get', 'admin1Pcod'], ['literal', SE_STATE_CODES]], 3200,
+            ['in', ['get', 'admin2Pcod'], ['literal', identifiedRef.current]], 2000,
+            700,
+          ],
+          'fill-extrusion-base': 0,
+          'fill-extrusion-opacity': 0.42,
         },
       });
 
@@ -1625,13 +1746,38 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
     }
   }, [showHistoricalOverlay, historicalOpacity, loaded]);
 
-  // Settlement Density heatmap effect
+  // Settlement Density heatmap & 3D Extrusions effect
   useEffect(() => {
     if (!loaded || !map.current) return;
     if (map.current.getLayer('density-heat')) {
       map.current.setLayoutProperty('density-heat', 'visibility', showDensity ? 'visible' : 'none');
     }
-  }, [showDensity, loaded]);
+    if (map.current.getLayer('lgas-3d-extrusion')) {
+      const show3DVolume = showDensity && is3D;
+      map.current.setLayoutProperty('lgas-3d-extrusion', 'visibility', show3DVolume ? 'visible' : 'none');
+    }
+  }, [showDensity, is3D, loaded]);
+
+  // 3D Terrain DEM Mesh & Atmosphere Synchronization
+  useEffect(() => {
+    if (!loaded || !map.current) return;
+    if (is3D) {
+      if (map.current.getSource('terrain-dem')) {
+        map.current.setTerrain({ source: 'terrain-dem', exaggeration: 1.6 });
+      }
+      if (typeof map.current.setSky === 'function') {
+        map.current.setSky({
+          'sky-color': basemapMode === 'light' ? '#38bdf8' : '#030712',
+          'horizon-color': basemapMode === 'light' ? '#bae6fd' : '#0d1527',
+          'fog-color': basemapMode === 'light' ? '#e0f2fe' : '#090e1c',
+          'fog-ground-blend': 0.75,
+          'atmosphere-blend': 0.8,
+        });
+      }
+    } else {
+      map.current.setTerrain(null);
+    }
+  }, [is3D, basemapMode, loaded]);
 
   // Dialect continuum visibility effect
   useEffect(() => {
@@ -1930,26 +2076,51 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
 
             <button
               type="button"
-              onClick={() => {
-                const next = !is3D;
-                setIs3D(next);
-                if (!map.current) return;
-                if (next) {
-                  map.current.easeTo({ pitch: 52, bearing: -15, duration: 900 });
-                } else {
-                  map.current.easeTo({ pitch: 0, bearing: 0, duration: 900 });
-                }
-              }}
+              onClick={toggle3D}
               className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all flex items-center gap-1.5 ${
                 is3D
                   ? 'bg-amber-500/25 text-amber-300 border border-amber-500/50 shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
-              title="Toggle 3D Perspective Tilt"
+              title="Toggle 3D Elevation Terrain, Physical Relief & Atmospheric Sky"
             >
+              <Mountain className={`w-3 h-3 ${is3D ? 'text-amber-400' : 'text-slate-400'}`} />
+              <span>3D Terrain</span>
               <span className={`w-1.5 h-1.5 rounded-full ${is3D ? 'bg-amber-400 animate-pulse' : 'bg-slate-500'}`} />
-              <span>3D View</span>
             </button>
+
+            {is3D && (
+              <>
+                {/* 3D Tilt Angle Switcher */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextPitch = pitchPreset === 56 ? 74 : 56;
+                    setPitchPreset(nextPitch);
+                    map.current?.easeTo({ pitch: nextPitch, duration: 700 });
+                  }}
+                  className="px-2 py-1 rounded-lg text-[10px] font-mono font-medium text-amber-200/90 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-all"
+                  title="Switch between 56° Oblique angle and 74° Deep Horizon view"
+                >
+                  <span>{pitchPreset}°</span>
+                </button>
+
+                {/* 360° Cinematic Orbit */}
+                <button
+                  type="button"
+                  onClick={toggleOrbit}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-mono font-medium transition-all flex items-center gap-1 ${
+                    isOrbiting
+                      ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/50 animate-pulse shadow-sm'
+                      : 'text-slate-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/10'
+                  }`}
+                  title={isOrbiting ? 'Stop 360° Drone Orbit' : 'Start 360° Drone Cinematic Orbit'}
+                >
+                  {isOrbiting ? <Pause className="w-2.5 h-2.5 text-emerald-400" /> : <Play className="w-2.5 h-2.5 text-amber-400" />}
+                  <span>{isOrbiting ? 'Orbiting' : 'Orbit'}</span>
+                </button>
+              </>
+            )}
 
             <div className="w-px h-4 bg-white/10 mx-0.5" />
 
@@ -2145,30 +2316,45 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
               </button>
             </div>
 
-            {/* 3D Perspective Tilt Toggle for Mobile */}
+            {/* 3D Perspective & Terrain for Mobile */}
             <div className="pt-2 border-t border-white/10 flex items-center justify-between">
               <div>
-                <span className="block text-xs font-bold text-white">3D Perspective Tilt</span>
-                <span className="block text-[10px] text-slate-400">View terrain with elevation angle</span>
+                <span className="block text-xs font-bold text-white flex items-center gap-1.5">
+                  <Mountain className="w-3.5 h-3.5 text-amber-400" />
+                  3D Elevation Terrain
+                </span>
+                <span className="block text-[10px] text-slate-400">
+                  {is3D ? `Active (${pitchPreset}° angle + DEM relief)` : 'Physical hills, ridges & valleys'}
+                </span>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  const next = !is3D;
-                  setIs3D(next);
-                  if (map.current) {
-                    map.current.easeTo({ pitch: next ? 52 : 0, bearing: next ? -15 : 0, duration: 800 });
-                  }
-                }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  is3D
-                    ? 'bg-amber-500/25 border border-amber-500/50 text-amber-300'
-                    : 'bg-white/[0.06] border border-white/10 text-slate-300'
-                }`}
-              >
-                <span className={`w-2 h-2 rounded-full ${is3D ? 'bg-amber-400 animate-pulse' : 'bg-slate-500'}`} />
-                <span>{is3D ? '3D Active' : 'Enable 3D'}</span>
-              </button>
+              <div className="flex items-center gap-1.5">
+                {is3D && (
+                  <button
+                    type="button"
+                    onClick={toggleOrbit}
+                    className={`px-2 py-1.5 rounded-xl text-[11px] font-mono font-medium transition-all flex items-center gap-1 ${
+                      isOrbiting
+                        ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/50 animate-pulse'
+                        : 'bg-white/[0.06] border border-white/10 text-slate-300'
+                    }`}
+                  >
+                    {isOrbiting ? <Pause className="w-2.5 h-2.5" /> : <Play className="w-2.5 h-2.5" />}
+                    <span>Orbit</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={toggle3D}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    is3D
+                      ? 'bg-amber-500/25 border border-amber-500/50 text-amber-300'
+                      : 'bg-white/[0.06] border border-white/10 text-slate-300'
+                  }`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${is3D ? 'bg-amber-400 animate-pulse' : 'bg-slate-500'}`} />
+                  <span>{is3D ? '3D Active' : 'Enable 3D'}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
