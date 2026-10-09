@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { InstallPrompt } from '@/components/common/InstallPrompt';
+import { UpdatePrompt } from '@/components/common/UpdatePrompt';
 
 export const metadata: Metadata = {
   title: 'Igbo Community Atlas | Participatory Geographic Database',
@@ -43,7 +44,7 @@ export default function RootLayout({
               <h1 className="text-xs sm:text-sm font-bold tracking-tight text-white flex items-center gap-1.5 sm:gap-2 truncate">
                 <span className="truncate">Igbo Community Atlas</span>
                 <span className="shrink-0 text-[9px] font-mono font-medium px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  v1.0
+                  v1.2
                 </span>
               </h1>
               <p className="text-[10px] text-slate-400 truncate hidden xs:block">
@@ -64,6 +65,9 @@ export default function RootLayout({
         <main className="flex-1 w-full relative overflow-hidden flex flex-col">
           {children}
         </main>
+
+        {/* PWA Update Notification for Installed & Web Users */}
+        <UpdatePrompt />
 
         {/* Mobile Install App Alert */}
         <InstallPrompt />
