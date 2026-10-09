@@ -318,6 +318,7 @@ export default function HomePage() {
           showHistoricalOverlay={showHistoricalOverlay}
           historicalOpacity={historicalOpacity}
           showDensity={showDensity}
+          onToggleDensity={setShowDensity}
           identifiedLgas={identifiedLgas}
           isAddMode={isAddMode}
           setIsAddMode={setIsAddMode}

@@ -71,6 +71,7 @@ interface MapContainerProps {
   showHistoricalOverlay?: boolean;
   historicalOpacity?: number;
   showDensity?: boolean;
+  onToggleDensity?: (val: boolean) => void;
   /** LGA codes outside the Southeast to shade as Igbo-identified */
   identifiedLgas?: string[];
   isAddMode: boolean;
@@ -117,6 +118,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
     showHistoricalOverlay = false,
     historicalOpacity = 0.45,
     showDensity = false,
+    onToggleDensity,
     identifiedLgas = IGBO_IDENTIFIED_LGAS,
     isAddMode,
     setIsAddMode,
@@ -944,21 +946,26 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
             visibility: showDensity ? 'visible' : 'none',
           },
           paint: {
-            'heatmap-weight': ['interpolate', ['linear'], ['get', 'weight'], 0, 0, 1.5, 1],
-            'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 4, 0.8, 9, 2.5],
+            // Factor dynamic point weight from verified Supabase records
+            'heatmap-weight': ['interpolate', ['linear'], ['get', 'weight'], 0.1, 0.1, 2.0, 1.8],
+            // Scale intensity across zoom levels
+            'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 4, 0.6, 7, 1.3, 10, 2.6],
+            // Multi-spectral cartographic palette: transparent -> emerald aura -> luminous teal -> spring green -> amber -> deep warm gold
             'heatmap-color': [
               'interpolate',
               ['linear'],
               ['heatmap-density'],
               0, 'rgba(0, 0, 0, 0)',
-              0.2, 'rgba(16, 185, 129, 0.25)',
-              0.4, 'rgba(16, 185, 129, 0.55)',
-              0.6, 'rgba(52, 211, 153, 0.75)',
-              0.8, 'rgba(251, 191, 36, 0.88)',
-              1.0, 'rgba(245, 158, 11, 0.98)',
+              0.15, 'rgba(5, 150, 105, 0.20)',
+              0.35, 'rgba(16, 185, 129, 0.45)',
+              0.55, 'rgba(52, 211, 153, 0.70)',
+              0.75, 'rgba(251, 191, 36, 0.86)',
+              0.95, 'rgba(245, 158, 11, 0.98)',
             ],
-            'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 4, 15, 8, 30, 12, 50],
-            'heatmap-opacity': 0.75,
+            // Dynamic radius scaling with zoom
+            'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 4, 18, 7, 32, 10, 55, 13, 80],
+            // Gracefully adjust opacity at close zooms to reveal village markers
+            'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 4, 0.82, 8, 0.78, 11, 0.60, 13, 0.35],
           },
         }
       );
@@ -1843,6 +1850,20 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
 
         <button
           type="button"
+          onClick={() => onToggleDensity?.(!showDensity)}
+          className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all flex items-center gap-1.5 ${
+            showDensity
+              ? 'bg-amber-500/25 text-amber-300 border border-amber-500/50 shadow-sm'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+          title="Toggle Derived Spatial Presence Heatmap"
+        >
+          <span className={`w-1.5 h-1.5 rounded-full ${showDensity ? 'bg-amber-400 animate-pulse' : 'bg-slate-500'}`} />
+          <span>Density Map</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => {
             const next = !is3D;
             setIs3D(next);
@@ -1864,6 +1885,44 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           <span>3D View</span>
         </button>
       </div>
+
+      {/* Dynamic Spatial Presence Heatmap Legend & Disclaimer Card */}
+      {showDensity && (
+        <div className="absolute top-16 left-3 sm:left-4 z-20 max-w-[280px] sm:max-w-xs rounded-2xl bg-[#090e1c]/90 backdrop-blur-xl border border-amber-500/30 p-3.5 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
+              <span className="text-xs font-bold text-white font-display uppercase tracking-wider">
+                Derived Spatial Presence
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => onToggleDensity?.(false)}
+              className="text-slate-400 hover:text-white p-0.5 rounded-md"
+              title="Close density overlay"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Gradient Spectrum Bar */}
+          <div className="space-y-1 mb-2.5">
+            <div className="h-2 w-full rounded-full bg-gradient-to-r from-emerald-950 via-emerald-500 via-amber-400 to-amber-500 shadow-inner" />
+            <div className="flex justify-between text-[9px] font-mono font-medium text-slate-400">
+              <span>Borderland / Continuum</span>
+              <span>Dense Homeland Core</span>
+            </div>
+          </div>
+
+          <p className="text-[10px] text-slate-300 leading-relaxed font-sans border-t border-white/10 pt-2">
+            Calculated dynamically from verified settlement points, community confirmations, and confidence scores.
+            <span className="block text-slate-400 font-medium mt-1 italic">
+              Note: Low density represents fewer documented records, never absence of people.
+            </span>
+          </p>
+        </div>
+      )}
 
       {/* Floating Action Controls Stack on Map (Top Right) */}
       <div className="absolute top-14 right-3 z-20 flex flex-col gap-2 items-center">
