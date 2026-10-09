@@ -15,7 +15,7 @@ import {
   ShieldAlert,
   MapPin,
 } from 'lucide-react';
-import type { GovernanceInquiry } from '@/lib/governance';
+import type { GovernanceInquiry } from '@/lib/governancePolicy';
 import { getOrCreateDeviceId, recordDeviceVote, getDeviceVote } from '@/lib/device';
 
 interface GovernanceInquiryCardProps {

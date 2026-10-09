@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { X, RotateCcw, ShieldCheck, HeartHandshake, Send, CheckCircle2, AlertTriangle, Volume2, Clock, Users } from 'lucide-react';
 import { getOrCreateDeviceId, recordDevicePetition } from '@/lib/device';
-import { getCommunityGovernancePolicy } from '@/lib/governance';
+import { getCommunityGovernancePolicy } from '@/lib/governancePolicy';
 
 interface ReinstatementModalProps {
   community: {

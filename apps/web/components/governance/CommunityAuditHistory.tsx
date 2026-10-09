@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { History, ShieldCheck, AlertTriangle, RotateCcw, Clock, Sparkles } from 'lucide-react';
-import type { CommunityAuditLog } from '@/lib/governance';
+import type { CommunityAuditLog } from '@/lib/governancePolicy';
 
 interface CommunityAuditHistoryProps {
   communityId: string;

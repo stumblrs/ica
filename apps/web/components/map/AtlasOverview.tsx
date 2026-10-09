@@ -51,7 +51,7 @@ import { DelistingModal } from '@/components/governance/DelistingModal';
 import { ReinstatementModal } from '@/components/governance/ReinstatementModal';
 import { GovernanceInquiryCard } from '@/components/governance/GovernanceInquiryCard';
 import { CommunityAuditHistory } from '@/components/governance/CommunityAuditHistory';
-import type { GovernanceInquiry } from '@/lib/governance';
+import type { GovernanceInquiry } from '@/lib/governancePolicy';
 
 export interface CommunitySummary {
   id: string;

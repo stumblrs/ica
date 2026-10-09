@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { X, AlertTriangle, Scale, ShieldAlert, BookOpen, Send, CheckCircle2, Clock, Users, ShieldCheck } from 'lucide-react';
 import { getOrCreateDeviceId, recordDevicePetition } from '@/lib/device';
-import { getCommunityGovernancePolicy } from '@/lib/governance';
+import { getCommunityGovernancePolicy } from '@/lib/governancePolicy';
 
 interface DelistingModalProps {
   community: {
