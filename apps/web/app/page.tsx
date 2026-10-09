@@ -28,6 +28,7 @@ import { AtlasOverview, type CommunitySummary, type AtlasTab } from '@/component
 import type { MapContainerHandle, SelectedFeature, BasemapMode, FilterDotType } from '@/components/map/MapContainer';
 import { AddCommunityModal } from '@/components/forms/AddCommunityModal';
 import { SE_STATE_CODES, IGBO_IDENTIFIED_LGAS, BEYOND_SOUTHEAST_REGIONS } from '@/lib/geo';
+import { DIALECT_CLUSTERS } from '@/lib/cultural';
 
 const MapContainer = dynamic(() => import('@/components/map/MapContainer'), {
   ssr: false,
@@ -60,6 +61,7 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<AtlasTab>('explore');
   const [basemapMode, setBasemapMode] = useState<BasemapMode>('dark');
   const [activeFilter, setActiveFilter] = useState<FilterDotType>('all');
+  const [selectedDialect, setSelectedDialect] = useState<string | null>(null);
   const [selectedMarketFilter, setSelectedMarketFilter] = useState<string | null>(null);
   const [pendingModal, setPendingModal] = useState<{
     coords: { lon: number; lat: number };
@@ -195,115 +197,189 @@ export default function HomePage() {
         aria-label="Interactive Map of Nigeria"
         className="w-full h-full lg:flex-1 lg:order-2 relative min-h-0 overflow-hidden"
       >
-        {/* Mobile Floating Quick Filter Pills (Horizontal thumb-swipeable scroller) */}
-        <div className="lg:hidden absolute top-2 left-0 right-0 z-20 px-3 py-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar pointer-events-auto">
-          <button
-            type="button"
-            onClick={() => setActiveFilter('all')}
-            className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold backdrop-blur-md transition-all active:scale-95 ${
-              activeFilter === 'all'
-                ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/30'
-                : 'bg-[#090e1c]/85 text-slate-300 border border-white/10'
-            }`}
-          >
-            ✨ All ({communities.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveFilter('verified')}
-            className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold backdrop-blur-md transition-all active:scale-95 ${
-              activeFilter === 'verified'
-                ? 'bg-amber-400 text-black shadow-lg shadow-amber-400/30'
-                : 'bg-[#090e1c]/85 text-slate-300 border border-white/10'
-            }`}
-          >
-            🛡️ Verified ({verifiedCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveFilter('contested')}
-            className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold backdrop-blur-md transition-all active:scale-95 ${
-              activeFilter === 'contested'
-                ? 'bg-amber-400 text-black shadow-lg shadow-amber-400/30 font-bold'
-                : 'bg-[#090e1c]/85 text-amber-300 border border-amber-500/30'
-            }`}
-          >
-            ⚖️ Reviews ({contestedCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveFilter('dormant')}
-            className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold backdrop-blur-md transition-all active:scale-95 ${
-              activeFilter === 'dormant'
-                ? 'bg-slate-300 text-black shadow-lg font-bold'
-                : 'bg-[#090e1c]/85 text-slate-400 border border-white/10'
-            }`}
-          >
-            👻 Dormant ({dormantCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveFilter('homeland')}
-            className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold backdrop-blur-md transition-all active:scale-95 ${
-              activeFilter === 'homeland'
-                ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/30'
-                : 'bg-[#090e1c]/85 text-slate-300 border border-white/10'
-            }`}
-          >
-            🌿 Homeland
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              const anioma = BEYOND_SOUTHEAST_REGIONS.find((r) => r.id === 'delta-anioma');
-              if (anioma) mapRef.current?.highlightRegion(anioma.lgas.map((l) => l.code), anioma.center, anioma.zoom);
-            }}
-            className="shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#090e1c]/85 text-emerald-300 border border-emerald-500/30 backdrop-blur-md active:scale-95"
-          >
-            🏛️ Anioma (Delta)
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              const benue = BEYOND_SOUTHEAST_REGIONS.find((r) => r.id === 'benue-borderlands');
-              if (benue) mapRef.current?.highlightRegion(benue.lgas.map((l) => l.code), benue.center, benue.zoom);
-            }}
-            className="shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#090e1c]/85 text-emerald-300 border border-emerald-500/30 backdrop-blur-md active:scale-95"
-          >
-            📍 Benue Borderlands
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              const rivers = BEYOND_SOUTHEAST_REGIONS.find((r) => r.id === 'rivers-upland');
-              if (rivers) mapRef.current?.highlightRegion(rivers.lgas.map((l) => l.code), rivers.center, rivers.zoom);
-            }}
-            className="shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#090e1c]/85 text-emerald-300 border border-emerald-500/30 backdrop-blur-md active:scale-95"
-          >
-            🌊 Rivers Mainland
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowLandmarks((prev) => !prev)}
-            className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold backdrop-blur-md transition-all active:scale-95 ${
-              showLandmarks
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                : 'bg-[#090e1c]/85 text-slate-400 border border-white/10'
-            }`}
-          >
-            🏪 Markets ({showLandmarks ? 'On' : 'Off'})
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowWaterways((prev) => !prev)}
-            className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold backdrop-blur-md transition-all active:scale-95 ${
-              showWaterways
-                ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
-                : 'bg-[#090e1c]/85 text-slate-400 border border-white/10'
-            }`}
-          >
-            🌊 Rivers ({showWaterways ? 'On' : 'Off'})
-          </button>
+        {/* Floating Quick Filter Pills (Dual-row glassmorphic scrollers) */}
+        <div className="absolute top-2 left-0 right-0 z-20 px-3 py-1 flex flex-col gap-1.5 pointer-events-none">
+          {/* Row 1: Primary Status & Geographic Focal Zones */}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pointer-events-auto max-w-[calc(100vw-120px)] sm:max-w-[calc(100vw-450px)]">
+            <button
+              type="button"
+              onClick={() => setActiveFilter('all')}
+              className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold backdrop-blur-md transition-all active:scale-95 ${
+                activeFilter === 'all'
+                  ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/30 font-bold'
+                  : 'bg-[#090e1c]/85 text-slate-300 border border-white/10 hover:border-white/20'
+              }`}
+            >
+              ✨ All ({communities.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveFilter('verified')}
+              className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold backdrop-blur-md transition-all active:scale-95 ${
+                activeFilter === 'verified'
+                  ? 'bg-amber-400 text-black shadow-lg shadow-amber-400/30 font-bold'
+                  : 'bg-[#090e1c]/85 text-slate-300 border border-white/10 hover:border-white/20'
+              }`}
+            >
+              🛡️ Verified ({verifiedCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveFilter('contested')}
+              className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold backdrop-blur-md transition-all active:scale-95 ${
+                activeFilter === 'contested'
+                  ? 'bg-amber-400 text-black shadow-lg shadow-amber-400/30 font-bold'
+                  : 'bg-[#090e1c]/85 text-amber-300 border border-amber-500/30'
+              }`}
+            >
+              ⚖️ Reviews ({contestedCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveFilter('dormant')}
+              className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold backdrop-blur-md transition-all active:scale-95 ${
+                activeFilter === 'dormant'
+                  ? 'bg-slate-300 text-black shadow-lg font-bold'
+                  : 'bg-[#090e1c]/85 text-slate-400 border border-white/10'
+              }`}
+            >
+              👻 Dormant ({dormantCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveFilter('homeland')}
+              className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold backdrop-blur-md transition-all active:scale-95 ${
+                activeFilter === 'homeland'
+                  ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/30 font-bold'
+                  : 'bg-[#090e1c]/85 text-slate-300 border border-white/10 hover:border-white/20'
+              }`}
+            >
+              🌿 Homeland
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const anioma = BEYOND_SOUTHEAST_REGIONS.find((r) => r.id === 'delta-anioma');
+                if (anioma) mapRef.current?.highlightRegion(anioma.lgas.map((l) => l.code), anioma.center, anioma.zoom);
+              }}
+              className="shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#090e1c]/85 text-emerald-300 border border-emerald-500/30 backdrop-blur-md active:scale-95 hover:border-emerald-500/60"
+            >
+              🏛️ Anioma (Delta)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const benue = BEYOND_SOUTHEAST_REGIONS.find((r) => r.id === 'benue-borderlands');
+                if (benue) mapRef.current?.highlightRegion(benue.lgas.map((l) => l.code), benue.center, benue.zoom);
+              }}
+              className="shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#090e1c]/85 text-emerald-300 border border-emerald-500/30 backdrop-blur-md active:scale-95 hover:border-emerald-500/60"
+            >
+              📍 Benue Borderlands
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const rivers = BEYOND_SOUTHEAST_REGIONS.find((r) => r.id === 'rivers-upland');
+                if (rivers) mapRef.current?.highlightRegion(rivers.lgas.map((l) => l.code), rivers.center, rivers.zoom);
+              }}
+              className="shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#090e1c]/85 text-emerald-300 border border-emerald-500/30 backdrop-blur-md active:scale-95 hover:border-emerald-500/60"
+            >
+              🌊 Rivers Mainland
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowDensity((prev) => !prev)}
+              className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold backdrop-blur-md transition-all active:scale-95 ${
+                showDensity
+                  ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/30 font-bold'
+                  : 'bg-[#090e1c]/85 text-slate-300 border border-white/10 hover:border-white/20'
+              }`}
+            >
+              🔥 Density ({showDensity ? 'On' : 'Off'})
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowLandmarks((prev) => !prev)}
+              className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold backdrop-blur-md transition-all active:scale-95 ${
+                showLandmarks
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                  : 'bg-[#090e1c]/85 text-slate-400 border border-white/10'
+              }`}
+            >
+              🏪 Markets ({showLandmarks ? 'On' : 'Off'})
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowWaterways((prev) => !prev)}
+              className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold backdrop-blur-md transition-all active:scale-95 ${
+                showWaterways
+                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
+                  : 'bg-[#090e1c]/85 text-slate-400 border border-white/10'
+              }`}
+            >
+              🌊 Rivers ({showWaterways ? 'On' : 'Off'})
+            </button>
+          </div>
+
+          {/* Row 2: Dialect Continuum & Transition Zones Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pointer-events-auto max-w-[calc(100vw-120px)] sm:max-w-[calc(100vw-450px)]">
+            <div className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#090e1c]/90 border border-white/10 text-[10px] font-mono text-slate-400 shadow-md">
+              <Sparkles className="w-3 h-3 text-amber-400" />
+              <span>Dialect Continua:</span>
+            </div>
+
+            {Object.values(DIALECT_CLUSTERS).map((cluster) => {
+              const isActive = selectedDialect === cluster.id;
+              return (
+                <button
+                  key={cluster.id}
+                  type="button"
+                  onClick={() => {
+                    if (isActive) {
+                      setSelectedDialect(null);
+                      setShowDialects(false);
+                    } else {
+                      setSelectedDialect(cluster.id);
+                      setShowDialects(true);
+                      mapRef.current?.highlightDialectCluster(cluster);
+                      setIsSidebarCollapsed(false);
+                      setMobileSheetState('half');
+                    }
+                  }}
+                  className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold backdrop-blur-md transition-all active:scale-95 flex items-center gap-1.5 ${
+                    isActive
+                      ? 'shadow-lg border ring-1 font-bold'
+                      : 'bg-[#090e1c]/85 text-slate-300 border border-white/10 hover:border-white/25 hover:text-white'
+                  }`}
+                  style={{
+                    borderColor: isActive ? cluster.color : undefined,
+                    backgroundColor: isActive ? `${cluster.color}33` : undefined,
+                    color: isActive ? '#ffffff' : undefined,
+                    boxShadow: isActive ? `0 0 12px ${cluster.color}40` : undefined,
+                  }}
+                  title={`${cluster.name} (${cluster.igboName}): "${cluster.sampleGreeting}" - Covering ${cluster.states.join(', ')}`}
+                >
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cluster.color }} />
+                  <span>{cluster.name.split('/')[0].trim()}</span>
+                  {isActive && <span className="text-[9px] font-mono px-1 rounded bg-white/20">Active</span>}
+                </button>
+              );
+            })}
+
+            {selectedDialect && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedDialect(null);
+                  setShowDialects(false);
+                }}
+                className="shrink-0 px-2.5 py-1 rounded-full text-[10px] font-mono text-slate-300 hover:text-white bg-white/10 border border-white/20 flex items-center gap-1 transition-all"
+              >
+                <X className="w-3 h-3 text-slate-400" />
+                <span>Reset</span>
+              </button>
+            )}
+          </div>
         </div>
 
         <MapContainer
@@ -314,6 +390,7 @@ export default function HomePage() {
           showWaterways={showWaterways}
           showLandmarks={showLandmarks}
           showDialects={showDialects}
+          activeDialectCluster={selectedDialect}
           showMigrationArcs={showMigrationArcs}
           showHistoricalOverlay={showHistoricalOverlay}
           historicalOpacity={historicalOpacity}

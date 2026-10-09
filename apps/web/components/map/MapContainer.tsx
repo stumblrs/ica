@@ -67,6 +67,7 @@ interface MapContainerProps {
   showWaterways?: boolean;
   showLandmarks?: boolean;
   showDialects?: boolean;
+  activeDialectCluster?: string | null;
   showMigrationArcs?: boolean;
   showHistoricalOverlay?: boolean;
   historicalOpacity?: number;
@@ -114,6 +115,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
     showWaterways = true,
     showLandmarks = true,
     showDialects = false,
+    activeDialectCluster = null,
     showMigrationArcs = false,
     showHistoricalOverlay = false,
     historicalOpacity = 0.45,
@@ -540,6 +542,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
       // Fly to approximate center of dialect cluster based on state
       const clusterCenters: Record<string, [number, number]> = {
         waawa: [7.45, 6.6],
+        northeastern: [8.05, 6.25],
         central: [7.15, 5.5],
         anioma: [6.45, 6.1],
         southern: [6.95, 4.95],
@@ -1620,6 +1623,36 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
       if (map.current!.getLayer(l)) map.current!.setLayoutProperty(l, 'visibility', v);
     });
   }, [showDialects, loaded]);
+
+  // Active Dialect Cluster highlighting effect
+  useEffect(() => {
+    if (!loaded || !map.current) return;
+
+    if (!activeDialectCluster) {
+      if (map.current.getLayer('dialect-fill')) {
+        map.current.setPaintProperty('dialect-fill', 'fill-opacity', 0.12);
+      }
+      if (map.current.getLayer('dialect-outline')) {
+        map.current.setPaintProperty('dialect-outline', 'line-width', 1.6);
+      }
+      return;
+    }
+
+    if (map.current.getLayer('dialect-fill')) {
+      map.current.setPaintProperty('dialect-fill', 'fill-opacity', [
+        'case',
+        ['==', ['get', 'id'], activeDialectCluster], 0.38,
+        0.05,
+      ]);
+    }
+    if (map.current.getLayer('dialect-outline')) {
+      map.current.setPaintProperty('dialect-outline', 'line-width', [
+        'case',
+        ['==', ['get', 'id'], activeDialectCluster], 3.2,
+        1.2,
+      ]);
+    }
+  }, [activeDialectCluster, loaded]);
 
   // Migration arcs visibility effect
   useEffect(() => {
