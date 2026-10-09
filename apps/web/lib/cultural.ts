@@ -37,12 +37,12 @@ export const DIALECT_CLUSTERS: Record<string, DialectCluster> = {
   },
   central: {
     id: 'central',
-    name: 'Central / Standard Igbo Core',
+    name: 'Central & Etiti Igbo Continuum',
     igboName: 'Igbo Izugbe & Etiti',
     description: 'Owerri, Umuahia, Okigwe, Orlu, Mbaise, Ngwa & Bende. Bedrock for modern standard literary Igbo formalized by Dr. S.E. Onwu committee.',
     color: '#10b981', // Emerald
     states: ['Imo', 'Abia'],
-    features: ['Owerri cultural axis', 'Umuahia historical hub', 'Mbaise cultural hearth', 'Aba commercial heartland'],
+    features: ['Owerri cultural axis', 'Umuahia historical hub', 'Mbaise cultural hearth', 'Aba commercial hub'],
     sampleGreeting: 'Ndewo nwanne m / Kedụ ka ị mere?',
   },
   anioma: {
@@ -328,7 +328,7 @@ export const ANCESTRAL_MIGRATION_ARCS: MigrationArc[] = [
   {
     id: 'opobo-jaja-founding',
     name: 'King Jaja Opobo Kingdom Founding Corridor',
-    origin: { name: 'Amaigbo (Heartland Origin)', coordinates: [7.0851, 5.6724] },
+    origin: { name: 'Amaigbo (Ancestral Hearth)', coordinates: [7.0851, 5.6724] },
     destination: { name: 'Opobo Town (Imo River Estuary)', coordinates: [7.5412, 4.5189] },
     era: '1869–1870 AD (King Jaja)',
     description: 'Founding of the Opobo Kingdom by King Jaja of Amaigbo with 14 royal chieftaincy houses, establishing Igbo as the official court and market tongue across the coastal delta.',
@@ -427,7 +427,7 @@ export function getDialectForLocation(stateName?: string, lgaName?: string): Dia
   const s = stateName.toLowerCase();
   const l = (lgaName || '').toLowerCase();
 
-  // 1. Core Southeast Homeland States
+  // 1. Southeast Regional States
   if (
     s.includes('anambra') ||
     l.includes('onitsha') ||

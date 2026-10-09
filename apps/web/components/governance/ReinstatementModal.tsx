@@ -116,7 +116,7 @@ export function ReinstatementModal({ community, onClose, onSuccess }: Reinstatem
             </div>
             <h3 className="text-base font-bold text-white">Reinstatement Petition Active!</h3>
             <p className="text-xs text-slate-300 max-w-xs">
-              {community.name} is now open for community restoration review. When quorum endorses the petition, it will automatically return to active core status!
+              {community.name} is now open for community restoration review. When quorum endorses the petition, it will automatically return to active verified status!
             </p>
           </div>
         ) : (

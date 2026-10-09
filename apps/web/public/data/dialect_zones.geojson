@@ -100,7 +100,7 @@
       "id": "central",
       "properties": {
         "id": "central",
-        "name": "Central / Standard Igbo Core",
+        "name": "Central & Etiti Igbo Continuum",
         "igboName": "Igbo Izugbe & Etiti",
         "color": "#10b981"
       },
@@ -303,7 +303,7 @@
       "type": "Feature",
       "properties": {
         "id": "central",
-        "name": "Central / Standard Igbo Core",
+        "name": "Central & Etiti Igbo Continuum",
         "igboName": "Igbo Izugbe & Etiti",
         "color": "#10b981"
       },

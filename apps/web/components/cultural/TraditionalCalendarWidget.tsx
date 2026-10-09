@@ -81,7 +81,7 @@ export function TraditionalCalendarWidget({
         </div>
 
         <p className="text-[11px] text-slate-400 leading-relaxed mb-3">
-          Presided by <strong className="text-slate-200">{todayMarket.spirit}</strong>. Communities holding their core market on {todayMarket.name} are active in commerce today.
+          Presided by <strong className="text-slate-200">{todayMarket.spirit}</strong>. Communities holding their primary traditional market on {todayMarket.name} are active in commerce today.
         </p>
 
         {/* 4-Day Cycle Track */}

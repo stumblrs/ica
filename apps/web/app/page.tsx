@@ -28,7 +28,7 @@ import { AtlasOverview, type CommunitySummary, type AtlasTab } from '@/component
 import type { MapContainerHandle, SelectedFeature, BasemapMode, FilterDotType } from '@/components/map/MapContainer';
 import { AddCommunityModal } from '@/components/forms/AddCommunityModal';
 import { SE_STATE_CODES, IGBO_IDENTIFIED_LGAS, BEYOND_SOUTHEAST_REGIONS } from '@/lib/geo';
-import { DIALECT_CLUSTERS } from '@/lib/cultural';
+import { DIALECT_CLUSTERS, getIgboMarketDay, IGBO_MARKET_DAYS } from '@/lib/cultural';
 
 const MapContainer = dynamic(() => import('@/components/map/MapContainer'), {
   ssr: false,
@@ -64,6 +64,7 @@ export default function HomePage() {
   const [activeFilter, setActiveFilter] = useState<FilterDotType>('all');
   const [selectedDialect, setSelectedDialect] = useState<string | null>(null);
   const [selectedMarketFilter, setSelectedMarketFilter] = useState<string | null>(null);
+  const todayMarket = useMemo(() => getIgboMarketDay(new Date()), []);
   const [pendingModal, setPendingModal] = useState<{
     coords: { lon: number; lat: number };
     name: string;
@@ -222,6 +223,11 @@ export default function HomePage() {
                   {selectedDialect}
                 </span>
               )}
+              {selectedMarketFilter && (
+                <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-mono capitalize">
+                  {selectedMarketFilter} Market
+                </span>
+              )}
             </button>
           </div>
         ) : (
@@ -356,6 +362,18 @@ export default function HomePage() {
             >
               🌊 Rivers ({showWaterways ? 'On' : 'Off'})
             </button>
+            <button
+              type="button"
+              onClick={() => setShowMigrationArcs((prev) => !prev)}
+              className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold backdrop-blur-md transition-all active:scale-95 ${
+                showMigrationArcs
+                  ? 'bg-amber-400 text-black shadow-lg shadow-amber-400/30 font-bold'
+                  : 'bg-[#090e1c]/85 text-slate-300 border border-white/10 hover:border-white/20'
+              }`}
+              title="Pre-colonial migration corridors and ancient trade axes"
+            >
+              🏹 Migrations ({showMigrationArcs ? 'On' : 'Off'})
+            </button>
           </div>
 
           {/* Row 2: Dialect Continuum & Transition Zones Filter Pills */}
@@ -414,6 +432,66 @@ export default function HomePage() {
               >
                 <X className="w-3 h-3 text-slate-400" />
                 <span>Reset</span>
+              </button>
+            )}
+          </div>
+
+          {/* Row 3: Traditional 4-Day Market Cycle (Izu) Filter */}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pointer-events-auto w-full max-w-full pr-4 sm:pr-8">
+            <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#090e1c]/90 border border-amber-500/30 text-[10px] font-mono text-amber-300 shadow-md">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              <span>Taata: <strong>{todayMarket.name}</strong> {todayMarket.symbol}</span>
+              <span className="text-[9px] text-amber-400/70 font-sans hidden sm:inline">({todayMarket.element.split('/')[0].trim()})</span>
+            </div>
+
+            {IGBO_MARKET_DAYS.map((d, idx) => {
+              const isSelected = selectedMarketFilter === d.name;
+              const isToday = idx === todayMarket.index;
+              return (
+                <button
+                  key={d.name}
+                  type="button"
+                  onClick={() => {
+                    const next = isSelected ? null : d.name;
+                    setSelectedMarketFilter(next);
+                    setShowLandmarks(true);
+                    mapRef.current?.filterLandmarksByMarketDay(next);
+                  }}
+                  className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold backdrop-blur-md transition-all active:scale-95 flex items-center gap-1.5 ${
+                    isSelected
+                      ? 'bg-amber-400 text-black font-bold shadow-lg shadow-amber-400/30 ring-1 ring-amber-300'
+                      : isToday
+                      ? 'bg-amber-500/15 text-amber-300 border border-amber-500/40 hover:bg-amber-500/25'
+                      : 'bg-[#090e1c]/85 text-slate-300 border border-white/10 hover:border-white/25 hover:text-white'
+                  }`}
+                  title={`${d.name} Market Cycle (${d.spirit}): ${d.element}`}
+                >
+                  <span>{d.symbol}</span>
+                  <span>{d.name}</span>
+                  {isToday && (
+                    <span className={`text-[8px] font-mono uppercase px-1 rounded ${isSelected ? 'bg-black/20 text-black' : 'bg-amber-400/20 text-amber-300'}`}>
+                      Today
+                    </span>
+                  )}
+                  {isSelected && (
+                    <span className="text-[9px] font-mono font-bold">✓</span>
+                  )}
+                </button>
+              );
+            })}
+
+            {selectedMarketFilter && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedMarketFilter(null);
+                  mapRef.current?.filterLandmarksByMarketDay(null);
+                }}
+                className="shrink-0 px-2.5 py-1 rounded-full text-[10px] font-mono text-amber-300 hover:text-white bg-amber-500/20 border border-amber-500/40 flex items-center gap-1 transition-all"
+                title="Clear market day filter"
+              >
+                <X className="w-3 h-3" />
+                <span>Clear ({selectedMarketFilter})</span>
               </button>
             )}
           </div>

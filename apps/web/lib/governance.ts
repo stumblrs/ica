@@ -353,7 +353,7 @@ export async function castVote(data: {
             communityId: inquiry.communityId,
             deviceId,
             action: 'REINSTATED',
-            summary: `Reinstatement approved by community quorum (${updatedVotesFor} for restoration). Settlement returned to active atlas core.`,
+            summary: `Reinstatement approved by community quorum (${updatedVotesFor} for restoration). Settlement returned to active atlas registry.`,
           },
         });
       } else if (againstRatio >= 0.6) {

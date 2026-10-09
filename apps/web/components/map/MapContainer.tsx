@@ -345,7 +345,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           markerColor,
           colorLabel: isSE ? 'Southeast Igbo Homeland' : isIdentifiedLga ? 'Identified Igbo LGA (Anioma / Rivers)' : 'Regional Administrative LGA',
           colorExplanation: isSE
-            ? 'Located in the Southeast geopolitical zone (core Igbo homeland).'
+            ? 'Located in the Southeast geopolitical zone.'
             : isIdentifiedLga
             ? 'Documented Igbo-identifying LGA outside the Southeast with cultural and linguistic Igbo heritage.'
             : 'Administrative Local Government Area within Nigeria.',
@@ -491,7 +491,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           placeType: 'State (Igbo Homeland)',
           markerColor: '#10b981',
           colorLabel: 'Southeast Igbo Homeland (100% Baseline)',
-          colorExplanation: `${stateInfo.name} State is in the Southeast geopolitical zone, forming the core contiguous Igbo homeland.`,
+          colorExplanation: `${stateInfo.name} State is in the Southeast geopolitical zone, contiguous with neighboring Igbo-speaking communities.`,
           whyMarked: `Authoritative administrative state boundary comprising ${stateInfo.lgasCount} LGAs. Capital: ${stateInfo.capital}.`,
           historicalNotes: stateInfo.historicalSummary,
           dialect: stateInfo.dialects,
@@ -581,17 +581,33 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         }
       } else {
         const lowerDay = dayName.toLowerCase();
-        // Match marketplace features containing the market day in their name
-        const dayFilter: any = [
-          'any',
-          ['in', lowerDay, ['downcase', ['coalesce', ['get', 'name'], '']]],
-          ['in', lowerDay, ['downcase', ['coalesce', ['get', 'name_latin'], '']]],
-        ];
+        let terms = [lowerDay];
+        if (lowerDay.includes('orie') || lowerDay.includes('oye')) {
+          terms = ['orie', 'oye'];
+        } else if (lowerDay.includes('af')) {
+          terms = ['afor', 'afọ', 'afo'];
+        } else if (lowerDay.includes('nkw')) {
+          terms = ['nkwo', 'nkwọ'];
+        } else if (lowerDay.includes('eke')) {
+          terms = ['eke'];
+        }
+
+        const checks = terms.flatMap((term) => [
+          ['in', term, ['downcase', ['coalesce', ['get', 'name'], '']]],
+          ['in', term, ['downcase', ['coalesce', ['get', 'name_latin'], '']]],
+        ]);
+
+        const dayFilter: any = ['any', ...checks];
         if (map.current.getLayer('landmarks-points')) {
           map.current.setFilter('landmarks-points', dayFilter);
         }
         if (map.current.getLayer('landmarks-labels')) {
           map.current.setFilter('landmarks-labels', dayFilter);
+        }
+
+        // If zoom is less than 8, zoom in so traditional market points and labels are visible
+        if (map.current.getZoom() < 8) {
+          map.current.flyTo({ center: [7.2, 5.8], zoom: 8.2, essential: true });
         }
       }
     },
@@ -1975,8 +1991,8 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           <div className="space-y-1 mb-2.5">
             <div className="h-2 w-full rounded-full bg-gradient-to-r from-emerald-950 via-emerald-500 via-amber-400 to-amber-500 shadow-inner" />
             <div className="flex justify-between text-[9px] font-mono font-medium text-slate-400">
-              <span>Borderland / Continuum</span>
-              <span>Dense Homeland Core</span>
+              <span>Dispersed Settlements</span>
+              <span>Dense Settlement Cluster</span>
             </div>
           </div>
 

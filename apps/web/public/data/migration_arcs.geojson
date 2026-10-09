@@ -1183,7 +1183,7 @@
       "properties": {
         "id": "opobo-jaja-founding",
         "name": "King Jaja Opobo Founding Corridor",
-        "originName": "Amaigbo (Heartland Hearth)",
+        "originName": "Amaigbo (Ancestral Hearth)",
         "destinationName": "Opobo Town (Imo Estuary)",
         "era": "1869–1870 AD",
         "description": "Founding of the Opobo Kingdom by King Jaja of Amaigbo, creating an Igbo mercantile and court power on the Atlantic.",
@@ -1304,7 +1304,7 @@
       "properties": {
         "id": "opobo-jaja-founding",
         "name": "Opobo Town (Imo Estuary)",
-        "originName": "Amaigbo (Heartland Hearth)",
+        "originName": "Amaigbo (Ancestral Hearth)",
         "destinationName": "Opobo Town (Imo Estuary)",
         "era": "1869–1870 AD",
         "description": "Founding of the Opobo Kingdom by King Jaja of Amaigbo, creating an Igbo mercantile and court power on the Atlantic.",
@@ -1597,6 +1597,167 @@
         "coordinates": [
           8.1345,
           7.1892
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "eri-aguleri-lineage",
+      "properties": {
+        "id": "eri-aguleri-lineage",
+        "name": "Eri Ancestral Genesis & Omambala Hearth",
+        "originName": "Eri Hearth (Eri-Aka, Aguleri)",
+        "destinationName": "Nri & Igbariam Valleys",
+        "era": "Ancient Antiquity (c. 10th Century BC – 900 AD)",
+        "description": "Ancestral genesis traditions of the Umueri and Umunri clans, establishing bronze metallurgy, agricultural covenants, and the sacred Eze Nri stool.",
+        "color": "#10b981"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            6.8865,
+            6.3421
+          ],
+          [
+            6.89117,
+            6.34118
+          ],
+          [
+            6.89585,
+            6.34021
+          ],
+          [
+            6.90052,
+            6.33912
+          ],
+          [
+            6.90519,
+            6.33786
+          ],
+          [
+            6.90987,
+            6.33638
+          ],
+          [
+            6.91454,
+            6.33463
+          ],
+          [
+            6.91921,
+            6.33255
+          ],
+          [
+            6.92389,
+            6.33011
+          ],
+          [
+            6.92856,
+            6.32726
+          ],
+          [
+            6.93323,
+            6.32397
+          ],
+          [
+            6.93791,
+            6.3202
+          ],
+          [
+            6.94258,
+            6.31593
+          ],
+          [
+            6.94725,
+            6.31114
+          ],
+          [
+            6.95193,
+            6.30582
+          ],
+          [
+            6.9566,
+            6.29995
+          ],
+          [
+            6.96127,
+            6.29353
+          ],
+          [
+            6.96595,
+            6.28657
+          ],
+          [
+            6.97062,
+            6.27907
+          ],
+          [
+            6.97529,
+            6.27105
+          ],
+          [
+            6.97997,
+            6.26253
+          ],
+          [
+            6.98464,
+            6.25354
+          ],
+          [
+            6.98931,
+            6.2441
+          ],
+          [
+            6.99399,
+            6.23426
+          ],
+          [
+            6.99866,
+            6.22405
+          ],
+          [
+            7.00333,
+            6.21352
+          ],
+          [
+            7.00801,
+            6.20271
+          ],
+          [
+            7.01268,
+            6.19168
+          ],
+          [
+            7.01735,
+            6.18048
+          ],
+          [
+            7.02203,
+            6.16917
+          ],
+          [
+            7.0267,
+            6.1578
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "eri-aguleri-lineage",
+        "name": "Eri Hearth (Eri-Aka, Aguleri)",
+        "originName": "Eri Hearth (Eri-Aka, Aguleri)",
+        "destinationName": "Nri & Igbariam Valleys",
+        "era": "Ancient Antiquity",
+        "description": "Ancestral genesis hearth along the Omambala River basin.",
+        "color": "#10b981"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.8865,
+          6.3421
         ]
       }
     }
