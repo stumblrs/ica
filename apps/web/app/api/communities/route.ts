@@ -112,38 +112,75 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const newRecord = await prisma.community.create({
-      data: {
-        id: 'comm-' + Date.now(),
-        name: name.trim(),
-        type,
-        description: description?.trim() || null,
-        latitude,
-        longitude,
-        stateId: resolveData.state.code,
-        stateName: resolveData.state.name,
-        lgaId: resolveData.lga.code,
-        lgaName: resolveData.lga.name,
-        identityStatus,
-        languageStatus: languageStatus?.trim() || null,
-        historicalStatus: historicalStatus?.trim() || null,
-        verificationStatus: 'pending', // Defaults to pending
-        lifecycleStatus: 'ACTIVE',
-        confidence: 0.5,
-        evidenceJson: evidence
-          ? JSON.stringify([
-              {
-                id: 'ev-' + Date.now(),
-                sourceType: evidence.sourceType,
-                citationOrUrl: evidence.citationOrUrl || null,
-                description: evidence.description,
-                isVerified: false,
-              },
-            ])
-          : null,
-        confirmationsCount: 0,
-        challengesCount: 0,
-      },
+    // Guard against erroneous states (Section 12.1 integrity)
+    if (
+      resolveData.state.code === 'NG032' ||
+      resolveData.state.name?.toLowerCase().includes('plateau') ||
+      resolveData.state.code === 'NG002' ||
+      resolveData.state.name?.toLowerCase().includes('adamawa')
+    ) {
+      return NextResponse.json(
+        { error: 'Specified coordinates fall within Plateau or Adamawa State, which are outside the Igbo cultural baseline and borderland contact zones.' },
+        { status: 422 }
+      );
+    }
+
+    const deviceId = req.headers.get('x-device-id') || body.deviceId || null;
+
+    // Ensure client device profile exists if deviceId is provided
+    if (deviceId) {
+      await prisma.device.upsert({
+        where: { id: deviceId },
+        update: { lastActiveAt: new Date() },
+        create: { id: deviceId, trustScore: 100 },
+      });
+    }
+
+    const newRecord = await prisma.$transaction(async (tx) => {
+      const community = await tx.community.create({
+        data: {
+          id: 'comm-' + Date.now(),
+          name: name.trim(),
+          type,
+          description: description?.trim() || null,
+          latitude,
+          longitude,
+          stateId: resolveData.state.code,
+          stateName: resolveData.state.name,
+          lgaId: resolveData.lga.code,
+          lgaName: resolveData.lga.name,
+          identityStatus,
+          languageStatus: languageStatus?.trim() || null,
+          historicalStatus: historicalStatus?.trim() || null,
+          verificationStatus: 'pending', // Defaults to pending
+          lifecycleStatus: 'ACTIVE',
+          confidence: 0.5,
+          evidenceJson: evidence
+            ? JSON.stringify([
+                {
+                  id: 'ev-' + Date.now(),
+                  sourceType: evidence.sourceType,
+                  citationOrUrl: evidence.citationOrUrl || null,
+                  description: evidence.description,
+                  isVerified: false,
+                },
+              ])
+            : null,
+          confirmationsCount: 0,
+          challengesCount: 0,
+        },
+      });
+
+      await tx.communityAuditLog.create({
+        data: {
+          communityId: community.id,
+          deviceId: deviceId || null,
+          action: 'CREATED',
+          summary: `Community submission '${community.name}' registered for verification in ${community.lgaName}, ${community.stateName}.`,
+        },
+      });
+
+      return community;
     });
 
     return NextResponse.json(

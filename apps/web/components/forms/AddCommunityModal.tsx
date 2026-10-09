@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, MapPin, ShieldAlert, CheckCircle, AlertTriangle } from 'lucide-react';
 import { CommunityType, IdentityStatus, EvidenceSourceType } from '@/lib/types';
+import { getOrCreateDeviceId } from '@/lib/device';
 
 interface AddCommunityModalProps {
   coordinates: { lon: number; lat: number } | null;
@@ -53,13 +54,18 @@ export function AddCommunityModal({
     setError(null);
 
     try {
+      const deviceId = getOrCreateDeviceId();
       const res = await fetch('/api/communities', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-device-id': deviceId,
+        },
         body: JSON.stringify({
           name: name.trim(),
           type,
           identityStatus,
+          deviceId,
           description: description.trim() || undefined,
           languageStatus: languageStatus.trim() || undefined,
           historicalStatus: historicalStatus.trim() || undefined,

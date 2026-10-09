@@ -79,3 +79,20 @@ export async function POST(
     return NextResponse.json({ error: 'Server error: ' + err.message }, { status: 500 });
   }
 }
+
+/**
+ * DELETE /api/communities/:id - Remove community record
+ */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params;
+    await prisma.community.delete({ where: { id } });
+    return NextResponse.json({ success: true, deletedId: id });
+  } catch (err: any) {
+    return NextResponse.json({ error: 'Server error: ' + err.message }, { status: 500 });
+  }
+}
+
