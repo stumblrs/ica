@@ -200,7 +200,7 @@ export default function HomePage() {
         {/* Floating Quick Filter Pills (Dual-row glassmorphic scrollers) */}
         <div className="absolute top-2 left-0 right-0 z-20 px-3 py-1 flex flex-col gap-1.5 pointer-events-none">
           {/* Row 1: Primary Status & Geographic Focal Zones */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pointer-events-auto max-w-[calc(100vw-120px)] sm:max-w-[calc(100vw-450px)]">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pointer-events-auto w-full max-w-full pr-4 sm:pr-8">
             <button
               type="button"
               onClick={() => setActiveFilter('all')}
@@ -322,7 +322,7 @@ export default function HomePage() {
           </div>
 
           {/* Row 2: Dialect Continuum & Transition Zones Filter Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pointer-events-auto max-w-[calc(100vw-120px)] sm:max-w-[calc(100vw-450px)]">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pointer-events-auto w-full max-w-full pr-4 sm:pr-8">
             <div className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#090e1c]/90 border border-white/10 text-[10px] font-mono text-slate-400 shadow-md">
               <Sparkles className="w-3 h-3 text-amber-400" />
               <span>Dialect Continua:</span>

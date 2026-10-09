@@ -1819,7 +1819,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
     <div className="relative w-full h-full min-h-[300px] overflow-hidden bg-[#060911]">
       {/* Placement mode banner */}
       {isAddMode && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 px-3.5 py-1.5 rounded-full bg-slate-950/90 border border-amber-400/50 text-amber-200 text-[11px] font-medium shadow-2xl flex items-center gap-2 whitespace-nowrap">
+        <div className="absolute top-[82px] sm:top-[86px] left-1/2 -translate-x-1/2 z-20 px-3.5 py-1.5 rounded-full bg-slate-950/95 border border-amber-400/50 text-amber-200 text-[11px] font-medium shadow-2xl flex items-center gap-2 whitespace-nowrap">
           <span className="h-2 w-2 rounded-full bg-amber-400 animate-ping" />
           Tap the map where the community is located
           <button type="button" onClick={() => setIsAddMode(false)} className="ml-1 text-amber-300/80 hover:text-white underline underline-offset-2">
@@ -1828,8 +1828,8 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         </div>
       )}
 
-      {/* Modern Basemap Style Toggle & 3D Tilt HUD */}
-      <div className="absolute top-3 right-12 z-20 hidden sm:flex items-center p-0.5 rounded-xl bg-[#090e1c]/85 backdrop-blur-xl border border-white/10 shadow-2xl gap-0.5">
+      {/* Modern Basemap Style Toggle & 3D Tilt HUD (Desktop: positioned below top filter pills) */}
+      <div className="absolute top-[82px] right-3 sm:right-4 z-20 hidden sm:flex items-center p-0.5 rounded-xl bg-[#090e1c]/90 backdrop-blur-xl border border-white/10 shadow-2xl gap-0.5">
         <button
           type="button"
           onClick={() => onBasemapChange?.('dark')}
@@ -1921,7 +1921,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
 
       {/* Dynamic Spatial Presence Heatmap Legend & Disclaimer Card */}
       {showDensity && (
-        <div className="absolute top-16 left-3 sm:left-4 z-20 max-w-[280px] sm:max-w-xs rounded-2xl bg-[#090e1c]/90 backdrop-blur-xl border border-amber-500/30 p-3.5 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-300">
+        <div className="absolute top-[82px] sm:top-[86px] left-3 sm:left-4 z-20 max-w-[280px] sm:max-w-xs rounded-2xl bg-[#090e1c]/90 backdrop-blur-xl border border-amber-500/30 p-3.5 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-300">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
@@ -1957,17 +1957,21 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         </div>
       )}
 
-      {/* Floating Action Controls Stack on Map (Top Right) */}
-      <div className="absolute top-14 right-3 z-20 flex flex-col gap-2 items-center">
-        {/* Mobile Basemap & 3D Drawer Modal Trigger */}
+      {/* Floating Action Controls Stack on Map (Right edge: top-[82px] on mobile, top-[128px] on desktop below HUD) */}
+      <div className="absolute top-[82px] sm:top-[128px] right-3 sm:right-4 z-20 flex flex-col gap-2 items-center">
+        {/* Mobile Basemap, Density & 3D Drawer Modal Trigger */}
         <button
           type="button"
           onClick={() => setShowMobileLayersModal(true)}
-          className="sm:hidden h-9 w-9 rounded-xl bg-[#090e1c]/90 backdrop-blur-xl border border-white/15 text-slate-300 hover:text-white flex items-center justify-center shadow-xl active:scale-95 transition-all"
+          className="sm:hidden h-9 px-2.5 rounded-xl bg-[#090e1c]/90 backdrop-blur-xl border border-white/15 text-slate-300 hover:text-white flex items-center justify-center gap-1.5 shadow-xl active:scale-95 transition-all"
           title="Change Basemap & Perspective"
           aria-label="Change Basemap"
         >
           <Layers className="w-4 h-4 text-emerald-400" />
+          <span className="text-[10px] font-mono font-bold capitalize text-emerald-300">{basemapMode}</span>
+          {(is3D || showDensity) && (
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+          )}
         </button>
 
         {/* GPS Locate Me Button */}
@@ -2003,14 +2007,14 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         </button>
       </div>
 
-      {/* Mobile Basemap & 3D Drawer Modal */}
+      {/* Mobile Basemap, Density & 3D Drawer Modal */}
       {showMobileLayersModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm sm:hidden flex flex-col justify-end p-3 animate-in fade-in duration-200">
           <div className="rounded-2xl bg-[#0a101f] border border-white/15 p-4 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Layers className="w-4 h-4 text-emerald-400" />
-                <span className="text-sm font-bold text-white font-display">Map Style & View</span>
+                <span className="text-sm font-bold text-white font-display">Map Style & View Controls</span>
               </div>
               <button
                 type="button"
@@ -2048,6 +2052,27 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
               ))}
             </div>
 
+            {/* Density Presence Heatmap Toggle for Mobile */}
+            <div className="pt-2 border-t border-white/10 flex items-center justify-between">
+              <div>
+                <span className="block text-xs font-bold text-white">Density Presence Map</span>
+                <span className="block text-[10px] text-slate-400">Multi-spectral spatial heatmap</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => onToggleDensity?.(!showDensity)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  showDensity
+                    ? 'bg-amber-500/25 border border-amber-500/50 text-amber-300'
+                    : 'bg-white/[0.06] border border-white/10 text-slate-300'
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full ${showDensity ? 'bg-amber-400 animate-pulse' : 'bg-slate-500'}`} />
+                <span>{showDensity ? 'Density Active' : 'Enable Density'}</span>
+              </button>
+            </div>
+
+            {/* 3D Perspective Tilt Toggle for Mobile */}
             <div className="pt-2 border-t border-white/10 flex items-center justify-between">
               <div>
                 <span className="block text-xs font-bold text-white">3D Perspective Tilt</span>
