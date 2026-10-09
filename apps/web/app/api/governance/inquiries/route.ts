@@ -45,8 +45,8 @@ export async function POST(request: NextRequest) {
       citations,
       evidenceUrls: evidenceUrls || [],
       clanLineage,
-      quorumThreshold: Number(quorumThreshold) || 15,
-      durationDays: Number(durationDays) || 7,
+      quorumThreshold: quorumThreshold ? Number(quorumThreshold) : undefined,
+      durationDays: durationDays ? Number(durationDays) : undefined,
     });
 
     return NextResponse.json(newInquiry, { status: 201 });

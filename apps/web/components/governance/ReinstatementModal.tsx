@@ -1,8 +1,8 @@
 'use client';
-
 import React, { useState } from 'react';
-import { X, RotateCcw, ShieldCheck, HeartHandshake, Send, CheckCircle2, AlertTriangle, Volume2 } from 'lucide-react';
+import { X, RotateCcw, ShieldCheck, HeartHandshake, Send, CheckCircle2, AlertTriangle, Volume2, Clock, Users } from 'lucide-react';
 import { getOrCreateDeviceId, recordDevicePetition } from '@/lib/device';
+import { getCommunityGovernancePolicy } from '@/lib/governance';
 
 interface ReinstatementModalProps {
   community: {
@@ -10,6 +10,11 @@ interface ReinstatementModalProps {
     name: string;
     lgaName?: string;
     stateName?: string;
+    type?: string;
+    historicalStatus?: string;
+    verificationStatus?: string;
+    confidence?: number;
+    whySignificant?: string;
   };
   onClose: () => void;
   onSuccess: () => void;
@@ -24,6 +29,8 @@ export function ReinstatementModal({ community, onClose, onSuccess }: Reinstatem
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  const policy = getCommunityGovernancePolicy(community);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,8 +61,8 @@ export function ReinstatementModal({ community, onClose, onSuccess }: Reinstatem
           clanLineage: clanLineage.trim(),
           citations: citations.trim() || dialectSample.trim() ? `Dialect Sample: ${dialectSample}. ${citations}` : citations,
           evidenceUrls: evidenceUrl.trim() ? [evidenceUrl.trim()] : [],
-          quorumThreshold: 15,
-          durationDays: 7,
+          quorumThreshold: policy.quorumThreshold,
+          durationDays: policy.durationDays,
           deviceId,
         }),
       });
@@ -90,8 +97,8 @@ export function ReinstatementModal({ community, onClose, onSuccess }: Reinstatem
             <div>
               <h2 className="text-sm font-bold text-white flex items-center gap-2">
                 Petition Reinstatement
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-400/10 text-emerald-300 border border-emerald-400/20">
-                  Reclaim Heritage
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-400/10 text-emerald-300 border border-emerald-400/20 font-semibold">
+                  {policy.badgeLabel}
                 </span>
               </h2>
               <p className="text-[11px] text-slate-400">
@@ -115,8 +122,8 @@ export function ReinstatementModal({ community, onClose, onSuccess }: Reinstatem
               <CheckCircle2 className="w-6 h-6" />
             </div>
             <h3 className="text-base font-bold text-white">Reinstatement Petition Active!</h3>
-            <p className="text-xs text-slate-300 max-w-xs">
-              {community.name} is now open for community restoration review. When quorum endorses the petition, it will automatically return to active verified status!
+            <p className="text-xs text-slate-300 max-w-xs leading-relaxed">
+              <span className="text-emerald-300 font-semibold">{community.name}</span> is now open for community restoration review for {policy.durationDays} days (requiring {policy.quorumThreshold} votes and 60% consensus).
             </p>
           </div>
         ) : (
@@ -215,10 +222,10 @@ export function ReinstatementModal({ community, onClose, onSuccess }: Reinstatem
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex items-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 text-black font-bold text-xs shadow-lg shadow-emerald-500/20 disabled:opacity-50 transition-all"
+                className="flex items-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 text-black font-bold text-xs shadow-lg shadow-emerald-500/20 disabled:opacity-50 transition-all cursor-pointer"
               >
                 <Send className="w-3.5 h-3.5" />
-                <span>{submitting ? 'Submitting Petition...' : 'Submit Reinstatement Petition'}</span>
+                <span>{submitting ? 'Submitting Petition...' : `Submit Reinstatement (${policy.quorumThreshold} Quorum)`}</span>
               </button>
             </div>
           </form>
