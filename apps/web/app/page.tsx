@@ -207,11 +207,11 @@ export default function HomePage() {
             <button
               type="button"
               onClick={() => setIsFiltersCollapsed(false)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#090e1c]/90 hover:bg-[#0f172a] border border-white/15 text-xs font-semibold text-slate-200 shadow-2xl backdrop-blur-xl transition-all active:scale-95 hover:border-emerald-500/40 group"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#090e1c]/90 hover:bg-[#0f172a] border border-white/15 text-xs font-semibold text-slate-200 shadow-2xl backdrop-blur-xl transition-all active:scale-95 hover:border-emerald-500/40 group"
               title="Expand Quick Filters & Dialects (Shortcut: F)"
+              aria-label="Expand Quick Filters"
             >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-400 group-hover:rotate-12 transition-transform" />
-              <span>Filters & Dialects</span>
+              <SlidersHorizontal className="w-4 h-4 text-emerald-400 group-hover:rotate-12 transition-transform" />
               {activeFilter !== 'all' && (
                 <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-mono capitalize">
                   {activeFilter}
@@ -222,7 +222,6 @@ export default function HomePage() {
                   {selectedDialect}
                 </span>
               )}
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors ml-0.5" />
             </button>
           </div>
         ) : (
