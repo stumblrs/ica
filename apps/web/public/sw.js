@@ -1,6 +1,6 @@
 // Igbo Community Atlas - Service Worker
-// Version: 1.2.0 (Updated: 2026-10-09)
-const CACHE_VERSION = 'ica-v1.2.0';
+// Version: 1.3.0 (Updated: 2026-10-10 - Offline Field Mode & Dynamic Cache)
+const CACHE_VERSION = 'ica-v1.3.0';
 const PRECACHE_ASSETS = [
   '/',
   '/manifest.json',
@@ -48,12 +48,39 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Dynamic API routes and version check: Always Network-First (never stale)
+  // 2. Dynamic API routes: Network-First with Cache Storage for offline field mode
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
-      fetch(event.request).catch(() => {
-        return caches.match(event.request);
-      })
+      fetch(event.request)
+        .then((response) => {
+          // Clone and cache atlas dataset responses for field mode
+          if (
+            response.status === 200 &&
+            (url.pathname.includes('/api/map/communities') ||
+              url.pathname.includes('/api/communities') ||
+              url.pathname.includes('/landmarks'))
+          ) {
+            const responseClone = response.clone();
+            caches.open(CACHE_VERSION).then((cache) => {
+              cache.put(event.request, responseClone);
+            });
+          }
+          return response;
+        })
+        .catch(async () => {
+          const cached = await caches.match(event.request);
+          if (cached) return cached;
+          // Also try matching against field pack cache if present
+          if ('caches' in self) {
+            const fieldCache = await caches.open('ica-offline-field-pack');
+            const fieldMatch = await fieldCache.match(event.request);
+            if (fieldMatch) return fieldMatch;
+          }
+          return new Response(JSON.stringify({ error: 'Offline mode active, record not locally cached.' }), {
+            headers: { 'Content-Type': 'application/json' },
+            status: 503,
+          });
+        })
     );
     return;
   }

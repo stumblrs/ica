@@ -29,6 +29,7 @@ import type { MapContainerHandle, SelectedFeature, BasemapMode, FilterDotType } 
 import { AddCommunityModal } from '@/components/forms/AddCommunityModal';
 import { SE_STATE_CODES, IGBO_IDENTIFIED_LGAS, BEYOND_SOUTHEAST_REGIONS } from '@/lib/geo';
 import { DIALECT_CLUSTERS, getIgboMarketDay, IGBO_MARKET_DAYS } from '@/lib/cultural';
+import { getOfflineSettlementsList } from '@/lib/offlineStorage';
 
 const MapContainer = dynamic(() => import('@/components/map/MapContainer'), {
   ssr: false,
@@ -92,9 +93,15 @@ export default function HomePage() {
   const loadCommunities = useCallback(async () => {
     try {
       const res = await fetch('/api/communities', { cache: 'no-store' });
-      if (res.ok) setCommunities(await res.json());
+      if (res.ok) {
+        setCommunities(await res.json());
+      } else {
+        const offlineList = await getOfflineSettlementsList();
+        if (offlineList.length > 0) setCommunities(offlineList);
+      }
     } catch {
-      /* keep previous list */
+      const offlineList = await getOfflineSettlementsList();
+      if (offlineList.length > 0) setCommunities(offlineList);
     }
   }, []);
 
@@ -783,6 +790,8 @@ export default function HomePage() {
               mapRef.current?.filterLandmarksByMarketDay(next);
             }}
             selectedMarketFilter={selectedMarketFilter}
+            onFlyThroughCorridor={(corridorId) => mapRef.current?.startCinematicFlyThrough(corridorId)}
+            onOpenKindredMapping={(community) => mapRef.current?.openKindredMappingModal(undefined, community)}
             activeTab={activeTab}
             onTabChange={setActiveTab}
             hideTopTabs={false}
@@ -1002,6 +1011,14 @@ export default function HomePage() {
                   mapRef.current?.filterLandmarksByMarketDay(next);
                 }}
                 selectedMarketFilter={selectedMarketFilter}
+                onFlyThroughCorridor={(corridorId) => {
+                  setMobileSheetState('peek');
+                  mapRef.current?.startCinematicFlyThrough(corridorId);
+                }}
+                onOpenKindredMapping={(community) => {
+                  setMobileSheetState('peek');
+                  mapRef.current?.openKindredMappingModal(undefined, community);
+                }}
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
                 hideTopTabs={true}

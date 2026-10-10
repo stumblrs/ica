@@ -116,6 +116,8 @@ interface AtlasOverviewProps {
   onSelectDialectCluster?: (cluster: any) => void;
   onFilterMarketDay?: (dayName: string | null) => void;
   selectedMarketFilter?: string | null;
+  onFlyThroughCorridor?: (corridorId: string) => void;
+  onOpenKindredMapping?: (community?: { id: string; name: string }) => void;
   activeTab?: AtlasTab;
   onTabChange?: (tab: AtlasTab) => void;
   hideTopTabs?: boolean;
@@ -185,6 +187,8 @@ export function AtlasOverview(props: AtlasOverviewProps) {
     onSelectDialectCluster,
     onFilterMarketDay,
     selectedMarketFilter,
+    onFlyThroughCorridor,
+    onOpenKindredMapping,
     showDensity = false,
     onToggleDensity,
     activeTab,
@@ -639,6 +643,21 @@ export function AtlasOverview(props: AtlasOverviewProps) {
                           <span className="truncate">Challenge / Delist</span>
                         </button>
                       </div>
+
+                      {/* Micro-Map Kindred (Ụmụnna) & Village Landmarks Trigger */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onOpenKindredMapping?.({
+                            id: selectedFeature.code || '',
+                            name: selectedFeature.name,
+                          });
+                        }}
+                        className="w-full py-2 px-3 rounded-xl bg-teal-500/15 hover:bg-teal-500/25 border border-teal-500/35 text-teal-300 text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-sm"
+                      >
+                        <Landmark className="w-3.5 h-3.5 text-teal-400" />
+                        <span>Micro-Map Kindred (Ụmụnna) & Landmarks</span>
+                      </button>
                     </div>
                   )}
 
@@ -1108,7 +1127,18 @@ export function AtlasOverview(props: AtlasOverviewProps) {
                         {arc.description}
                       </p>
 
-                      <div className="pt-2 border-t border-white/[0.06] flex justify-end">
+                      <div className="pt-2 border-t border-white/[0.06] flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (onFlyThroughCorridor) {
+                              onFlyThroughCorridor(arc.id);
+                            }
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-[10px] font-semibold flex items-center gap-1 transition-all"
+                        >
+                          <span>✈️ Fly in 3D</span>
+                        </button>
                         <button
                           type="button"
                           onClick={() => {
@@ -1247,29 +1277,42 @@ export function AtlasOverview(props: AtlasOverviewProps) {
                           </span>
                         ))}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onFlyTo(corridor.center, corridor.zoom);
-                          onSelectFeature?.({
-                            type: 'landmark',
-                            name: corridor.name,
-                            parentName: `${corridor.basin} Basin`,
-                            coordinates: corridor.center,
-                            placeType: 'Precolonial Waterway Highway',
-                            markerColor: '#0284c7',
-                            colorLabel: 'Waterway Trade Highway',
-                            colorExplanation: corridor.description,
-                            whyMarked: `Navigable trade artery. Route: ${corridor.route}. Key ports: ${corridor.keyPorts.join(', ')}.`,
-                            waterwayContext: corridor.route,
-                            historicalNotes: corridor.description,
-                          });
-                        }}
-                        className="px-2.5 py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-300 text-[10px] font-semibold flex items-center gap-1 transition-colors"
-                      >
-                        <Waves className="w-3 h-3" />
-                        <span>Inspect Corridor</span>
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (onFlyThroughCorridor) {
+                              onFlyThroughCorridor(corridor.id);
+                            }
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-sky-500/25 hover:bg-sky-500/35 border border-sky-500/50 text-sky-200 text-[10px] font-semibold flex items-center gap-1 transition-all"
+                        >
+                          <span>✈️ Fly in 3D</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onFlyTo(corridor.center, corridor.zoom);
+                            onSelectFeature?.({
+                              type: 'landmark',
+                              name: corridor.name,
+                              parentName: `${corridor.basin} Basin`,
+                              coordinates: corridor.center,
+                              placeType: 'Precolonial Waterway Highway',
+                              markerColor: '#0284c7',
+                              colorLabel: 'Waterway Trade Highway',
+                              colorExplanation: corridor.description,
+                              whyMarked: `Navigable trade artery. Route: ${corridor.route}. Key ports: ${corridor.keyPorts.join(', ')}.`,
+                              waterwayContext: corridor.route,
+                              historicalNotes: corridor.description,
+                            });
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-300 text-[10px] font-semibold flex items-center gap-1 transition-colors"
+                        >
+                          <Waves className="w-3 h-3" />
+                          <span>Inspect Corridor</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}

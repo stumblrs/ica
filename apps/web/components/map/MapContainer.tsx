@@ -2,10 +2,13 @@
 
 import React, { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import maplibregl from 'maplibre-gl';
-import { Layers, Crosshair, Loader2, X, Compass, ChevronLeft, ChevronRight, Plus, Minus, Mountain, Play, Pause } from 'lucide-react';
+import { Layers, Crosshair, Loader2, X, Compass, ChevronLeft, ChevronRight, Plus, Minus, Mountain, Play, Pause, Navigation, Landmark as LandmarkIcon } from 'lucide-react';
 import { AddCommunityModal } from '../forms/AddCommunityModal';
+import { CinematicFlyThroughHUD, type FlightCorridorItem, type WaypointInfo } from './CinematicFlyThroughHUD';
+import { KindredMicroMappingModal } from './KindredMicroMappingModal';
+import { getKindredLandmarksOffline, getOfflineCommunitiesGeoJSON, type KindredLandmarkItem } from '@/lib/offlineStorage';
 import { SE_STATE_CODES, SE_STATES, ANIOMA_LGAS, IGBO_IDENTIFIED_LGAS, NIGERIA_BOUNDS, BEYOND_SOUTHEAST_REGIONS } from '@/lib/geo';
-import { calculateNearestWaterway, getDialectForLocation, type DialectCluster } from '@/lib/cultural';
+import { calculateNearestWaterway, getDialectForLocation, type DialectCluster, ANCESTRAL_MIGRATION_ARCS, WATERWAY_TRADE_CORRIDORS } from '@/lib/cultural';
 
 export interface SelectedFeature {
   type: 'state' | 'lga' | 'community' | 'settlement' | 'landmark' | 'migration' | 'region';
@@ -59,6 +62,10 @@ export interface MapContainerHandle {
   start3DOrbit: () => void;
   stop3DOrbit: () => void;
   setPitchPreset: (pitch: number) => void;
+  startCinematicFlyThrough: (corridorId: string) => void;
+  stopCinematicFlyThrough: () => void;
+  openKindredMappingModal: (coords?: { lon: number; lat: number }, community?: { id: string; name: string }) => void;
+  togglePinKindredMode: () => void;
   resize: () => void;
 }
 
@@ -248,6 +255,262 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
       { enableHighAccuracy: true, timeout: 10000 }
     );
   }
+
+  // ── Option 4: Kindred (Ụmụnna) & Village Landmark Micro-Mapping State ──
+  const [isPinningKindred, setIsPinningKindred] = useState(false);
+  const isPinningKindredRef = useRef(false);
+  const [showKindredModal, setShowKindredModal] = useState(false);
+  const [pendingKindredCoords, setPendingKindredCoords] = useState<{ lon: number; lat: number } | null>(null);
+  const [selectedKindredCommunity, setSelectedKindredCommunity] = useState<{ id: string; name: string } | undefined>(undefined);
+
+  const refreshKindredLandmarks = useCallback(async () => {
+    if (!map.current) return;
+    try {
+      const offlineList = await getKindredLandmarksOffline();
+      let features: any[] = [];
+      try {
+        const res = await fetch('/api/landmarks');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.features)) features = [...data.features];
+        }
+      } catch {
+        // Offline: rely purely on local store
+      }
+
+      const existingIds = new Set(features.map((f: any) => f.properties?.id));
+      for (const kl of offlineList) {
+        if (!existingIds.has(kl.id)) {
+          features.push({
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [kl.longitude, kl.latitude] },
+            properties: kl,
+          });
+        }
+      }
+
+      const src = map.current.getSource('kindred-landmarks-source') as maplibregl.GeoJSONSource | undefined;
+      src?.setData({ type: 'FeatureCollection', features } as any);
+    } catch {
+      // Non-fatal
+    }
+  }, []);
+
+  // ── Option 3: 3D Cinematic Migration Corridor Fly-Through Engine ──
+  const [activeFlightCorridor, setActiveFlightCorridor] = useState<FlightCorridorItem | null>(null);
+  const activeFlightCorridorRef = useRef<FlightCorridorItem | null>(null);
+  const [flightWaypointIndex, setFlightWaypointIndex] = useState(0);
+  const flightWaypointIndexRef = useRef(0);
+  const [isFlightPlaying, setIsFlightPlaying] = useState(false);
+  const isFlightPlayingRef = useRef(false);
+  const [flightSpeed, setFlightSpeed] = useState(1);
+  const flightSpeedRef = useRef(1);
+  const [flightBearing, setFlightBearing] = useState(0);
+  const [flightPitch, setFlightPitch] = useState(64);
+  const flightTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const buildFlightCorridor = useCallback((corridorId: string): FlightCorridorItem | null => {
+    const arc = ANCESTRAL_MIGRATION_ARCS.find((a) => a.id === corridorId);
+    if (arc) {
+      const o = arc.origin.coordinates;
+      const d = arc.destination.coordinates;
+      const steps = 6;
+      const waypoints: WaypointInfo[] = [];
+      for (let i = 0; i < steps; i++) {
+        const frac = i / (steps - 1);
+        const lateralCurvature = Math.sin(frac * Math.PI) * 0.08;
+        const lon = o[0] + (d[0] - o[0]) * frac + lateralCurvature;
+        const lat = o[1] + (d[1] - o[1]) * frac;
+        let name = `Waypoint ${i + 1}`;
+        let note = arc.description;
+        if (i === 0) {
+          name = `Departure: ${arc.origin.name}`;
+          note = `Commencing 3D flight at ancestral origin of ${arc.origin.name}. Era: ${arc.era}.`;
+        } else if (i === steps - 1) {
+          name = `Arrival: ${arc.destination.name}`;
+          note = `Approaching ancestral destination hub at ${arc.destination.name}. Diaspora nexus reached.`;
+        } else if (i === 1) {
+          name = 'Ascending Plateau Escarpment';
+          note = 'Climbing the escarpment and navigating ancestral trade pathways.';
+        } else if (i === 2) {
+          name = 'Watershed River Crossing';
+          note = 'Traversing central drainage basin and historic riverine covenants.';
+        } else if (i === 3) {
+          name = 'Settlement Corridor Apex';
+          note = arc.description;
+        } else if (i === 4) {
+          name = 'Approaching Lineage Foothills';
+          note = 'Gliding towards the settlement valley and contiguous kindred groves.';
+        }
+        waypoints.push({
+          name,
+          coords: [lon, lat],
+          note,
+          altitudeMeters: Math.round(1100 + Math.sin(frac * Math.PI) * 1100),
+        });
+      }
+      return {
+        id: arc.id,
+        name: arc.name,
+        type: 'migration',
+        era: arc.era,
+        description: arc.description,
+        waypoints,
+      };
+    }
+
+    const water = WATERWAY_TRADE_CORRIDORS.find((w) => w.id === corridorId);
+    if (water) {
+      const waypoints: WaypointInfo[] = water.keyPorts.map((port, idx) => {
+        const frac = idx / Math.max(1, water.keyPorts.length - 1);
+        const dLon = (frac - 0.5) * 0.35;
+        const dLat = (frac - 0.5) * 0.45;
+        return {
+          name: `Wharf: ${port}`,
+          coords: [water.center[0] + dLon, water.center[1] + dLat],
+          note: `Naval trading port along ${water.basin}. Commodities: ${water.historicalCommodities.join(', ')}.`,
+          altitudeMeters: Math.round(850 + idx * 280),
+        };
+      });
+      return {
+        id: water.id,
+        name: water.name,
+        type: 'waterway',
+        era: 'Pre-Colonial Aquatic Highway',
+        description: water.description,
+        waypoints,
+      };
+    }
+
+    return null;
+  }, []);
+
+  const flyToFlightWaypoint = useCallback((index: number, corridorOverride?: FlightCorridorItem) => {
+    if (!map.current) return;
+    const corridor = corridorOverride || activeFlightCorridorRef.current;
+    if (!corridor || !corridor.waypoints[index]) return;
+
+    setFlightWaypointIndex(index);
+    flightWaypointIndexRef.current = index;
+
+    const currentWp = corridor.waypoints[index];
+    const nextWp = corridor.waypoints[index + 1] || currentWp;
+
+    let targetBearing = map.current.getBearing();
+    if (index < corridor.waypoints.length - 1) {
+      const dLon = nextWp.coords[0] - currentWp.coords[0];
+      const dLat = nextWp.coords[1] - currentWp.coords[1];
+      const rad = Math.atan2(dLon, dLat);
+      targetBearing = (rad * 180) / Math.PI;
+    }
+    setFlightBearing(targetBearing);
+    setFlightPitch(64);
+
+    const dur = Math.max(2500, Math.round(6500 / flightSpeedRef.current));
+
+    map.current.flyTo({
+      center: currentWp.coords,
+      zoom: 11.4,
+      pitch: 64,
+      bearing: targetBearing,
+      duration: dur,
+      curve: 1.15,
+      essential: true,
+    });
+
+    if (flightTimerRef.current) {
+      clearTimeout(flightTimerRef.current);
+      flightTimerRef.current = null;
+    }
+
+    if (isFlightPlayingRef.current) {
+      flightTimerRef.current = setTimeout(() => {
+        if (!isFlightPlayingRef.current) return;
+        const nextIdx = flightWaypointIndexRef.current + 1;
+        if (nextIdx < corridor.waypoints.length) {
+          flyToFlightWaypoint(nextIdx, corridor);
+        } else {
+          setIsFlightPlaying(false);
+          isFlightPlayingRef.current = false;
+        }
+      }, dur + 600);
+    }
+  }, []);
+
+  const startCinematicFlyThrough = useCallback((corridorId: string) => {
+    if (!map.current) return;
+    const corridor = buildFlightCorridor(corridorId);
+    if (!corridor || corridor.waypoints.length === 0) return;
+
+    // 1. Enable 3D Terrain DEM & Atmospheric Sky
+    if (map.current.getSource('terrain-dem')) {
+      map.current.setTerrain({ source: 'terrain-dem', exaggeration: 1.8 });
+    }
+    if (typeof map.current.setSky === 'function') {
+      map.current.setSky({
+        'sky-color': basemapMode === 'light' ? '#38bdf8' : '#030712',
+        'horizon-color': basemapMode === 'light' ? '#bae6fd' : '#0d1527',
+        'fog-color': basemapMode === 'light' ? '#e0f2fe' : '#090e1c',
+        'fog-ground-blend': 0.75,
+        'atmosphere-blend': 0.8,
+      });
+    }
+    setIs3D(true);
+
+    setActiveFlightCorridor(corridor);
+    activeFlightCorridorRef.current = corridor;
+    setIsFlightPlaying(true);
+    isFlightPlayingRef.current = true;
+
+    // Fly to first waypoint
+    flyToFlightWaypoint(0, corridor);
+  }, [basemapMode, buildFlightCorridor, flyToFlightWaypoint]);
+
+  const stopCinematicFlyThrough = useCallback(() => {
+    if (flightTimerRef.current) {
+      clearTimeout(flightTimerRef.current);
+      flightTimerRef.current = null;
+    }
+    setIsFlightPlaying(false);
+    isFlightPlayingRef.current = false;
+    setActiveFlightCorridor(null);
+    activeFlightCorridorRef.current = null;
+
+    if (map.current) {
+      map.current.easeTo({ pitch: is3D ? 52 : 0, bearing: 0, zoom: 8.2, duration: 1200 });
+    }
+  }, [is3D]);
+
+  const togglePlayFlight = useCallback(() => {
+    const next = !isFlightPlaying;
+    setIsFlightPlaying(next);
+    isFlightPlayingRef.current = next;
+
+    if (next && activeFlightCorridorRef.current) {
+      flyToFlightWaypoint(flightWaypointIndexRef.current);
+    } else if (flightTimerRef.current) {
+      clearTimeout(flightTimerRef.current);
+      flightTimerRef.current = null;
+    }
+  }, [isFlightPlaying, flyToFlightWaypoint]);
+
+  const nextFlightWaypoint = useCallback(() => {
+    if (!activeFlightCorridorRef.current) return;
+    const nextIdx = Math.min(activeFlightCorridorRef.current.waypoints.length - 1, flightWaypointIndexRef.current + 1);
+    flyToFlightWaypoint(nextIdx);
+  }, [flyToFlightWaypoint]);
+
+  const prevFlightWaypoint = useCallback(() => {
+    if (!activeFlightCorridorRef.current) return;
+    const prevIdx = Math.max(0, flightWaypointIndexRef.current - 1);
+    flyToFlightWaypoint(prevIdx);
+  }, [flyToFlightWaypoint]);
+
+  const handleFlightSpeedChange = useCallback((spd: number) => {
+    setFlightSpeed(spd);
+    flightSpeedRef.current = spd;
+  }, []);
+
 
   function fitNigeria(animate = true) {
     if (!map.current) return;
@@ -681,6 +944,22 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           map.current.flyTo({ center: [7.2, 5.8], zoom: 8.2, essential: true });
         }
       }
+    },
+    startCinematicFlyThrough(corridorId: string) {
+      startCinematicFlyThrough(corridorId);
+    },
+    stopCinematicFlyThrough() {
+      stopCinematicFlyThrough();
+    },
+    openKindredMappingModal(coords?: { lon: number; lat: number }, community?: { id: string; name: string }) {
+      if (coords) setPendingKindredCoords(coords);
+      if (community) setSelectedKindredCommunity(community);
+      setShowKindredModal(true);
+    },
+    togglePinKindredMode() {
+      const next = !isPinningKindred;
+      setIsPinningKindred(next);
+      isPinningKindredRef.current = next;
     },
     resize() {
       map.current?.resize();
@@ -1344,6 +1623,120 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         },
       });
 
+      // ── Option 4: Kindred (Ụmụnna) & Village Landmarks ──
+      mapInstance.addSource('kindred-landmarks-source', {
+        type: 'geojson',
+        data: '/api/landmarks',
+      });
+
+      mapInstance.addLayer({
+        id: 'kindred-landmarks-glow',
+        type: 'circle',
+        source: 'kindred-landmarks-source',
+        minzoom: 7.5,
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 7.5, 6, 11, 14],
+          'circle-color': [
+            'match',
+            ['get', 'category'],
+            'village_square', '#10b981',
+            'kindred_hall', '#f59e0b',
+            'sacred_grove', '#14b8a6',
+            'heritage_spring', '#06b6d4',
+            'market_post', '#a855f7',
+            'monument', '#ec4899',
+            '#38bdf8'
+          ],
+          'circle-opacity': 0.35,
+          'circle-blur': 0.8,
+        },
+      });
+
+      mapInstance.addLayer({
+        id: 'kindred-landmarks-points',
+        type: 'circle',
+        source: 'kindred-landmarks-source',
+        minzoom: 7.5,
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 7.5, 3.5, 10, 5.5, 12, 7.5],
+          'circle-color': [
+            'match',
+            ['get', 'category'],
+            'village_square', '#10b981',
+            'kindred_hall', '#f59e0b',
+            'sacred_grove', '#14b8a6',
+            'heritage_spring', '#06b6d4',
+            'market_post', '#a855f7',
+            'monument', '#ec4899',
+            '#38bdf8'
+          ],
+          'circle-stroke-width': 1.8,
+          'circle-stroke-color': '#ffffff',
+          'circle-opacity': 0.95,
+        },
+      });
+
+      mapInstance.addLayer({
+        id: 'kindred-landmarks-labels',
+        type: 'symbol',
+        source: 'kindred-landmarks-source',
+        minzoom: 9.0,
+        layout: {
+          'text-field': '{name}',
+          'text-size': ['interpolate', ['linear'], ['zoom'], 9, 9, 11, 11.5],
+          'text-offset': [0, 1.2],
+          'text-anchor': 'top',
+          'text-max-width': 8,
+        },
+        paint: {
+          'text-color': '#a5f3fc',
+          'text-halo-color': '#020617',
+          'text-halo-width': 2.2,
+          'text-halo-blur': 1,
+        },
+      });
+
+      // Hydrate offline kindred landmarks & offline communities from IndexedDB
+      getKindredLandmarksOffline().then((localLandmarks) => {
+        if (localLandmarks && localLandmarks.length > 0) {
+          fetch('/api/landmarks')
+            .then((r) => r.json())
+            .then((remoteGeoJson) => {
+              const features = Array.isArray(remoteGeoJson.features) ? [...remoteGeoJson.features] : [];
+              const existingIds = new Set(features.map((f: any) => f.properties?.id));
+              for (const kl of localLandmarks) {
+                if (!existingIds.has(kl.id)) {
+                  features.push({
+                    type: 'Feature',
+                    geometry: { type: 'Point', coordinates: [kl.longitude, kl.latitude] },
+                    properties: kl,
+                  });
+                }
+              }
+              const src = mapInstance.getSource('kindred-landmarks-source') as maplibregl.GeoJSONSource | undefined;
+              src?.setData({ type: 'FeatureCollection', features } as any);
+            })
+            .catch(() => {
+              const features = localLandmarks.map((kl) => ({
+                type: 'Feature' as const,
+                geometry: { type: 'Point' as const, coordinates: [kl.longitude, kl.latitude] },
+                properties: kl,
+              }));
+              const src = mapInstance.getSource('kindred-landmarks-source') as maplibregl.GeoJSONSource | undefined;
+              src?.setData({ type: 'FeatureCollection', features } as any);
+            });
+        }
+      });
+
+      getOfflineCommunitiesGeoJSON().then((offlineGeo) => {
+        if (offlineGeo && offlineGeo.features?.length > 0) {
+          const src = mapInstance.getSource('communities-source') as maplibregl.GeoJSONSource | undefined;
+          if (src && !navigator.onLine) {
+            src.setData(offlineGeo);
+          }
+        }
+      });
+
       const zoneOf = (stateCode: string, lgaCode?: string): HoverInfo['zone'] =>
         SE_STATE_CODES.includes(stateCode)
           ? 'southeast'
@@ -1359,23 +1752,43 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           zoom: Number(mapInstance.getZoom().toFixed(1)),
         });
 
-        const layers = ['communities-points', 'landmarks-points', 'settlements-points', 'lgas-fill', 'states-fill'].filter(
+        const layers = ['communities-points', 'kindred-landmarks-points', 'landmarks-points', 'settlements-points', 'lgas-fill', 'states-fill'].filter(
           (l) => mapInstance.getLayer(l) && mapInstance.getLayoutProperty(l, 'visibility') !== 'none'
         );
         const feats = mapInstance.queryRenderedFeatures(e.point, { layers });
         const community = feats.find((f) => f.layer.id === 'communities-points');
+        const kindred = feats.find((f) => f.layer.id === 'kindred-landmarks-points');
         const landmark = feats.find((f) => f.layer.id === 'landmarks-points');
         const settlement = feats.find((f) => f.layer.id === 'settlements-points');
         const lga = feats.find((f) => f.layer.id === 'lgas-fill');
         const state = feats.find((f) => f.layer.id === 'states-fill');
 
-        const isDotHovered = Boolean(community || landmark || settlement);
-        mapInstance.getCanvas().style.cursor = isAddActive() ? 'crosshair' : isDotHovered || state || lga ? 'pointer' : '';
+        const isDotHovered = Boolean(community || kindred || landmark || settlement);
+        mapInstance.getCanvas().style.cursor = isAddActive() || isPinningKindredRef.current ? 'crosshair' : isDotHovered || state || lga ? 'pointer' : '';
 
         const stateCode = (state?.properties?.admin1Pcod ?? lga?.properties?.admin1Pcod ?? settlement?.properties?.adm1_pcode ?? landmark?.properties?.adm1_pcode) as string | undefined;
         mapInstance.setFilter('states-hover', ['==', ['get', 'admin1Pcod'], stateCode ?? '']);
 
-        // 1. If hovering a community submission dot
+        // 1. If hovering a kindred landmark dot
+        if (kindred) {
+          const p = kindred.properties as any;
+          setHover({
+            x: e.point.x,
+            y: e.point.y,
+            name: p.name,
+            typeBadge: `ỤMỤNNA: ${(p.category || 'LANDMARK').toUpperCase().replace('_', ' ')}`,
+            state: p.communityName ? `${p.communityName}` : undefined,
+            lga: p.umunnaName ? `Ụmụnna: ${p.umunnaName}` : undefined,
+            zone: 'southeast',
+            colorLabel: 'Cyan: Kindred (Ụmụnna) Landmark',
+            colorBg: 'bg-cyan-500/15',
+            colorBorder: 'border-cyan-500/40',
+            colorText: 'text-cyan-300',
+          });
+          return;
+        }
+
+        // 2. If hovering a community submission dot
         if (community) {
           const p = community.properties as any;
           const isChallenged = p.verification_status === 'challenged';
@@ -1468,6 +1881,14 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
       });
 
       mapInstance.on('click', (e) => {
+        if (isPinningKindredRef.current) {
+          setIsPinningKindred(false);
+          isPinningKindredRef.current = false;
+          setPendingKindredCoords({ lon: e.lngLat.lng, lat: e.lngLat.lat });
+          setShowKindredModal(true);
+          return;
+        }
+
         if (isAddActive()) {
           if (onOpenAddModalRef.current) {
             onOpenAddModalRef.current({ lon: e.lngLat.lng, lat: e.lngLat.lat });
@@ -1479,6 +1900,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
 
         const layers = [
           'communities-points',
+          'kindred-landmarks-points',
           'landmarks-points',
           'settlements-points',
           'migration-lines',
@@ -1488,11 +1910,32 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         ].filter((l) => mapInstance.getLayer(l) && mapInstance.getLayoutProperty(l, 'visibility') !== 'none');
         const feats = mapInstance.queryRenderedFeatures(e.point, { layers });
         const community = feats.find((f) => f.layer.id === 'communities-points');
+        const kindred = feats.find((f) => f.layer.id === 'kindred-landmarks-points');
         const landmark = feats.find((f) => f.layer.id === 'landmarks-points');
         const settlement = feats.find((f) => f.layer.id === 'settlements-points');
         const migrationFeature = feats.find((f) => f.layer.id === 'migration-lines' || f.layer.id === 'migration-hubs');
         const lga = feats.find((f) => f.layer.id === 'lgas-fill');
         const state = feats.find((f) => f.layer.id === 'states-fill');
+
+        if (kindred) {
+          const p = kindred.properties as any;
+          const coords = (kindred.geometry as any)?.coordinates as [number, number] | undefined;
+          if (coords) highlightPoint(coords, '#06b6d4');
+          const nearestRiver = coords ? calculateNearestWaterway(coords[0], coords[1]) : undefined;
+          onSelectRef.current({
+            type: 'landmark',
+            name: p.name,
+            parentName: [p.communityName, p.umunnaName && `Kindred (${p.umunnaName})`].filter(Boolean).join(' • '),
+            coordinates: coords,
+            placeType: `Kindred Landmark (${(p.category || 'heritage').replace('_', ' ')})`,
+            markerColor: '#06b6d4',
+            colorLabel: 'Cyan: Kindred (Ụmụnna) Landmark',
+            colorExplanation: p.description || 'Community-mapped ancestral village square, kindred hall, or sacred grove.',
+            whyMarked: `Documented by native contributors. Category: ${p.category}. Custodian lineage: ${p.umunnaName || 'Communal'}.`,
+            nearestRiver,
+          });
+          return;
+        }
 
         if (community) {
           const p = community.properties as any;
@@ -2122,6 +2565,46 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
               </>
             )}
 
+            {/* 3D Cinematic Fly-Through Trigger */}
+            <button
+              type="button"
+              onClick={() => {
+                if (activeFlightCorridor) {
+                  stopCinematicFlyThrough();
+                } else {
+                  startCinematicFlyThrough('nri-spiritual-expansion');
+                }
+              }}
+              className={`px-2 py-1 rounded-lg text-[10px] font-mono font-medium transition-all flex items-center gap-1 ${
+                activeFlightCorridor
+                  ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-500/50 shadow-sm animate-pulse'
+                  : 'text-slate-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/10'
+              }`}
+              title="3D Cinematic Fly-Through along ancestral migration arcs and waterways"
+            >
+              <Navigation className="w-3 h-3 text-cyan-400" />
+              <span>Fly-Through</span>
+            </button>
+
+            {/* Pin Kindred Landmark Trigger */}
+            <button
+              type="button"
+              onClick={() => {
+                const next = !isPinningKindred;
+                setIsPinningKindred(next);
+                isPinningKindredRef.current = next;
+              }}
+              className={`px-2 py-1 rounded-lg text-[10px] font-mono font-medium transition-all flex items-center gap-1 ${
+                isPinningKindred
+                  ? 'bg-teal-500/30 text-teal-300 border border-teal-500/50 shadow-sm ring-1 ring-teal-400'
+                  : 'text-slate-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/10'
+              }`}
+              title="Click map to micro-map an ancestral village square, kindred hall, or sacred grove"
+            >
+              <LandmarkIcon className="w-3 h-3 text-teal-400" />
+              <span>Pin Kindred</span>
+            </button>
+
             <div className="w-px h-4 bg-white/10 mx-0.5" />
 
             {/* Collapse HUD Button */}
@@ -2412,6 +2895,61 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
 
       {/* Atmospheric Peripheral Map Vignette */}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_55%,rgba(6,9,17,0.75)_100%)] z-10" />
+
+      {/* Active Kindred Landmark Pinning Banner */}
+      {isPinningKindred && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-[#0a0f1d]/95 border border-teal-500/50 rounded-2xl shadow-2xl px-4 py-2 backdrop-blur-xl flex items-center gap-3 animate-pulse">
+          <LandmarkIcon className="w-4 h-4 text-teal-400 shrink-0" />
+          <span className="text-xs text-white font-medium">
+            Click anywhere on the map to place an Ụmụnna square (Obi/Ilo), kindred hall, or sacred grove
+          </span>
+          <button
+            onClick={() => {
+              setIsPinningKindred(false);
+              isPinningKindredRef.current = false;
+            }}
+            className="text-[11px] text-slate-300 hover:text-white px-2 py-0.5 rounded-lg bg-white/10"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* 3D Cinematic Fly-Through Cockpit HUD Overlay */}
+      {activeFlightCorridor && (
+        <CinematicFlyThroughHUD
+          activeCorridor={activeFlightCorridor}
+          currentWaypointIndex={flightWaypointIndex}
+          totalWaypoints={activeFlightCorridor.waypoints.length}
+          isPlaying={isFlightPlaying}
+          bearing={flightBearing}
+          pitch={flightPitch}
+          speed={flightSpeed}
+          onTogglePlay={togglePlayFlight}
+          onNextWaypoint={nextFlightWaypoint}
+          onPrevWaypoint={prevFlightWaypoint}
+          onChangeSpeed={handleFlightSpeedChange}
+          onSelectCorridor={(id) => startCinematicFlyThrough(id)}
+          onExit={stopCinematicFlyThrough}
+        />
+      )}
+
+      {/* Kindred (Ụmụnna) & Village Landmark Micro-Mapping Modal */}
+      {showKindredModal && (
+        <KindredMicroMappingModal
+          isOpen={showKindredModal}
+          initialCoords={pendingKindredCoords || undefined}
+          initialCommunity={selectedKindredCommunity}
+          onClose={() => {
+            setShowKindredModal(false);
+            setPendingKindredCoords(null);
+            setSelectedKindredCommunity(undefined);
+          }}
+          onLandmarkCreated={() => {
+            refreshKindredLandmarks();
+          }}
+        />
+      )}
 
       {pendingCoords && (
         <AddCommunityModal

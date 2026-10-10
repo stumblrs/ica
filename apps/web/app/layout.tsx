@@ -3,6 +3,7 @@ import './globals.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { InstallPrompt } from '@/components/common/InstallPrompt';
 import { UpdatePrompt } from '@/components/common/UpdatePrompt';
+import { OfflineFieldModeIndicator } from '@/components/common/OfflineFieldModeIndicator';
 
 export const metadata: Metadata = {
   title: 'Igbo Community Atlas | Participatory Geographic Database',
@@ -54,6 +55,7 @@ export default function RootLayout({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <OfflineFieldModeIndicator />
             <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-[11px] font-mono text-slate-300">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping"></span>
               <span>37 States • 774 LGAs</span>
