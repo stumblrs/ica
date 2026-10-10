@@ -65,6 +65,16 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (err: any) {
-    return NextResponse.json({ error: 'Failed to generate map geojson: ' + err.message }, { status: 500 });
+    console.error('Database query error in /api/map/communities.geojson:', err);
+    return NextResponse.json(
+      { type: 'FeatureCollection', features: [] },
+      {
+        status: 200,
+        headers: {
+          'x-db-status': 'fallback',
+          'x-db-error': err.message || 'Database unavailable',
+        },
+      }
+    );
   }
 }

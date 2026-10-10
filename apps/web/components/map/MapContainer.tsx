@@ -1093,6 +1093,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
       container: mapContainer.current,
       style: {
         version: 8,
+        glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
         sources: {
           'satellite-tiles': {
             type: 'raster',

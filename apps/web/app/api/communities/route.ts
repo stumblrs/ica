@@ -57,7 +57,14 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(parsed);
   } catch (err: any) {
-    return NextResponse.json({ error: 'Server error: ' + err.message }, { status: 500 });
+    console.error('Database query error in /api/communities:', err);
+    return NextResponse.json([], {
+      status: 200,
+      headers: {
+        'x-db-status': 'fallback',
+        'x-db-error': err.message || 'Database unavailable',
+      },
+    });
   }
 }
 
