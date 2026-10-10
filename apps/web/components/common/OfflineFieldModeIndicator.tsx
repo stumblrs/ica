@@ -19,6 +19,7 @@ import {
   cacheAtlasForOffline,
   getOfflineStorageStats,
   clearOfflineStorage,
+  syncPendingOfflineContributions,
   type OfflineStorageStats,
 } from '@/lib/offlineStorage';
 
@@ -33,6 +34,7 @@ export function OfflineFieldModeIndicator() {
     communitiesCount: 0,
     settlementsCount: 0,
     landmarksCount: 0,
+    pendingSyncCount: 0,
     lastSyncTimestamp: null,
     estimatedSizeMB: 0,
   });
@@ -45,9 +47,21 @@ export function OfflineFieldModeIndicator() {
   useEffect(() => {
     setIsOnline(navigator.onLine);
 
-    const handleOnline = () => {
+    const handleOnline = async () => {
       setIsOnline(true);
-      refreshStats();
+      await refreshStats();
+      // Auto-sync pending offline field contributions when back online
+      const s = await getOfflineStorageStats();
+      if (s.pendingSyncCount > 0) {
+        setSyncing(true);
+        setProgressPct(40);
+        setProgressMsg(`Auto-syncing ${s.pendingSyncCount} offline field contribution(s)...`);
+        await syncPendingOfflineContributions();
+        setSyncing(false);
+        setProgressMsg('Contributions synced successfully!');
+        setTimeout(() => setProgressMsg(''), 2500);
+        await refreshStats();
+      }
     };
     const handleOffline = () => {
       setIsOnline(false);
@@ -64,6 +78,22 @@ export function OfflineFieldModeIndicator() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  const handleSyncPendingNow = async () => {
+    if (!isOnline) return;
+    setSyncing(true);
+    setProgressPct(50);
+    setProgressMsg(`Syncing ${stats.pendingSyncCount} offline record(s) to server...`);
+    const res = await syncPendingOfflineContributions();
+    setSyncing(false);
+    if (res.success) {
+      setProgressMsg(`Synced ${res.syncedCount} record(s)!`);
+      setTimeout(() => setProgressMsg(''), 2500);
+    } else {
+      setProgressMsg(res.error || 'Sync error');
+    }
+    await refreshStats();
+  };
 
   const handleDownload = async () => {
     setSyncing(true);
@@ -115,6 +145,17 @@ export function OfflineFieldModeIndicator() {
             <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-ping" />
             <WifiOff className="w-3.5 h-3.5 text-amber-400" />
             <span className="font-bold">Offline Field Mode</span>
+            {stats.pendingSyncCount > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-amber-500/30 text-amber-200 text-[10px] font-bold">
+                {stats.pendingSyncCount} pending
+              </span>
+            )}
+          </>
+        ) : stats.pendingSyncCount > 0 ? (
+          <>
+            <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
+            <RefreshCw className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="text-cyan-300 font-bold">{stats.pendingSyncCount} to sync</span>
           </>
         ) : hasOfflinePack ? (
           <>
@@ -200,29 +241,60 @@ export function OfflineFieldModeIndicator() {
               </div>
 
               {/* Offline Storage Metrics */}
-              <div className="grid grid-cols-3 gap-2">
-                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center space-y-1">
+              <div className="grid grid-cols-4 gap-1.5">
+                <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center space-y-0.5">
                   <MapPin className="w-3.5 h-3.5 text-emerald-400 mx-auto" />
-                  <div className="text-sm font-bold text-white font-mono">
+                  <div className="text-xs font-bold text-white font-mono">
                     {stats.communitiesCount || stats.settlementsCount || 0}
                   </div>
-                  <div className="text-[9px] text-slate-400">Communities</div>
+                  <div className="text-[8.5px] text-slate-400">Settlements</div>
                 </div>
 
-                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center space-y-1">
+                <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center space-y-0.5">
                   <Compass className="w-3.5 h-3.5 text-teal-400 mx-auto" />
-                  <div className="text-sm font-bold text-white font-mono">7 / 7</div>
-                  <div className="text-[9px] text-slate-400">Dialect Continua</div>
+                  <div className="text-xs font-bold text-white font-mono">7 / 7</div>
+                  <div className="text-[8.5px] text-slate-400">Continua</div>
                 </div>
 
-                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center space-y-1">
-                  <HardDrive className="w-3.5 h-3.5 text-amber-400 mx-auto" />
-                  <div className="text-sm font-bold text-white font-mono">
-                    {hasOfflinePack ? `${stats.estimatedSizeMB} MB` : '0 MB'}
+                <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center space-y-0.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400 mx-auto" />
+                  <div className="text-xs font-bold text-white font-mono">
+                    {stats.landmarksCount}
                   </div>
-                  <div className="text-[9px] text-slate-400">Offline Size</div>
+                  <div className="text-[8.5px] text-slate-400">Landmarks</div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center space-y-0.5">
+                  <HardDrive className="w-3.5 h-3.5 text-purple-400 mx-auto" />
+                  <div className="text-xs font-bold text-white font-mono">
+                    {hasOfflinePack ? `${stats.estimatedSizeMB}M` : '0M'}
+                  </div>
+                  <div className="text-[8.5px] text-slate-400">Cache Size</div>
                 </div>
               </div>
+
+              {/* Pending Offline Contributions Alert & Action */}
+              {stats.pendingSyncCount > 0 && (
+                <div className="p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/40 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-bold text-cyan-200 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                      <span>{stats.pendingSyncCount} Field Contribution(s) Pending</span>
+                    </div>
+                    <div className="text-[10px] text-cyan-300/70">
+                      Recorded locally while offline. Ready for server sync.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={syncing || !isOnline}
+                    onClick={handleSyncPendingNow}
+                    className="px-3 py-1.5 rounded-lg bg-cyan-500/25 hover:bg-cyan-500/40 border border-cyan-400/50 text-cyan-200 text-xs font-bold transition-all disabled:opacity-50 shrink-0"
+                  >
+                    Sync Now
+                  </button>
+                </div>
+              )}
 
               {/* Feature Checklist */}
               <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06] space-y-2">

@@ -20,6 +20,7 @@ export interface OfflineStorageStats {
   communitiesCount: number;
   settlementsCount: number;
   landmarksCount: number;
+  pendingSyncCount: number;
   lastSyncTimestamp: string | null;
   estimatedSizeMB: number;
 }
@@ -236,16 +237,21 @@ export async function getOfflineStorageStats(): Promise<OfflineStorageStats> {
     return new Promise((resolve) => {
       const tx = db.transaction([STORE_SETTLEMENTS, STORE_LANDMARKS, STORE_METADATA], 'readonly');
       const setReq = tx.objectStore(STORE_SETTLEMENTS).count();
-      const landReq = tx.objectStore(STORE_LANDMARKS).count();
+      const landReq = tx.objectStore(STORE_LANDMARKS).getAll();
       const metaReq = tx.objectStore(STORE_METADATA).get('sync_info');
 
       let settlementsCount = 0;
       let landmarksCount = 0;
+      let pendingSyncCount = 0;
       let lastSyncTimestamp: string | null = null;
       let communitiesCount = 0;
 
       setReq.onsuccess = () => { settlementsCount = setReq.result || 0; };
-      landReq.onsuccess = () => { landmarksCount = landReq.result || 0; };
+      landReq.onsuccess = () => {
+        const items = landReq.result || [];
+        landmarksCount = items.length;
+        pendingSyncCount = items.filter((l: any) => l.isLocalContribution).length;
+      };
       metaReq.onsuccess = () => {
         if (metaReq.result) {
           lastSyncTimestamp = metaReq.result.lastSync || null;
@@ -260,6 +266,7 @@ export async function getOfflineStorageStats(): Promise<OfflineStorageStats> {
           communitiesCount,
           settlementsCount,
           landmarksCount,
+          pendingSyncCount,
           lastSyncTimestamp,
           estimatedSizeMB: Math.max(0.8, estimatedSizeMB),
         });
@@ -271,6 +278,7 @@ export async function getOfflineStorageStats(): Promise<OfflineStorageStats> {
           communitiesCount: 0,
           settlementsCount: 0,
           landmarksCount: 0,
+          pendingSyncCount: 0,
           lastSyncTimestamp: null,
           estimatedSizeMB: 0,
         });
@@ -282,8 +290,90 @@ export async function getOfflineStorageStats(): Promise<OfflineStorageStats> {
       communitiesCount: 0,
       settlementsCount: 0,
       landmarksCount: 0,
+      pendingSyncCount: 0,
       lastSyncTimestamp: null,
       estimatedSizeMB: 0,
+    };
+  }
+}
+
+/**
+ * Returns all locally contributed landmarks that have not yet been synced to the server.
+ */
+export async function getPendingLocalContributions(): Promise<KindredLandmarkItem[]> {
+  try {
+    const db = await openDB();
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_LANDMARKS, 'readonly');
+      const req = tx.objectStore(STORE_LANDMARKS).getAll();
+      req.onsuccess = () => {
+        const all: KindredLandmarkItem[] = req.result || [];
+        resolve(all.filter((item) => item.isLocalContribution));
+      };
+      req.onerror = () => resolve([]);
+    });
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Synchronizes pending offline landmarks with the server (/api/sync/batch).
+ * On success, marks the local items as synced (isLocalContribution = false).
+ */
+export async function syncPendingOfflineContributions(): Promise<{
+  success: boolean;
+  syncedCount: number;
+  skippedDuplicates?: number;
+  error?: string;
+}> {
+  try {
+    const pending = await getPendingLocalContributions();
+    if (pending.length === 0) {
+      return { success: true, syncedCount: 0 };
+    }
+
+    const res = await fetch('/api/sync/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ landmarks: pending }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Batch sync request failed');
+    }
+
+    const data = await res.json();
+
+    // Mark synced items as no longer pending local contributions
+    const db = await openDB();
+    const tx = db.transaction(STORE_LANDMARKS, 'readwrite');
+    const store = tx.objectStore(STORE_LANDMARKS);
+
+    for (const item of pending) {
+      store.put({
+        ...item,
+        isLocalContribution: false,
+        syncedAt: new Date().toISOString(),
+      });
+    }
+
+    await new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+    });
+
+    return {
+      success: true,
+      syncedCount: data.syncedCount || pending.length,
+      skippedDuplicates: data.skippedDuplicates || 0,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      syncedCount: 0,
+      error: err.message || 'Failed to sync offline contributions',
     };
   }
 }

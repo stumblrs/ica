@@ -2934,6 +2934,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         />
       )}
 
+
       {/* Kindred (Ụmụnna) & Village Landmark Micro-Mapping Modal */}
       {showKindredModal && (
         <KindredMicroMappingModal

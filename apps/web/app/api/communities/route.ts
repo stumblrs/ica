@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { revalidateAtlasData } from '@/lib/revalidation';
 
 /**
  * GET /api/communities - List and filter communities from Supabase
@@ -182,6 +183,8 @@ export async function POST(req: NextRequest) {
 
       return community;
     });
+
+    revalidateAtlasData();
 
     return NextResponse.json(
       {
