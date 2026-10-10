@@ -789,8 +789,10 @@ export default function HomePage() {
               setShowLandmarks(true);
               mapRef.current?.filterLandmarksByMarketDay(next);
             }}
-            selectedMarketFilter={selectedMarketFilter}
-            onFlyThroughCorridor={(corridorId) => mapRef.current?.startCinematicFlyThrough(corridorId)}
+            onFlyThroughCorridor={(corridorId) => {
+              setIsSidebarCollapsed(true);
+              mapRef.current?.startCinematicFlyThrough(corridorId);
+            }}
             onOpenKindredMapping={(community) => mapRef.current?.openKindredMappingModal(undefined, community)}
             activeTab={activeTab}
             onTabChange={setActiveTab}

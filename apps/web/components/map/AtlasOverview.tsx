@@ -31,6 +31,7 @@ import {
   ExternalLink,
   Archive,
   Scale,
+  Navigation,
 } from 'lucide-react';
 import { SearchBar } from './SearchBar';
 import type { SelectedFeature, FilterDotType } from './MapContainer';
@@ -1028,6 +1029,29 @@ export function AtlasOverview(props: AtlasOverviewProps) {
 
         {tab === 'culture' && (
           <div className="space-y-6 rise">
+            {/* 3D Cinematic Fly-Through Feature Hero Banner */}
+            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950/50 via-[#0a1829] to-cyan-950/50 border border-cyan-500/30 flex items-center justify-between gap-3 shadow-xl">
+              <div className="space-y-0.5 min-w-0">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-cyan-200">
+                  <Navigation className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>3D Cinematic Fly-Through</span>
+                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-semibold border border-cyan-500/30">
+                    Live 3D
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-snug">
+                  Fly camera along ancestral migration arcs and pre-colonial aquatic trade highways.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onFlyThroughCorridor?.('nri-hegemony')}
+                className="shrink-0 px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:brightness-110 text-black font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-cyan-500/20 active:scale-95 transition-all"
+              >
+                <span>Fly 3D</span>
+              </button>
+            </div>
+
             {/* Traditional 4-Day Calendar & Festivals */}
             <section>
               <SectionTitle icon={Calendar}>Igbo Calendar & Four Market Days</SectionTitle>

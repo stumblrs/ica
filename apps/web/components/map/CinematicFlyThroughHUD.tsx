@@ -82,7 +82,7 @@ export function CinematicFlyThroughHUD({
   const cardinal = cardinalDirections[Math.round(normalizedBearing / 45) % 8];
 
   return (
-    <div className="absolute inset-x-0 bottom-6 z-40 flex flex-col items-center pointer-events-none px-4 select-none animate-fade-in">
+    <div className="fixed sm:absolute inset-x-0 bottom-[64px] sm:bottom-6 z-50 flex flex-col items-center pointer-events-none px-3 sm:px-4 select-none animate-in fade-in duration-300">
       {/* Top Floating Commentary Card */}
       <div className="pointer-events-auto max-w-xl w-full mb-3 bg-[#0a0f1d]/90 border border-emerald-500/30 rounded-2xl shadow-2xl backdrop-blur-xl p-3.5 sm:p-4 text-white">
         <div className="flex items-center justify-between gap-2 mb-2">

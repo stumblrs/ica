@@ -310,7 +310,17 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
   const flightTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const buildFlightCorridor = useCallback((corridorId: string): FlightCorridorItem | null => {
-    const arc = ANCESTRAL_MIGRATION_ARCS.find((a) => a.id === corridorId);
+    let arc = ANCESTRAL_MIGRATION_ARCS.find((a) => a.id === corridorId);
+    let water = WATERWAY_TRADE_CORRIDORS.find((w) => w.id === corridorId);
+
+    // Resilient fuzzy fallback for legacy or partial IDs
+    if (!arc && !water) {
+      arc =
+        ANCESTRAL_MIGRATION_ARCS.find(
+          (a) => a.id.toLowerCase().includes(corridorId.toLowerCase()) || corridorId.toLowerCase().includes(a.id.toLowerCase())
+        ) || ANCESTRAL_MIGRATION_ARCS[0];
+    }
+
     if (arc) {
       const o = arc.origin.coordinates;
       const d = arc.destination.coordinates;
@@ -359,19 +369,60 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
       };
     }
 
-    const water = WATERWAY_TRADE_CORRIDORS.find((w) => w.id === corridorId);
     if (water) {
-      const waypoints: WaypointInfo[] = water.keyPorts.map((port, idx) => {
-        const frac = idx / Math.max(1, water.keyPorts.length - 1);
-        const dLon = (frac - 0.5) * 0.35;
-        const dLat = (frac - 0.5) * 0.45;
-        return {
-          name: `Wharf: ${port}`,
-          coords: [water.center[0] + dLon, water.center[1] + dLat],
-          note: `Naval trading port along ${water.basin}. Commodities: ${water.historicalCommodities.join(', ')}.`,
-          altitudeMeters: Math.round(850 + idx * 280),
-        };
-      });
+      let riverPathCoords: Array<{ name: string; coords: [number, number]; note: string }> = [];
+
+      if (water.id === 'waterway-lower-niger') {
+        riverPathCoords = [
+          { name: 'Idah / Upper River Niger Entrance', coords: [6.74, 6.75], note: 'Northern riverine entrance into Igboland and ancient trade gateway.' },
+          { name: 'Asaba Ferry Head (Anioma Bank)', coords: [6.7214, 6.1982], note: 'Historic west-bank crossing connecting Anioma to the eastern homeland.' },
+          { name: 'Onitsha Wharf & Commercial Port', coords: [6.7865, 6.1498], note: 'The central maritime emporium and Ezechima dynasty seat.' },
+          { name: 'Atani & Osomari Riverine Heartlands', coords: [6.7320, 5.9230], note: 'Naval trading ports and historic river covenants.' },
+          { name: 'Aboh Royal Naval Kingdom', coords: [6.5412, 5.5489], note: 'Command center of the Lower Niger canoe navy, controlling tariffs.' },
+          { name: 'Lower Niger Estuary & Delta Crevasse', coords: [6.3500, 5.1200], note: 'Southern maritime outlet towards the Atlantic Ocean.' },
+        ];
+      } else if (water.id === 'waterway-imo-river') {
+        riverPathCoords = [
+          { name: 'Okigwe Escarpment Springs', coords: [7.3500, 5.8300], note: 'Highland source springs of the sacred Imo River (Mmiri Imo).' },
+          { name: 'Umuahia - Ngwa Drainage Valley', coords: [7.4500, 5.4500], note: 'Central agricultural corridor and commercial artery.' },
+          { name: 'Aba River Wharf & Market Landing', coords: [7.3680, 5.1050], note: 'Historic mercantile station connecting southern markets.' },
+          { name: 'Azumini Blue River Basin', coords: [7.4200, 4.9600], note: 'Crystal-clear tributary and strategic pre-colonial trading depot.' },
+          { name: 'Akwete Textile Wharf', coords: [7.3550, 4.8850], note: 'Famous textile-weaving center and direct river outlet.' },
+          { name: 'Opobo Town Island Kingdom', coords: [7.5412, 4.5189], note: 'King Jaja’s coastal fortress, intercepting colonial monopolies.' },
+        ];
+      } else if (water.id === 'waterway-orashi-basin') {
+        riverPathCoords = [
+          { name: 'Oguta Lake Sacred Confluence', coords: [6.8080, 5.7120], note: 'Confluence of the twin sacred waters of Urashi and Ogbuide.' },
+          { name: 'Egbema Riverine Port', coords: [6.7500, 5.5500], note: 'Freshwater swamp transport and timber artery.' },
+          { name: 'Omoku River Jetty (Ogbaland)', coords: [6.6500, 5.3400], note: 'Commercial landing serving the ancient Oba of Ogbaland.' },
+          { name: 'Ahoada Beach (Ekpeye Landings)', coords: [6.6450, 5.0800], note: 'Freshwater trading beach connecting inland farmers to fishers.' },
+          { name: 'Degema / Abonnema Delta Creeks', coords: [6.7600, 4.7500], note: 'Navigable mangrove channels opening into the Atlantic delta.' },
+        ];
+      } else if (water.id === 'waterway-omambala-anambra') {
+        riverPathCoords = [
+          { name: 'Ibaji Highland Borderlands', coords: [6.8500, 6.7500], note: 'Upper Omambala drainage basin and fertile agricultural floodplains.' },
+          { name: 'Otuocha Market Port (Aguleri)', coords: [6.8865, 6.3421], note: 'Ancestral Eri hearth and bustling agrarian river market.' },
+          { name: 'Umuoba Anam Wetland Jetty', coords: [6.8400, 6.2800], note: 'Alluvial yam breadbasket and ancient dugout canoe landing.' },
+          { name: 'Omambala - River Niger Confluence', coords: [6.7800, 6.1800], note: 'Majestic junction where the Omambala empties into the River Niger.' },
+        ];
+      } else {
+        riverPathCoords = water.keyPorts.map((port, idx) => {
+          const frac = idx / Math.max(1, water.keyPorts.length - 1);
+          return {
+            name: `Wharf: ${port}`,
+            coords: [water.center[0] + (frac - 0.5) * 0.2, water.center[1] + (frac - 0.5) * 0.3] as [number, number],
+            note: `Port along ${water.basin}. Commodities: ${water.historicalCommodities.join(', ')}.`,
+          };
+        });
+      }
+
+      const waypoints: WaypointInfo[] = riverPathCoords.map((pt, idx) => ({
+        name: pt.name,
+        coords: pt.coords,
+        note: pt.note,
+        altitudeMeters: Math.round(950 + idx * 180),
+      }));
+
       return {
         id: water.id,
         name: water.name,
@@ -388,7 +439,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
   const flyToFlightWaypoint = useCallback((index: number, corridorOverride?: FlightCorridorItem) => {
     if (!map.current) return;
     const corridor = corridorOverride || activeFlightCorridorRef.current;
-    if (!corridor || !corridor.waypoints[index]) return;
+    if (!corridor || !corridor.waypoints || !corridor.waypoints[index]) return;
 
     setFlightWaypointIndex(index);
     flightWaypointIndexRef.current = index;
@@ -404,19 +455,58 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
       targetBearing = (rad * 180) / Math.PI;
     }
     setFlightBearing(targetBearing);
-    setFlightPitch(64);
+    setFlightPitch(62);
 
     const dur = Math.max(2500, Math.round(6500 / flightSpeedRef.current));
 
-    map.current.flyTo({
-      center: currentWp.coords,
-      zoom: 11.4,
-      pitch: 64,
-      bearing: targetBearing,
-      duration: dur,
-      curve: 1.15,
-      essential: true,
-    });
+    // Update flight trajectory on map with current waypoint position
+    const src = map.current.getSource('flight-corridor-source') as maplibregl.GeoJSONSource | undefined;
+    if (src) {
+      src.setData({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: corridor.waypoints.map((w) => w.coords),
+            },
+            properties: { id: 'trajectory' },
+          },
+          {
+            type: 'Feature',
+            geometry: {
+              type: 'Point',
+              coordinates: currentWp.coords,
+            },
+            properties: { id: 'current-aircraft', name: currentWp.name },
+          },
+        ],
+      });
+    }
+
+    // Departure smoothly flies in; subsequent waypoints easeTo continuously forward without jarring zoom-outs
+    if (index === 0) {
+      map.current.flyTo({
+        center: currentWp.coords,
+        zoom: 11.2,
+        pitch: 62,
+        bearing: targetBearing,
+        duration: 2600,
+        curve: 1.0,
+        essential: true,
+      });
+    } else {
+      map.current.easeTo({
+        center: currentWp.coords,
+        zoom: 11.2,
+        pitch: 62,
+        bearing: targetBearing,
+        duration: dur,
+        easing: (t) => t,
+        essential: true,
+      });
+    }
 
     if (flightTimerRef.current) {
       clearTimeout(flightTimerRef.current);
@@ -424,16 +514,17 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
     }
 
     if (isFlightPlayingRef.current) {
+      const waitTime = index === 0 ? 2800 : dur;
       flightTimerRef.current = setTimeout(() => {
         if (!isFlightPlayingRef.current) return;
-        const nextIdx = flightWaypointIndexRef.current + 1;
+        const nextIdx = index + 1;
         if (nextIdx < corridor.waypoints.length) {
           flyToFlightWaypoint(nextIdx, corridor);
         } else {
           setIsFlightPlaying(false);
           isFlightPlayingRef.current = false;
         }
-      }, dur + 600);
+      }, waitTime);
     }
   }, []);
 
@@ -462,6 +553,32 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
     setIsFlightPlaying(true);
     isFlightPlayingRef.current = true;
 
+    // Populate visual trajectory line on map immediately
+    const src = map.current.getSource('flight-corridor-source') as maplibregl.GeoJSONSource | undefined;
+    if (src) {
+      src.setData({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: corridor.waypoints.map((w) => w.coords),
+            },
+            properties: { id: 'trajectory' },
+          },
+          {
+            type: 'Feature',
+            geometry: {
+              type: 'Point',
+              coordinates: corridor.waypoints[0].coords,
+            },
+            properties: { id: 'current-aircraft', name: corridor.waypoints[0].name },
+          },
+        ],
+      });
+    }
+
     // Fly to first waypoint
     flyToFlightWaypoint(0, corridor);
   }, [basemapMode, buildFlightCorridor, flyToFlightWaypoint]);
@@ -477,9 +594,12 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
     activeFlightCorridorRef.current = null;
 
     if (map.current) {
+      const src = map.current.getSource('flight-corridor-source') as maplibregl.GeoJSONSource | undefined;
+      src?.setData({ type: 'FeatureCollection', features: [] });
       map.current.easeTo({ pitch: is3D ? 52 : 0, bearing: 0, zoom: 8.2, duration: 1200 });
     }
   }, [is3D]);
+
 
   const togglePlayFlight = useCallback(() => {
     const next = !isFlightPlaying;
@@ -1080,6 +1200,14 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
 
     mapInstance.on('dragstart', () => {
       if (isOrbitingRef.current) stopOrbit();
+      if (isFlightPlayingRef.current) {
+        setIsFlightPlaying(false);
+        isFlightPlayingRef.current = false;
+        if (flightTimerRef.current) {
+          clearTimeout(flightTimerRef.current);
+          flightTimerRef.current = null;
+        }
+      }
     });
 
     mapInstance.on('load', () => {
@@ -1620,6 +1748,52 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           'text-color': '#fde68a',
           'text-halo-color': '#040814',
           'text-halo-width': 2,
+        },
+      });
+
+      // ── 3D Cinematic Flight Corridor Trajectory Layer ──
+      mapInstance.addSource('flight-corridor-source', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+
+      mapInstance.addLayer({
+        id: 'flight-corridor-glow',
+        type: 'line',
+        source: 'flight-corridor-source',
+        filter: ['==', '$type', 'LineString'],
+        paint: {
+          'line-color': '#10b981',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 6, 8, 11, 16],
+          'line-opacity': 0.45,
+          'line-blur': 6,
+        },
+      });
+
+      mapInstance.addLayer({
+        id: 'flight-corridor-line',
+        type: 'line',
+        source: 'flight-corridor-source',
+        filter: ['==', '$type', 'LineString'],
+        paint: {
+          'line-color': '#34d399',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 6, 2.5, 11, 4.5],
+          'line-opacity': 0.95,
+          'line-dasharray': [3, 1.5],
+        },
+      });
+
+      mapInstance.addLayer({
+        id: 'flight-corridor-beacon',
+        type: 'circle',
+        source: 'flight-corridor-source',
+        filter: ['==', '$type', 'Point'],
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 6, 11, 10],
+          'circle-color': '#38bdf8',
+          'circle-stroke-width': 2.5,
+          'circle-stroke-color': '#ffffff',
+          'circle-opacity': 1,
         },
       });
 
@@ -2572,7 +2746,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
                 if (activeFlightCorridor) {
                   stopCinematicFlyThrough();
                 } else {
-                  startCinematicFlyThrough('nri-spiritual-expansion');
+                  startCinematicFlyThrough('nri-hegemony');
                 }
               }}
               className={`px-2 py-1 rounded-lg text-[10px] font-mono font-medium transition-all flex items-center gap-1 ${
@@ -2583,7 +2757,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
               title="3D Cinematic Fly-Through along ancestral migration arcs and waterways"
             >
               <Navigation className="w-3 h-3 text-cyan-400" />
-              <span>Fly-Through</span>
+              <span>{activeFlightCorridor ? 'Exit Flight' : 'Fly 3D'}</span>
             </button>
 
             {/* Pin Kindred Landmark Trigger */}
@@ -2661,6 +2835,27 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
 
       {/* Floating Action Controls Stack on Map */}
       <div className={`absolute ${isFiltersCollapsed ? 'top-14 sm:top-14' : 'top-[82px] sm:top-[128px]'} right-3 sm:right-4 z-20 flex flex-col gap-2 items-center transition-all duration-200`}>
+        {/* Mobile & Desktop 3D Fly-Through Floating Button */}
+        <button
+          type="button"
+          onClick={() => {
+            if (activeFlightCorridor) {
+              stopCinematicFlyThrough();
+            } else {
+              startCinematicFlyThrough('nri-hegemony');
+            }
+          }}
+          className={`h-9 w-9 rounded-xl backdrop-blur-xl border flex items-center justify-center shadow-xl active:scale-95 transition-all ${
+            activeFlightCorridor
+              ? 'bg-cyan-500/25 border-cyan-400 text-cyan-300 ring-2 ring-cyan-400/40 animate-pulse'
+              : 'bg-[#090e1c]/90 border-white/15 text-slate-300 hover:text-white hover:border-cyan-500/40 hover:bg-[#0f172a]'
+          }`}
+          title={activeFlightCorridor ? 'Exit 3D Fly-Through' : '3D Cinematic Fly-Through'}
+          aria-label="3D Cinematic Fly-Through"
+        >
+          <Navigation className={`w-4 h-4 ${activeFlightCorridor ? 'text-cyan-300' : 'text-cyan-400'}`} />
+        </button>
+
         {/* Mobile Basemap, Density & 3D Drawer Modal Trigger */}
         <button
           type="button"
@@ -2838,6 +3033,37 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
                   <span>{is3D ? '3D Active' : 'Enable 3D'}</span>
                 </button>
               </div>
+            </div>
+
+            {/* 3D Cinematic Fly-Through for Mobile */}
+            <div className="pt-2 border-t border-white/10 flex items-center justify-between">
+              <div>
+                <span className="block text-xs font-bold text-white flex items-center gap-1.5">
+                  <Navigation className="w-3.5 h-3.5 text-cyan-400" />
+                  3D Cinematic Fly-Through
+                </span>
+                <span className="block text-[10px] text-slate-400">
+                  {activeFlightCorridor ? `Active: ${activeFlightCorridor.name}` : 'Fly over ancestral highways & waterways'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMobileLayersModal(false);
+                  if (activeFlightCorridor) {
+                    stopCinematicFlyThrough();
+                  } else {
+                    startCinematicFlyThrough('nri-hegemony');
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  activeFlightCorridor
+                    ? 'bg-cyan-500/25 border border-cyan-500/50 text-cyan-300'
+                    : 'bg-white/[0.06] border border-white/10 text-slate-300'
+                }`}
+              >
+                <span>{activeFlightCorridor ? 'Stop Flight' : 'Fly 3D'}</span>
+              </button>
             </div>
           </div>
         </div>
