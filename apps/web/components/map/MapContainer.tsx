@@ -1315,23 +1315,47 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         },
       });
 
+      // ── State Background Watermark Labels ──
       mapInstance.addLayer({
         id: 'states-labels',
         type: 'symbol',
         source: 'states-source',
-        minzoom: 5.0,
+        minzoom: 4.5,
+        maxzoom: 11.2,
         layout: {
-          'text-field': '{admin1Name}',
-          'text-size': ['interpolate', ['linear'], ['zoom'], 5.0, 10, 7.5, 13, 9, 15],
+          'text-field': ['upcase', ['get', 'admin1Name']],
+          'text-size': [
+            'interpolate', ['linear'], ['zoom'],
+            4.5, 14,
+            6.0, 20,
+            7.5, 26,
+            9.0, 32,
+            10.5, 36,
+          ],
           'text-font': ['Noto Sans Bold'],
-          'text-max-width': 8,
-          'text-allow-overlap': false,
+          'text-letter-spacing': 0.18,
+          'text-max-width': 9,
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
         },
         paint: {
           'text-color': '#f8fafc',
-          'text-halo-color': '#040814',
-          'text-halo-width': 2.2,
-          'text-halo-blur': 1.2,
+          'text-opacity': [
+            'interpolate', ['linear'], ['zoom'],
+            4.5, 0.35,
+            5.8, 0.70,
+            7.8, 0.65,
+            9.2, 0.32,
+            10.8, 0.0,
+          ],
+          'text-halo-color': '#020617',
+          'text-halo-width': [
+            'interpolate', ['linear'], ['zoom'],
+            4.5, 1.8,
+            7.5, 2.8,
+            10.5, 3.8,
+          ],
+          'text-halo-blur': 1.8,
         },
       });
 
@@ -1392,16 +1416,18 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
       // ── Settlements (Towns, Villages, Cities) ──
       mapInstance.addSource('settlements-source', { type: 'geojson', data: '/data/regional_settlements.geojson' });
 
+      // ── Regional Major Settlements (Towns, Cities) ──
       mapInstance.addLayer({
         id: 'settlements-points',
         type: 'circle',
         source: 'settlements-source',
+        minzoom: 7.5,
         paint: {
           'circle-radius': [
             'interpolate', ['linear'], ['zoom'],
-            4, ['match', ['get', 'place'], 'city', 4, 'town', 3, 2],
-            7, ['match', ['get', 'place'], 'city', 6, 'town', 4.5, 3],
-            10, ['match', ['get', 'place'], 'city', 9, 'town', 7, 5]
+            7.5, 2.5,
+            9.5, 4.5,
+            12.0, 7.0,
           ],
           'circle-color': [
             'case',
@@ -1412,7 +1438,12 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
             // Non-Igbo / outside areas -> Distinct contrasting warm red
             '#ef4444'
           ],
-          'circle-opacity': 0.9,
+          'circle-opacity': [
+            'interpolate', ['linear'], ['zoom'],
+            7.5, 0.0,
+            8.2, 0.85,
+            10.5, 0.95,
+          ],
           'circle-stroke-width': 1.5,
           'circle-stroke-color': '#020617',
         },
@@ -1422,14 +1453,14 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         id: 'settlements-labels',
         type: 'symbol',
         source: 'settlements-source',
-        minzoom: 5.5,
+        minzoom: 8.2,
         layout: {
           'text-field': '{name}',
           'text-size': [
             'interpolate', ['linear'], ['zoom'],
-            5.5, 9,
-            8, 11,
-            11, 13
+            8.2, 10,
+            10.5, 12,
+            13.0, 14,
           ],
           'text-offset': [0, 0.9],
           'text-anchor': 'top',
@@ -1438,9 +1469,78 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         },
         paint: {
           'text-color': '#ffffff',
+          'text-opacity': [
+            'interpolate', ['linear'], ['zoom'],
+            8.2, 0.0,
+            9.0, 0.75,
+            10.5, 1.0,
+          ],
           'text-halo-color': '#040814',
           'text-halo-width': 2.2,
           'text-halo-blur': 1.2,
+        },
+      });
+
+      // ── 13-State Reference Settlements & Villages (GRID3: 45,814 Points with Wards) ──
+      mapInstance.addSource('reference-settlements-source', {
+        type: 'geojson',
+        data: '/data/settlements_13_states.geojson',
+      });
+
+      mapInstance.addLayer({
+        id: 'reference-settlements-points',
+        type: 'circle',
+        source: 'reference-settlements-source',
+        minzoom: 10.5,
+        paint: {
+          'circle-radius': [
+            'interpolate', ['linear'], ['zoom'],
+            10.5, 2.0,
+            12.5, 4.0,
+            15.0, 6.0,
+          ],
+          'circle-color': '#38bdf8',
+          'circle-opacity': [
+            'interpolate', ['linear'], ['zoom'],
+            10.5, 0.0,
+            11.2, 0.80,
+            12.5, 0.95,
+          ],
+          'circle-stroke-width': 1.2,
+          'circle-stroke-color': '#020617',
+        },
+      });
+
+      mapInstance.addLayer({
+        id: 'reference-settlements-labels',
+        type: 'symbol',
+        source: 'reference-settlements-source',
+        minzoom: 11.2,
+        layout: {
+          'text-field': '{name}',
+          'text-size': [
+            'interpolate', ['linear'], ['zoom'],
+            11.2, 9.5,
+            13.0, 11.5,
+            15.0, 13.5,
+          ],
+          'text-font': ['Noto Sans Regular'],
+          'text-offset': [0, 0.85],
+          'text-anchor': 'top',
+          'text-max-width': 8,
+          'text-allow-overlap': false,
+        },
+        paint: {
+          'text-color': '#e0f2fe',
+          'text-opacity': [
+            'interpolate', ['linear'], ['zoom'],
+            11.2, 0.0,
+            11.8, 0.85,
+            13.0, 1.0,
+          ],
+          'text-halo-color': '#020617',
+          'text-halo-width': 2.0,
+          'text-halo-blur': 1.0,
         },
       });
 
@@ -1927,18 +2027,19 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           zoom: Number(mapInstance.getZoom().toFixed(1)),
         });
 
-        const layers = ['communities-points', 'kindred-landmarks-points', 'landmarks-points', 'settlements-points', 'lgas-fill', 'states-fill'].filter(
+        const layers = ['communities-points', 'kindred-landmarks-points', 'landmarks-points', 'reference-settlements-points', 'settlements-points', 'lgas-fill', 'states-fill'].filter(
           (l) => mapInstance.getLayer(l) && mapInstance.getLayoutProperty(l, 'visibility') !== 'none'
         );
         const feats = mapInstance.queryRenderedFeatures(e.point, { layers });
         const community = feats.find((f) => f.layer.id === 'communities-points');
         const kindred = feats.find((f) => f.layer.id === 'kindred-landmarks-points');
         const landmark = feats.find((f) => f.layer.id === 'landmarks-points');
+        const referenceSettlement = feats.find((f) => f.layer.id === 'reference-settlements-points');
         const settlement = feats.find((f) => f.layer.id === 'settlements-points');
         const lga = feats.find((f) => f.layer.id === 'lgas-fill');
         const state = feats.find((f) => f.layer.id === 'states-fill');
 
-        const isDotHovered = Boolean(community || kindred || landmark || settlement);
+        const isDotHovered = Boolean(community || kindred || landmark || referenceSettlement || settlement);
         mapInstance.getCanvas().style.cursor = isAddActive() || isPinningKindredRef.current ? 'crosshair' : isDotHovered || state || lga ? 'pointer' : '';
 
         const stateCode = (state?.properties?.admin1Pcod ?? lga?.properties?.admin1Pcod ?? settlement?.properties?.adm1_pcode ?? landmark?.properties?.adm1_pcode) as string | undefined;
@@ -2010,7 +2111,26 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           return;
         }
 
-        // 3. If hovering a regional settlement dot
+        // 3. If hovering a 13-state reference settlement / village (Sky Blue)
+        if (referenceSettlement) {
+          const p = referenceSettlement.properties as any;
+          setHover({
+            x: e.point.x,
+            y: e.point.y,
+            name: p.name || 'Local Settlement',
+            typeBadge: p.ward ? `WARD: ${(p.ward || '').toUpperCase()}` : 'REFERENCE SETTLEMENT',
+            state: p.state ? `${p.state} State` : undefined,
+            lga: p.lga ? `${p.lga} LGA` : undefined,
+            zone: 'southeast',
+            colorLabel: p.wardCode ? `Ward: ${p.ward || ''} (${p.wardCode})` : 'GRID3 Reference Settlement',
+            colorBg: 'bg-sky-500/15',
+            colorBorder: 'border-sky-500/40',
+            colorText: 'text-sky-300',
+          });
+          return;
+        }
+
+        // 4. If hovering a regional settlement dot
         if (settlement) {
           const p = settlement.properties as any;
           const isSE = p.adm1_pcode ? SE_STATE_CODES.includes(p.adm1_pcode) : false;

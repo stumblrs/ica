@@ -95,5 +95,35 @@ if (fs.existsSync(commStorePath)) {
   }
 }
 
+// 5. 13-State Reference Settlements & Wards (GRID3)
+const refSettlementsPath = path.resolve(__dirname, 'apps/web/public/data/settlements_13_states.json');
+if (fs.existsSync(refSettlementsPath)) {
+  const refSettlements = JSON.parse(fs.readFileSync(refSettlementsPath, 'utf8'));
+  const existingNames = new Set(items.map((it) => `${it.name.toLowerCase()}|${(it.lgaName || '').toLowerCase()}`));
+  let addedCount = 0;
+  for (const s of refSettlements) {
+    if (!s.name) continue;
+    const key = `${s.name.toLowerCase()}|${s.lga.toLowerCase()}`;
+    if (existingNames.has(key)) continue;
+    existingNames.add(key);
+
+    items.push({
+      id: 'ref-' + s.id,
+      type: 'village',
+      name: s.name,
+      altName: s.altName || undefined,
+      wardName: s.ward || undefined,
+      wardCode: s.wardCode || undefined,
+      lgaName: s.lga,
+      lgaCode: s.lgaCode,
+      stateName: s.state,
+      stateCode: s.stateCode,
+      center: s.coords,
+    });
+    addedCount++;
+  }
+  console.log('Added 13-state reference settlements:', addedCount);
+}
+
 fs.writeFileSync(outputPath, JSON.stringify(items), 'utf8');
 console.log('Indexed items:', items.length);

@@ -6,6 +6,21 @@ import * as turf from '@turf/turf';
 // Cache for normalized GeoJSON features to allow fast spatial queries
 let cachedStatesGeoJson: any = null;
 let cachedLgasGeoJson: any = null;
+interface SettlementItem {
+  id: string;
+  name: string;
+  altName?: string;
+  ward: string;
+  wardCode: string;
+  lga: string;
+  lgaCode: string;
+  state: string;
+  stateCode: string;
+  coords: [number, number];
+}
+
+let cachedSettlements: SettlementItem[] | null = null;
+const settlementsByLga = new Map<string, SettlementItem[]>();
 
 function loadGeoJsonData() {
   if (!cachedStatesGeoJson) {
@@ -30,6 +45,28 @@ function loadGeoJsonData() {
     for (const p of candidates) {
       if (fs.existsSync(p)) {
         cachedLgasGeoJson = JSON.parse(fs.readFileSync(p, 'utf8'));
+        break;
+      }
+    }
+  }
+  if (!cachedSettlements) {
+    const candidates = [
+      path.resolve(process.cwd(), 'public/data/settlements_13_states.json'),
+      path.resolve(process.cwd(), 'apps/web/public/data/settlements_13_states.json'),
+    ];
+    for (const p of candidates) {
+      if (fs.existsSync(p)) {
+        cachedSettlements = JSON.parse(fs.readFileSync(p, 'utf8'));
+        settlementsByLga.clear();
+        if (Array.isArray(cachedSettlements)) {
+          for (const s of cachedSettlements) {
+            const lgaKey = s.lga.toLowerCase().trim();
+            if (!settlementsByLga.has(lgaKey)) {
+              settlementsByLga.set(lgaKey, []);
+            }
+            settlementsByLga.get(lgaKey)!.push(s);
+          }
+        }
         break;
       }
     }
@@ -121,6 +158,37 @@ export async function POST(req: NextRequest) {
 
     const matchedLga = matchingLgas[0];
 
+    // Find Nearest Reference Settlement and Derived Ward
+    let nearestSettlement: any = null;
+    let resolvedWard: any = null;
+
+    if (cachedSettlements && cachedSettlements.length > 0) {
+      const lgaName = (matchedLga.properties.admin2Name || '').toLowerCase().trim();
+      const localSettlements = settlementsByLga.get(lgaName) || cachedSettlements.filter(
+        (s) => s.state.toLowerCase() === (matchedLga.properties.admin1Name || '').toLowerCase()
+      );
+
+      let minDistance = Infinity;
+      for (const s of localSettlements) {
+        const d = turf.distance(pt, turf.point(s.coords), { units: 'meters' });
+        if (d < minDistance) {
+          minDistance = d;
+          nearestSettlement = {
+            id: s.id,
+            name: s.name,
+            altName: s.altName || null,
+            distanceMeters: Math.round(d),
+          };
+          if (s.ward || s.wardCode) {
+            resolvedWard = {
+              name: s.ward,
+              code: s.wardCode,
+            };
+          }
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       ambiguous: false,
@@ -132,6 +200,8 @@ export async function POST(req: NextRequest) {
         code: matchedLga.properties.admin2Pcod,
         name: matchedLga.properties.admin2Name,
       },
+      ward: resolvedWard,
+      nearestSettlement,
     });
   } catch (err: any) {
     return NextResponse.json(
@@ -140,3 +210,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+

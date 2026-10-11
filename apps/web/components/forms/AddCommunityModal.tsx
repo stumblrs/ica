@@ -41,6 +41,39 @@ export function AddCommunityModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [resolvedAdmin, setResolvedAdmin] = useState<{
+    state?: { name: string; code: string };
+    lga?: { name: string; code: string };
+    ward?: { name: string; code: string };
+    nearestSettlement?: { name: string; distanceMeters: number };
+  } | null>(null);
+  const [resolving, setResolving] = useState(false);
+
+  useEffect(() => {
+    if (!coordinates) return;
+    let isCancelled = false;
+    setResolving(true);
+    fetch('/api/spatial/resolve-admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ longitude: coordinates.lon, latitude: coordinates.lat }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!isCancelled && data.success) {
+          setResolvedAdmin(data);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!isCancelled) setResolving(false);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [coordinates?.lon, coordinates?.lat]);
+
   if (!coordinates) return null;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -123,6 +156,47 @@ export function AddCommunityModal({
           <span className="text-emerald-400 font-bold">
             {coordinates.lat.toFixed(5)}° N, {coordinates.lon.toFixed(5)}° E
           </span>
+        </div>
+
+        {/* Spatial Hierarchy & Ward Context */}
+        <div className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/20 text-xs space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-400 font-mono">Administrative Context:</span>
+            {resolving ? (
+              <span className="text-slate-400 animate-pulse text-[11px]">Resolving spatial hierarchy...</span>
+            ) : resolvedAdmin ? (
+              <span className="text-emerald-300 font-medium">
+                {resolvedAdmin.state?.name} State • {resolvedAdmin.lga?.name} LGA
+              </span>
+            ) : (
+              <span className="text-slate-500 font-mono">Nigeria</span>
+            )}
+          </div>
+          {resolvedAdmin?.ward && (
+            <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-white/[0.06]">
+              <span className="text-slate-400">Electoral Ward (Admin 3):</span>
+              <span className="text-sky-300 font-semibold">
+                {resolvedAdmin.ward.name} {resolvedAdmin.ward.code ? `(${resolvedAdmin.ward.code})` : ''}
+              </span>
+            </div>
+          )}
+          {resolvedAdmin?.nearestSettlement && (
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-slate-400">Nearest Reference Place:</span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (resolvedAdmin.nearestSettlement?.name) {
+                    setName(resolvedAdmin.nearestSettlement.name);
+                  }
+                }}
+                className="text-amber-300 hover:text-amber-200 underline decoration-dotted transition-colors font-medium"
+                title="Click to use this name"
+              >
+                {resolvedAdmin.nearestSettlement.name} ({resolvedAdmin.nearestSettlement.distanceMeters}m away)
+              </button>
+            </div>
+          )}
         </div>
 
         {error && (
