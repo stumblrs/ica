@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GET as cronGET, POST as cronPOST } from '@/app/api/cron/evaluate/route';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   return cronGET(req);
 }

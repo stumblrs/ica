@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { revalidateAtlasData } from '@/lib/revalidation';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/communities - List and filter communities from Supabase
  */
@@ -62,7 +64,6 @@ export async function GET(req: NextRequest) {
       status: 200,
       headers: {
         'x-db-status': 'fallback',
-        'x-db-error': err.message || 'Database unavailable',
       },
     });
   }

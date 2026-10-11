@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/map/communities.geojson
  * Streams all active and contested communities from Supabase as standard GeoJSON
@@ -72,7 +74,6 @@ export async function GET(req: NextRequest) {
         status: 200,
         headers: {
           'x-db-status': 'fallback',
-          'x-db-error': err.message || 'Database unavailable',
         },
       }
     );

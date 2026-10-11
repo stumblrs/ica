@@ -6,6 +6,8 @@ const DB_FILE = path.resolve(process.cwd(), 'public/data/communities_store.json'
 
 import { prisma } from '@/lib/prisma';
 
+export const dynamic = 'force-dynamic';
+
 // The 5 Southeast Nigerian states
 const SOUTHEAST_STATE_PCODS = ['NG001', 'NG004', 'NG011', 'NG014', 'NG017'];
 const EXCLUDED_NON_IGBO_STATE_PCODS = ['NG032', 'NG002']; // Plateau, Adamawa

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { evaluateInquiryOutcome } from '@/lib/governance';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET or POST /api/cron/evaluate
  * Automated Governance Resolution Worker
