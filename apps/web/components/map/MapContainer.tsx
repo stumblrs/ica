@@ -704,7 +704,99 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
     animRef.current = requestAnimationFrame(step);
   }
 
-  function highlightPoint(coords: [number, number] | null, color = '#fbbf24') {
+  const searchMarkerRef = useRef<maplibregl.Marker | null>(null);
+
+  function clearSearchIndicator() {
+    if (searchMarkerRef.current) {
+      searchMarkerRef.current.remove();
+      searchMarkerRef.current = null;
+    }
+  }
+
+  function renderSearchIndicator(coords: [number, number], color = '#10b981', labelName?: string, subLabel?: string) {
+    if (!map.current) return;
+    clearSearchIndicator();
+
+    const el = document.createElement('div');
+    el.className = 'ica-search-indicator-wrapper';
+
+    if (labelName) {
+      const badge = document.createElement('div');
+      badge.className = 'ica-search-indicator-badge';
+      badge.style.border = `1.5px solid ${color}`;
+      badge.style.boxShadow = `0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 0 20px ${color}55`;
+
+      const dot = document.createElement('span');
+      dot.style.cssText = `width: 7px; height: 7px; border-radius: 9999px; background: ${color}; display: inline-block; box-shadow: 0 0 8px ${color}; flex-shrink: 0;`;
+
+      const title = document.createElement('span');
+      title.style.cssText = 'color: #ffffff; font-weight: 700; letter-spacing: -0.01em; max-width: 200px; overflow: hidden; text-overflow: ellipsis;';
+      title.textContent = labelName;
+
+      badge.appendChild(dot);
+      badge.appendChild(title);
+
+      if (subLabel) {
+        const sub = document.createElement('span');
+        sub.style.cssText = 'color: #94a3b8; font-size: 10px; font-family: monospace; font-weight: 500; max-width: 140px; overflow: hidden; text-overflow: ellipsis;';
+        sub.textContent = `• ${subLabel}`;
+        badge.appendChild(sub);
+      }
+
+      const closeBtn = document.createElement('button');
+      closeBtn.style.cssText = 'margin-left: 4px; color: #94a3b8; font-size: 11px; line-height: 1; padding: 2px 4px; border-radius: 4px; display: flex; align-items: center; justify-content: center;';
+      closeBtn.innerHTML = '✕';
+      closeBtn.title = 'Dismiss indicator';
+      closeBtn.onclick = (e) => {
+        e.stopPropagation();
+        highlightPoint(null);
+      };
+      badge.appendChild(closeBtn);
+
+      el.appendChild(badge);
+    }
+
+    const pinBox = document.createElement('div');
+    pinBox.style.cssText = 'position: relative; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px;';
+
+    const wave1 = document.createElement('div');
+    wave1.className = 'ica-beacon-wave-1';
+    wave1.style.background = `${color}25`;
+    wave1.style.border = `1.5px solid ${color}`;
+
+    const wave2 = document.createElement('div');
+    wave2.className = 'ica-beacon-wave-2';
+    wave2.style.background = `${color}12`;
+    wave2.style.border = `1px solid ${color}60`;
+
+    const pin = document.createElement('div');
+    pin.style.cssText = `position: relative; z-index: 10; width: 34px; height: 34px; border-radius: 9999px; background: radial-gradient(circle at 35% 35%, #ffffff 0%, ${color} 75%); border: 2.5px solid #ffffff; box-shadow: 0 4px 14px rgba(0,0,0,0.5), 0 0 22px ${color}ee; display: flex; align-items: center; justify-content: center; color: #ffffff; cursor: pointer;`;
+    pin.innerHTML = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#040b17" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3" fill="#040b17"/></svg>';
+
+    pinBox.appendChild(wave1);
+    pinBox.appendChild(wave2);
+    pinBox.appendChild(pin);
+
+    el.appendChild(pinBox);
+
+    el.onclick = () => {
+      map.current?.flyTo({
+        center: coords,
+        zoom: Math.max(map.current.getZoom(), 14.2),
+        essential: true,
+      });
+    };
+
+    searchMarkerRef.current = new maplibregl.Marker({
+      element: el,
+      anchor: 'bottom',
+    })
+      .setLngLat(coords)
+      .addTo(map.current);
+  }
+
+  function highlightPoint(coords: [number, number] | null, color = '#fbbf24', labelName?: string, subLabel?: string) {
+    clearSearchIndicator();
     const src = map.current?.getSource('selected-point-source') as maplibregl.GeoJSONSource | undefined;
     if (!src) return;
     if (!coords) {
@@ -724,6 +816,10 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
       ],
     });
     startBlinking();
+
+    if (map.current && labelName) {
+      renderSearchIndicator(coords, color, labelName, subLabel);
+    }
   }
 
   useImperativeHandle(ref, () => ({
@@ -733,10 +829,27 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
       const lat = item.latitude ?? (item.center ? item.center[1] : null);
 
       const isLga = item.type === 'lga';
-      const zoom = isLga ? 9.0 : 11.5;
+      let zoom = 14.0;
+      if (isLga) {
+        zoom = 10.5;
+      } else if (item.type === 'city') {
+        zoom = 12.8;
+      } else if (item.type === 'town') {
+        zoom = 13.8;
+      } else if (item.type === 'market' || item.type === 'marketplace' || item.type === 'landmark') {
+        zoom = 14.2;
+      } else if (item.type === 'village' || item.type === 'community' || item.source === 'community') {
+        zoom = 14.6;
+      }
 
       if (lon != null && lat != null) {
-        map.current.flyTo({ center: [lon, lat], zoom, essential: true });
+        map.current.flyTo({
+          center: [lon, lat],
+          zoom,
+          speed: 1.25,
+          curve: 1.4,
+          essential: true,
+        });
       }
 
       const lgaCode = item.lgaCode ?? item.lgaId ?? (isLga ? item.code : null);
@@ -751,12 +864,17 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
       const nearestRiver = (lon != null && lat != null) ? calculateNearestWaterway(lon, lat) : undefined;
       const dialectCluster = isIgboArea ? getDialectForLocation(item.stateName, item.lgaName) : undefined;
 
+      const subLabel = [
+        item.lgaName && `${item.lgaName} LGA`,
+        item.stateName && `${item.stateName} State`,
+      ].filter(Boolean).join(', ');
+
       if (item.source === 'community' || item.type === 'community') {
         const isChallenged = item.verificationStatus === 'challenged';
         const isPending = item.verificationStatus === 'pending';
         const markerColor = isChallenged ? '#ef4444' : isPending ? '#f59e0b' : '#10b981';
         if (lon != null && lat != null) {
-          highlightPoint([lon, lat], markerColor);
+          highlightPoint([lon, lat], markerColor, item.name, subLabel || 'Community');
         }
         onSelectRef.current({
           type: 'community',
@@ -781,7 +899,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
       } else if (isLga) {
         const markerColor = isIgboArea ? '#10b981' : '#64748b';
         if (lon != null && lat != null) {
-          highlightPoint([lon, lat], markerColor);
+          highlightPoint([lon, lat], markerColor, item.name, subLabel || 'LGA');
         }
         onSelectRef.current({
           type: 'lga',
@@ -804,7 +922,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         });
       } else if (item.type === 'market' || item.type === 'marketplace' || item.type === 'landmark') {
         if (lon != null && lat != null) {
-          highlightPoint([lon, lat], '#f59e0b');
+          highlightPoint([lon, lat], '#f59e0b', item.name, subLabel || item.typeLabel || 'Traditional Market');
         }
         onSelectRef.current({
           type: 'landmark',
@@ -824,7 +942,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         const placeType = item.type ? `${item.type.charAt(0).toUpperCase()}${item.type.slice(1)}` : 'Settlement';
         const markerColor = isIgboArea ? '#10b981' : '#ef4444';
         if (lon != null && lat != null) {
-          highlightPoint([lon, lat], markerColor);
+          highlightPoint([lon, lat], markerColor, item.name, subLabel || placeType);
         }
         onSelectRef.current({
           type: 'settlement',
@@ -2443,6 +2561,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
     return () => {
       resizeObserver.disconnect();
       stopBlinking();
+      clearSearchIndicator();
       mapInstance.remove();
       map.current = null;
     };

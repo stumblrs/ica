@@ -948,6 +948,7 @@ export default function HomePage() {
                 isAddMode={isAddMode}
                 onToggleAddMode={() => setIsAddMode((p) => !p)}
                 onSelectCommunity={(c) => {
+                  setMobileSheetState('peek');
                   mapRef.current?.flyToCommunity(c);
                 }}
                 onFlyTo={(center, zoom) => mapRef.current?.flyTo(center, zoom)}

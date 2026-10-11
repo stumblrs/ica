@@ -272,3 +272,70 @@ html, body {
 
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; }
+
+/* Search Indicator Beacon Animations */
+@keyframes ica-beacon-ping {
+  0% { transform: scale(0.6); opacity: 0.95; }
+  80%, 100% { transform: scale(2.4); opacity: 0; }
+}
+
+@keyframes ica-beacon-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.4); opacity: 0.3; }
+}
+
+@keyframes ica-beacon-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.ica-search-indicator-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: auto;
+  cursor: pointer;
+  user-select: none;
+  z-index: 50;
+}
+
+.ica-search-indicator-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 9999px;
+  background: rgba(8, 13, 26, 0.95);
+  color: #ffffff;
+  backdrop-filter: blur(12px);
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  animation: ica-beacon-bounce 2s ease-in-out infinite;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ica-search-indicator-badge:hover {
+  transform: scale(1.06) !important;
+}
+
+.ica-beacon-wave-1 {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  border-radius: 9999px;
+  animation: ica-beacon-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+  pointer-events: none;
+}
+
+.ica-beacon-wave-2 {
+  position: absolute;
+  width: 76px;
+  height: 76px;
+  border-radius: 9999px;
+  animation: ica-beacon-pulse 2.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  pointer-events: none;
+}
+
