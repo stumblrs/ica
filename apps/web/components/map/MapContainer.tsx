@@ -1240,10 +1240,10 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           'historical-tiles': {
             type: 'raster',
             tiles: [
-              'https://server.arcgisonline.com/ArcGIS/rest/services/Specialty/DeLorme_World_Base_Map/MapServer/tile/{z}/{y}/{x}',
+              'https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}',
             ],
             tileSize: 256,
-            attribution: 'Historical Survey Archive',
+            attribution: 'National Geographic Archival Survey',
           },
         },
         layers: [
@@ -1285,17 +1285,6 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
             },
             paint: {
               'raster-opacity': 0.88,
-            },
-          },
-          {
-            id: 'historical-layer',
-            type: 'raster',
-            source: 'historical-tiles',
-            layout: {
-              visibility: showHistoricalOverlay ? 'visible' : 'none',
-            },
-            paint: {
-              'raster-opacity': historicalOpacity,
             },
           },
         ],
@@ -1421,6 +1410,22 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           'fill-extrusion-opacity': 0.42,
         },
       });
+
+      // ── Archival Historical Survey Overlay ──
+      mapInstance.addLayer(
+        {
+          id: 'historical-layer',
+          type: 'raster',
+          source: 'historical-tiles',
+          layout: {
+            visibility: showHistoricalOverlay ? 'visible' : 'none',
+          },
+          paint: {
+            'raster-opacity': historicalOpacity,
+          },
+        },
+        'states-outline'
+      );
 
       mapInstance.addLayer({
         id: 'states-outline',
