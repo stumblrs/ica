@@ -841,6 +841,111 @@
         "historicalSignificance": "Ancient coastal island city-state and Atlantic gateway, pivotal in pre-colonial and modern maritime trade."
       },
       "geometry": { "type": "Point", "coordinates": [7.1700, 4.4500] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-okrika",
+      "properties": {
+        "id": "igbo-okrika",
+        "name": "Okrika",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Rivers",
+        "lgaName": "Okrika",
+        "region": "coastal",
+        "historicalSignificance": "Ancient coastal island and mercantile kingdom along the Bonny River / Okrika Creek, deeply intertwined with the inland Ndoki, Ikwerre, and palm oil trading networks."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.0833, 4.7417] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-eleme",
+      "properties": {
+        "id": "igbo-eleme",
+        "name": "Eleme",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Rivers",
+        "lgaName": "Eleme",
+        "region": "coastal",
+        "historicalSignificance": "Prominent cultural and industrial community historically connecting the inland trade route to the coastal delta."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.1180, 4.7930] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-ogu",
+      "properties": {
+        "id": "igbo-ogu",
+        "name": "Ogu",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Rivers",
+        "lgaName": "Ogu/Bolo",
+        "region": "coastal",
+        "historicalSignificance": "Ancient coastal island town along the mangrove estuary, renowned for traditional canoe navigation and estuary trade."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.1950, 4.7080] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-tai",
+      "properties": {
+        "id": "igbo-tai",
+        "name": "Tai",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Rivers",
+        "lgaName": "Tai",
+        "region": "coastal",
+        "historicalSignificance": "Agricultural and trade nexus historically linking the upland Imo River trade corridors with the coastal riverine communities."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.2750, 4.7250] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-bori",
+      "properties": {
+        "id": "igbo-bori",
+        "name": "Bori",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Rivers",
+        "lgaName": "Khana",
+        "region": "coastal",
+        "historicalSignificance": "Historic regional mercantile capital, traditional market epicenter, and cultural center of the Ogoni continuum."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.3650, 4.6750] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-gokana",
+      "properties": {
+        "id": "igbo-gokana",
+        "name": "Gokana",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Rivers",
+        "lgaName": "Gokana",
+        "region": "coastal",
+        "historicalSignificance": "Vibrant agrarian and trading community situated along the lower Imo River trade network."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.2880, 4.6530] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-ngo-andoni",
+      "properties": {
+        "id": "igbo-ngo-andoni",
+        "name": "Ngo (Andoni)",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Rivers",
+        "lgaName": "Andoni",
+        "region": "coastal",
+        "historicalSignificance": "Historic coastal delta island and maritime trading kingdom adjacent to Opobo and the Atlantic seaboard."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.4450, 4.4750] }
     }
   ]
 }

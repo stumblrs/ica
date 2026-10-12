@@ -102,6 +102,13 @@ export const RIVERS_IGBO_LGAS = [
   'NG033003', // Ahoada West (Ekpeye/Engenni borderlands)
   'NG033020', // Opobo/Nkoro (Opobo Kingdom coastal Igbo enclave)
   'NG033007', // Bonny (Grand Bonny / Okoloma - historic Igbo language-shift & mercantile enclave)
+  'NG033018', // Okrika (Wakirike / coastal delta trading, palm oil & cultural contact zone)
+  'NG033009', // Eleme (Coastal / Port Harcourt cultural and economic nexus)
+  'NG033017', // Ogu/Bolo (Coastal mangrove & estuary trade connection)
+  'NG033023', // Tai (Inland agricultural & palm oil trade corridor)
+  'NG033012', // Gokana (Lower Imo River estuary trade nexus)
+  'NG033014', // Khana (Bori / regional market & trading hub)
+  'NG033005', // Andoni (Historic coastal delta, Opobo/Bonny maritime continuum)
 ];
 
 /**
@@ -210,8 +217,8 @@ export const BEYOND_SOUTHEAST_REGIONS: BeyondRegionData[] = [
     id: 'rivers-upland',
     name: 'Rivers · Igboid Mainland & Coastal Enclaves',
     shortName: 'Rivers Igboid',
-    subtitle: 'Mainland, Orashi/Sombreiro Basins, Opobo & Bonny Coastal Enclaves · 12 LGAs',
-    note: 'Ikwerre, Etche, Ogba, Ekpeye, Ndoni, Omumma, Oyigbo, Port Harcourt, Opobo & Bonny (12 LGAs)',
+    subtitle: 'Mainland, Basins, Coastal & Ogoni/Andoni Enclaves · 19 LGAs',
+    note: 'Ikwerre, Etche, Ogba, Ekpeye, Ndoni, Omumma, Oyigbo, Port Harcourt, Opobo, Bonny, Okrika, Eleme, Ogu/Bolo, Tai, Gokana, Khana & Andoni (19 LGAs)',
     stateName: 'Rivers',
     stateCode: 'NG033',
     center: [6.95, 4.80],
@@ -229,8 +236,15 @@ export const BEYOND_SOUTHEAST_REGIONS: BeyondRegionData[] = [
       { code: 'NG033003', name: 'Ahoada West', state: 'Rivers', stateCode: 'NG033', center: [6.48, 5.06] },
       { code: 'NG033020', name: 'Opobo/Nkoro', state: 'Rivers', stateCode: 'NG033', center: [7.54, 4.52] },
       { code: 'NG033007', name: 'Bonny', state: 'Rivers', stateCode: 'NG033', center: [7.17, 4.45] },
+      { code: 'NG033018', name: 'Okrika', state: 'Rivers', stateCode: 'NG033', center: [7.09, 4.68] },
+      { code: 'NG033009', name: 'Eleme', state: 'Rivers', stateCode: 'NG033', center: [7.14, 4.79] },
+      { code: 'NG033017', name: 'Ogu/Bolo', state: 'Rivers', stateCode: 'NG033', center: [7.20, 4.65] },
+      { code: 'NG033023', name: 'Tai', state: 'Rivers', stateCode: 'NG033', center: [7.26, 4.77] },
+      { code: 'NG033012', name: 'Gokana', state: 'Rivers', stateCode: 'NG033', center: [7.29, 4.66] },
+      { code: 'NG033014', name: 'Khana', state: 'Rivers', stateCode: 'NG033', center: [7.43, 4.67] },
+      { code: 'NG033005', name: 'Andoni', state: 'Rivers', stateCode: 'NG033', center: [7.40, 4.51] },
     ],
-    keyTowns: ['Port Harcourt (Diobu/Rebisi)', 'Grand Bonny (Okoloma)', 'Omoku', 'Okehi', 'Oyigbo (Obigbo)', 'Ahoada', 'Opobo Town', 'Isiokpo', 'Finima', 'Ozuzu', 'Eberi'],
+    keyTowns: ['Port Harcourt (Diobu/Rebisi)', 'Grand Bonny (Okoloma)', 'Okrika', 'Eleme', 'Bori (Khana)', 'Ngo (Andoni)', 'Omoku', 'Okehi', 'Oyigbo (Obigbo)', 'Ahoada', 'Opobo Town', 'Isiokpo', 'Finima', 'Ozuzu', 'Eberi'],
     dialect: 'Ikwerre, Etche, Ogba, Ekpeye, Ndoki, Opobo-Bonny coastal Igbo, and Ndoni varieties',
     dialectGreeting: 'Ndaani / Meka / Ibọlachi / Kpọkọma',
     historicalContext:

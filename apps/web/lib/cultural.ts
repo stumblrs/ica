@@ -59,11 +59,15 @@ export const DIALECT_CLUSTERS: Record<string, DialectCluster> = {
     id: 'southern',
     name: 'Southern Igboid / Rivers State Continuum',
     igboName: 'Olundi Ndịda & Rivers Igboid',
-    description: 'Ikwerre, Etche, Ogba, Egbema, Ekpeye, Ndoni, Oyigbo (Ndoki), and the coastal Opobo and Bonny Igbo language-shift enclaves of Rivers State.',
+    description: 'Ikwerre, Etche, Ogba, Egbema, Ekpeye, Ndoni, Oyigbo (Ndoki), and the coastal/delta Opobo, Bonny, Okrika, Eleme, Ogoni (Tai, Gokana, Khana), Ogu/Bolo, and Andoni cultural and mercantile contact zones of Rivers State.',
     color: '#f59e0b', // Amber
     states: ['Rivers', 'Delta'],
-    lgas: ['NG033013', 'NG033011', 'NG033016', 'NG033021', 'NG033019', 'NG033010', 'NG033015', 'NG033022', 'NG033002', 'NG033003', 'NG033020', 'NG033007'],
-    features: ['Port Harcourt (Rebisi/Diobu)', 'Grand Bonny (Okoloma)', 'Omoku (Ogbaland)', 'Okehi (Etche)', 'Ozuzu Amadioha Shrine', 'Opobo Kingdom', 'Ahoada (Ekpeye)', 'Isiokpo (Ikwerre)'],
+    lgas: [
+      'NG033013', 'NG033011', 'NG033016', 'NG033021', 'NG033019', 'NG033010', 'NG033015', 'NG033022',
+      'NG033002', 'NG033003', 'NG033020', 'NG033007', 'NG033018', 'NG033009', 'NG033017', 'NG033023',
+      'NG033012', 'NG033014', 'NG033005'
+    ],
+    features: ['Port Harcourt (Rebisi/Diobu)', 'Grand Bonny (Okoloma)', 'Okrika Island', 'Eleme', 'Bori (Khana)', 'Ngo (Andoni)', 'Omoku (Ogbaland)', 'Okehi (Etche)', 'Ozuzu Amadioha Shrine', 'Opobo Kingdom', 'Ahoada (Ekpeye)', 'Isiokpo (Ikwerre)'],
     sampleGreeting: 'Ndaani / Meka / Ibọlachi / Kpọkọma',
   },
   crossriver: {
@@ -537,6 +541,14 @@ export function getDialectForLocation(stateName?: string, lgaName?: string): Dia
       l.includes('port harcourt') ||
       l.includes('opobo') ||
       l.includes('bonny') ||
+      l.includes('okrika') ||
+      l.includes('eleme') ||
+      l.includes('ogu') ||
+      l.includes('bolo') ||
+      l.includes('tai') ||
+      l.includes('gokana') ||
+      l.includes('khana') ||
+      l.includes('andoni') ||
       l.includes('diobu')
     ) {
       return DIALECT_CLUSTERS.southern;
