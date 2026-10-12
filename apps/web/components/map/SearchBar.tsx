@@ -16,13 +16,17 @@ export function SearchBar({ onSelectCommunity }: SearchBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
+    function handleClickOutside(e: MouseEvent | TouchEvent) {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
   }, []);
 
   // Keyboard shortcut listener: Cmd/Ctrl + K or "/" opens and focuses search
@@ -170,9 +174,8 @@ export function SearchBar({ onSelectCommunity }: SearchBarProps) {
                           <button
                             key={`amb-${ambItem.id || ambItem.name}-${ambItem.lgaName}`}
                             type="button"
-                            onPointerDown={(e) => {
+                            onMouseDown={(e) => {
                               e.preventDefault();
-                              handleSelectItem(ambItem);
                             }}
                             onClick={() => {
                               handleSelectItem(ambItem);
@@ -201,9 +204,8 @@ export function SearchBar({ onSelectCommunity }: SearchBarProps) {
                         <button
                           key={item.id ?? `${item.name}-${item.latitude}`}
                           type="button"
-                          onPointerDown={(e) => {
+                          onMouseDown={(e) => {
                             e.preventDefault();
-                            handleSelectItem(item);
                           }}
                           onClick={() => {
                             handleSelectItem(item);

@@ -75,6 +75,7 @@ export default function HomePage() {
     name: string;
   } | null>(null);
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
+  const [pendingNavTarget, setPendingNavTarget] = useState<any | null>(null);
 
   const loadCommunities = useCallback(async () => {
     try {
@@ -116,39 +117,43 @@ export default function HomePage() {
   }, []);
 
   const handleSelectCommunity = useCallback((c: any) => {
-    // 1. Switch to Map view on mobile
+    // 1. Switch to Map view on mobile and collapse sidebar on desktop
     setMobileTab('map');
+    setIsSidebarCollapsed(true);
+    setPendingNavTarget(c);
 
-    // 2. Perform map camera flight with retries so canvas is unhidden and resized
-    const trigger = () => {
+    // 2. Perform map camera flight
+    requestAnimationFrame(() => {
       if (mapRef.current) {
         mapRef.current.resize();
         mapRef.current.flyToCommunity(c);
       }
-    };
-
-    trigger();
-    requestAnimationFrame(() => {
-      trigger();
-      setTimeout(trigger, 80);
-      setTimeout(trigger, 260);
     });
   }, []);
 
+  // Guarantee flight execution when transitioning mobile tabs into 'map'
+  useEffect(() => {
+    if (mobileTab === 'map' && pendingNavTarget) {
+      const target = pendingNavTarget;
+      setPendingNavTarget(null);
+      const timer = setTimeout(() => {
+        if (mapRef.current) {
+          mapRef.current.resize();
+          mapRef.current.flyToCommunity(target);
+        }
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [mobileTab, pendingNavTarget]);
+
   const handleFlyTo = useCallback((center: [number, number], zoom: number) => {
     setMobileTab('map');
-    const trigger = () => {
+    setIsSidebarCollapsed(true);
+    requestAnimationFrame(() => {
       if (mapRef.current) {
         mapRef.current.resize();
         mapRef.current.flyTo(center, zoom);
       }
-    };
-
-    trigger();
-    requestAnimationFrame(() => {
-      trigger();
-      setTimeout(trigger, 80);
-      setTimeout(trigger, 260);
     });
   }, []);
 
@@ -271,7 +276,7 @@ export default function HomePage() {
       <section
         aria-label="Interactive Map of Nigeria"
         className={`w-full flex-1 lg:h-full lg:order-2 relative min-h-0 overflow-hidden ${
-          mobileTab !== 'map' ? 'hidden lg:block' : 'block'
+          mobileTab !== 'map' ? 'max-lg:invisible max-lg:absolute max-lg:inset-0 max-lg:-z-10' : 'block'
         }`}
       >
         {/* Quick Filter Controls: Sleek Twitter Pill on Desktop, Clean 0-clutter header toggle on Mobile */}

@@ -827,28 +827,30 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
 
   function highlightPoint(coords: [number, number] | null, color = '#fbbf24', labelName?: string, subLabel?: string) {
     clearSearchIndicator();
-    const src = map.current?.getSource('selected-point-source') as maplibregl.GeoJSONSource | undefined;
-    if (!src) return;
     if (!coords) {
       stopBlinking();
-      src.setData({ type: 'FeatureCollection', features: [] });
+      const src = map.current?.getSource('selected-point-source') as maplibregl.GeoJSONSource | undefined;
+      src?.setData({ type: 'FeatureCollection', features: [] });
       return;
     }
     activeCoordRef.current = coords;
-    src.setData({
-      type: 'FeatureCollection',
-      features: [
-        {
-          type: 'Feature',
-          geometry: { type: 'Point', coordinates: coords },
-          properties: { color },
-        },
-      ],
-    });
-    startBlinking();
+    const src = map.current?.getSource('selected-point-source') as maplibregl.GeoJSONSource | undefined;
+    if (src) {
+      src.setData({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: coords },
+            properties: { color },
+          },
+        ],
+      });
+      startBlinking();
+    }
 
-    if (map.current && labelName) {
-      renderSearchIndicator(coords, color, labelName, subLabel);
+    if (map.current) {
+      renderSearchIndicator(coords, color, labelName || 'Selected Settlement', subLabel);
     }
   }
 
@@ -859,44 +861,37 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
       const lat = item.latitude ?? (item.center ? item.center[1] : (item.coordinates ? item.coordinates[1] : null));
 
       const isLga = item.type === 'lga';
-      let zoom = 14.5;
+      let zoom = 15.0;
       if (isLga) {
         zoom = 13.0;
       } else if (item.type === 'capital' || item.category === 'capital') {
-        zoom = 13.5;
-      } else if (item.type === 'city') {
         zoom = 14.0;
-      } else if (item.type === 'town') {
+      } else if (item.type === 'city') {
         zoom = 14.5;
-      } else if (item.type === 'market' || item.type === 'marketplace' || item.type === 'landmark') {
+      } else if (item.type === 'town') {
         zoom = 14.8;
+      } else if (item.type === 'market' || item.type === 'marketplace' || item.type === 'landmark') {
+        zoom = 15.0;
       } else if (item.type === 'village' || item.type === 'community' || item.source === 'community') {
         zoom = 15.2;
       }
 
       if (lon != null && lat != null) {
-        const executeCameraFly = () => {
-          if (!map.current) return;
+        try {
+          map.current.resize();
+          map.current.stop();
+          map.current.flyTo({
+            center: [lon, lat],
+            zoom,
+            speed: 1.5,
+            curve: 1.25,
+            essential: true,
+          });
+        } catch {
           try {
-            map.current.resize();
-            map.current.flyTo({
-              center: [lon, lat],
-              zoom,
-              speed: 1.45,
-              curve: 1.25,
-              essential: true,
-            });
-          } catch {
-            try {
-              map.current.jumpTo({ center: [lon, lat], zoom });
-            } catch {}
-          }
-        };
-
-        // Execute immediately and queue retries to guarantee execution once canvas layout unhides
-        executeCameraFly();
-        setTimeout(executeCameraFly, 60);
-        setTimeout(executeCameraFly, 220);
+            map.current.jumpTo({ center: [lon, lat], zoom });
+          } catch {}
+        }
       }
 
       const lgaCode = item.lgaCode ?? item.lgaId ?? (isLga ? item.code : null);
