@@ -30,6 +30,7 @@ import { AddCommunityModal } from '@/components/forms/AddCommunityModal';
 import { MobileTwitterBottomNav, type MobileTab } from '@/components/layout/MobileTwitterBottomNav';
 import { TwitterComposeFAB } from '@/components/layout/TwitterComposeFAB';
 import { TwitterVoiceModal } from '@/components/community/TwitterVoiceModal';
+import { MapFeatureFloatingCard } from '@/components/map/MapFeatureFloatingCard';
 import { SE_STATE_CODES, IGBO_IDENTIFIED_LGAS, BEYOND_SOUTHEAST_REGIONS } from '@/lib/geo';
 import { DIALECT_CLUSTERS, getIgboMarketDay, IGBO_MARKET_DAYS } from '@/lib/cultural';
 import { getOfflineSettlementsList } from '@/lib/offlineStorage';
@@ -103,6 +104,15 @@ export default function HomePage() {
       }
       return next;
     });
+  }, []);
+
+  const handlePinNearby = useCallback((feature: SelectedFeature) => {
+    if (feature.coordinates) {
+      mapRef.current?.flyTo(feature.coordinates, 15.0);
+    }
+    setSelectedFeature(null);
+    setIsAddMode(true);
+    setMobileTab('map');
   }, []);
 
   // Global Keyboard shortcuts: "[" or "]" toggles sidebar collapse, Esc clears selection, "f" toggles filters
@@ -591,64 +601,32 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Mobile Twitter Map Selected Feature Floating Card */}
-        {selectedFeature && mobileTab === 'map' && (
-          <div className="lg:hidden fixed bottom-[64px] left-3 right-3 z-30 p-3.5 rounded-2xl bg-[#000000]/95 border border-[#2f3336] shadow-2xl backdrop-blur-xl animate-in slide-in-from-bottom-3 duration-200">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span
-                  className="w-3 h-3 rounded-full shrink-0 ring-2 ring-white/20"
-                  style={{ backgroundColor: selectedFeature.markerColor || '#10b981' }}
-                />
-                <div className="min-w-0">
-                  <h3 className="text-sm font-bold text-[#e7e9ea] truncate leading-tight">
-                    {selectedFeature.name}
-                  </h3>
-                  <p className="text-[11px] text-[#71767b] font-mono truncate leading-tight mt-0.5">
-                    {[selectedFeature.placeType || selectedFeature.type, selectedFeature.parentName].filter(Boolean).join(' · ')}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedFeature(null);
-                  mapRef.current?.resetView();
-                }}
-                className="p-1.5 rounded-full text-[#71767b] hover:text-white"
-                title="Dismiss"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Cultural detail snippet */}
-            {(selectedFeature.dialectGreeting || selectedFeature.whyMarked || selectedFeature.colorExplanation) && (
-              <p className="text-xs text-slate-300 mt-2 line-clamp-2 leading-relaxed">
-                {selectedFeature.dialectGreeting
-                  ? `"${selectedFeature.dialectGreeting}" · ${selectedFeature.dialect || ''}`
-                  : selectedFeature.whyMarked || selectedFeature.colorExplanation}
-              </p>
-            )}
-
-            {/* Actions: View in Explore + Reset */}
-            <div className="flex items-center justify-between gap-2 mt-3 pt-2.5 border-t border-[#2f3336]">
-              <span className="text-[10px] font-mono text-emerald-400">
-                {selectedFeature.colorLabel?.split('(')[0]?.trim() || 'Documented Place'}
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab('explore');
-                  setMobileTab('explore');
-                }}
-                className="px-3 py-1 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-xs font-semibold border border-emerald-500/40 flex items-center gap-1 active:scale-95 transition-all"
-              >
-                <span>Full Lore & Details</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
+        {/* Mobile & Collapsed Floating Map Feature Preview & Quick Add Card */}
+        {selectedFeature && (mobileTab === 'map' || isSidebarCollapsed) && (
+          <MapFeatureFloatingCard
+            feature={selectedFeature}
+            onClose={() => {
+              setSelectedFeature(null);
+              mapRef.current?.resetView();
+            }}
+            onDocumentFeature={(f) => {
+              const coords = f.coordinates
+                ? { lon: f.coordinates[0], lat: f.coordinates[1] }
+                : mapRef.current?.getCenter?.() || { lon: 7.05, lat: 5.5 };
+              setPendingModal({
+                coords,
+                name: f.name || '',
+              });
+              setIsAddMode(false);
+            }}
+            onPinNearby={handlePinNearby}
+            onViewLore={() => {
+              setActiveTab('explore');
+              setMobileTab('explore');
+              setIsSidebarCollapsed(false);
+            }}
+            onAddVoice={() => setIsVoiceModalOpen(true)}
+          />
         )}
       </section>
 
@@ -856,6 +834,7 @@ export default function HomePage() {
               });
               setIsAddMode(false);
             }}
+            onPinNearby={handlePinNearby}
             onCommunityUpdated={loadCommunities}
             isCollapsed={isSidebarCollapsed}
             onToggleCollapse={() => setIsSidebarCollapsed(true)}
@@ -946,6 +925,7 @@ export default function HomePage() {
               });
               setIsAddMode(false);
             }}
+            onPinNearby={handlePinNearby}
             onCommunityUpdated={loadCommunities}
             activeFilter={activeFilter}
             onFilterChange={setActiveFilter}

@@ -103,6 +103,7 @@ interface AtlasOverviewProps {
   selectedFeature: SelectedFeature | null;
   onCloseSelected: () => void;
   onDocumentFeature?: (feature: SelectedFeature) => void;
+  onPinNearby?: (feature: SelectedFeature) => void;
   onCommunityUpdated?: () => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
@@ -175,6 +176,7 @@ export function AtlasOverview(props: AtlasOverviewProps) {
     selectedFeature,
     onCloseSelected,
     onDocumentFeature,
+    onPinNearby,
     onCommunityUpdated,
     onToggleCollapse,
     activeFilter = 'all',
@@ -822,20 +824,34 @@ export function AtlasOverview(props: AtlasOverviewProps) {
                 </div>
               ) : (
                 (selectedFeature.zone === 'reference' || selectedFeature.type === 'settlement' || selectedFeature.type === 'landmark' || selectedFeature.type === 'lga') && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (onDocumentFeature && selectedFeature) {
-                        onDocumentFeature(selectedFeature);
-                      } else {
-                        onToggleAddMode();
-                      }
-                    }}
-                    className="mt-3 w-full text-[11px] font-semibold py-2.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 transition-all flex items-center justify-center gap-1.5 shadow-sm"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Document as Igbo Community</span>
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onDocumentFeature && selectedFeature) {
+                          onDocumentFeature(selectedFeature);
+                        } else {
+                          onToggleAddMode();
+                        }
+                      }}
+                      className="mt-3 w-full text-[11px] font-semibold py-2.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Document as Igbo Community</span>
+                    </button>
+
+                    {onPinNearby && (
+                      <button
+                        type="button"
+                        onClick={() => onPinNearby(selectedFeature)}
+                        className="mt-2 w-full text-[11px] font-semibold py-2 rounded-lg border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                        title={`Pin an unmapped village or kindred near ${selectedFeature.name}`}
+                      >
+                        <MapPin className="w-3.5 h-3.5" />
+                        <span>Pin Specific Village or Kindred Nearby</span>
+                      </button>
+                    )}
+                  </>
                 )
               )}
             </section>
