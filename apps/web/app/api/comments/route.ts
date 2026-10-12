@@ -26,17 +26,21 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const stateFilter = searchParams.get('state')?.toLowerCase();
     const communityId = searchParams.get('communityId');
+    const cursor = searchParams.get('cursor');
+    // Default to 5 items to minimize initial egress and bandwidth
+    const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '5', 10), 1), 50);
 
     const where: any = {};
     if (communityId) {
       where.communityId = communityId;
     }
-    if (stateFilter) {
+    if (stateFilter && stateFilter !== 'all') {
       where.community = {
         stateName: { equals: stateFilter, mode: 'insensitive' },
       };
     }
 
+    // Query limit + 1 to check if another page exists without a separate count query
     const comments = await prisma.comment.findMany({
       where,
       include: {
@@ -52,10 +56,15 @@ export async function GET(req: NextRequest) {
         },
       },
       orderBy: { createdAt: 'desc' },
-      take: 100,
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
 
-    const enriched: EnrichedComment[] = comments.map((cmt) => ({
+    const hasMore = comments.length > limit;
+    const trimmed = hasMore ? comments.slice(0, limit) : comments;
+    const nextCursor = hasMore && trimmed.length > 0 ? trimmed[trimmed.length - 1].id : null;
+
+    const enriched: EnrichedComment[] = trimmed.map((cmt) => ({
       id: cmt.id,
       communityId: cmt.communityId || '',
       communityName: cmt.community?.name || 'Community',
@@ -71,7 +80,11 @@ export async function GET(req: NextRequest) {
       createdAt: cmt.createdAt.toISOString(),
     }));
 
-    return NextResponse.json(enriched);
+    return NextResponse.json({
+      comments: enriched,
+      nextCursor,
+      hasMore,
+    });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Failed to fetch comments' }, { status: 500 });
   }

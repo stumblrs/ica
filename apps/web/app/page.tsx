@@ -16,7 +16,7 @@ import {
   Landmark,
   MapPin,
   Globe2,
-  SlidersHorizontal,
+  Filter,
   Sparkles,
   MessageSquare,
   Archive,
@@ -27,6 +27,9 @@ import {
 import { AtlasOverview, type CommunitySummary, type AtlasTab } from '@/components/map/AtlasOverview';
 import type { MapContainerHandle, SelectedFeature, BasemapMode, FilterDotType } from '@/components/map/MapContainer';
 import { AddCommunityModal } from '@/components/forms/AddCommunityModal';
+import { MobileTwitterBottomNav, type MobileTab } from '@/components/layout/MobileTwitterBottomNav';
+import { TwitterComposeFAB } from '@/components/layout/TwitterComposeFAB';
+import { TwitterVoiceModal } from '@/components/community/TwitterVoiceModal';
 import { SE_STATE_CODES, IGBO_IDENTIFIED_LGAS, BEYOND_SOUTHEAST_REGIONS } from '@/lib/geo';
 import { DIALECT_CLUSTERS, getIgboMarketDay, IGBO_MARKET_DAYS } from '@/lib/cultural';
 import { getOfflineSettlementsList } from '@/lib/offlineStorage';
@@ -59,7 +62,7 @@ export default function HomePage() {
   const [communities, setCommunities] = useState<CommunitySummary[]>([]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isFiltersCollapsed, setIsFiltersCollapsed] = useState(false);
-  const [mobileSheetState, setMobileSheetState] = useState<'peek' | 'half' | 'full'>('peek');
+  const [mobileTab, setMobileTab] = useState<MobileTab>('map');
   const [activeTab, setActiveTab] = useState<AtlasTab>('explore');
   const [basemapMode, setBasemapMode] = useState<BasemapMode>('dark');
   const [activeFilter, setActiveFilter] = useState<FilterDotType>('all');
@@ -70,25 +73,7 @@ export default function HomePage() {
     coords: { lon: number; lat: number };
     name: string;
   } | null>(null);
-
-  const touchStartY = useRef<number | null>(null);
-
-  const handleSheetTouchStart = (e: React.TouchEvent) => {
-    touchStartY.current = e.touches[0].clientY;
-  };
-
-  const handleSheetTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartY.current === null) return;
-    const endY = e.changedTouches[0].clientY;
-    const diff = endY - touchStartY.current;
-    touchStartY.current = null;
-
-    if (diff < -35) {
-      setMobileSheetState((prev) => (prev === 'peek' ? 'half' : 'full'));
-    } else if (diff > 35) {
-      setMobileSheetState((prev) => (prev === 'full' ? 'half' : 'peek'));
-    }
-  };
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
 
   const loadCommunities = useCallback(async () => {
     try {
@@ -109,6 +94,17 @@ export default function HomePage() {
     loadCommunities();
   }, [loadCommunities]);
 
+  const handleToggleAddMode = useCallback(() => {
+    setIsAddMode((prev) => {
+      const next = !prev;
+      if (next) {
+        setMobileTab('map');
+        setTimeout(() => mapRef.current?.resize(), 50);
+      }
+      return next;
+    });
+  }, []);
+
   // Global Keyboard shortcuts: "[" or "]" toggles sidebar collapse, Esc clears selection, "f" toggles filters
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -123,7 +119,7 @@ export default function HomePage() {
         mapRef.current?.resetView();
       } else if (e.key.toLowerCase() === 'a' && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
-        setIsAddMode((prev) => !prev);
+        handleToggleAddMode();
       } else if (e.key.toLowerCase() === 'f' && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         setIsFiltersCollapsed((prev) => !prev);
@@ -131,6 +127,26 @@ export default function HomePage() {
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleToggleAddMode]);
+
+  // Sync filter collapse and active status with top AppBarFilterButton
+  useEffect(() => {
+    const hasActive = activeFilter !== 'all' || !!selectedDialect || !!selectedMarketFilter;
+    window.dispatchEvent(
+      new CustomEvent('ica:filters-state', {
+        detail: { isCollapsed: isFiltersCollapsed, hasActive },
+      })
+    );
+  }, [isFiltersCollapsed, activeFilter, selectedDialect, selectedMarketFilter]);
+
+  useEffect(() => {
+    function handleToggleFilters() {
+      setIsFiltersCollapsed((prev) => !prev);
+    }
+    window.addEventListener('ica:toggle-filters', handleToggleFilters);
+    return () => {
+      window.removeEventListener('ica:toggle-filters', handleToggleFilters);
+    };
   }, []);
 
   // Smoothly trigger map resizing throughout the desktop sidebar width transition
@@ -203,52 +219,69 @@ export default function HomePage() {
   );
 
   return (
-    <div className="w-full h-full min-h-0 flex flex-col lg:flex-row overflow-hidden relative select-none">
-      {/* Map Section: On mobile, expansive full-screen canvas; on desktop, right flex-1 panel */}
+    <div className="w-full h-full min-h-0 flex flex-col lg:flex-row overflow-hidden relative select-none bg-[#000000]">
+      {/* Map Section: On mobile visible when mobileTab === 'map', on desktop always right flex-1 panel */}
       <section
         aria-label="Interactive Map of Nigeria"
-        className="w-full h-full lg:flex-1 lg:order-2 relative min-h-0 overflow-hidden"
+        className={`w-full flex-1 lg:h-full lg:order-2 relative min-h-0 overflow-hidden ${
+          mobileTab !== 'map' ? 'hidden lg:block' : 'block'
+        }`}
       >
-        {/* Floating Quick Filter Pills (Dual-row glassmorphic scrollers: Collapsible for clean map focus) */}
+        {/* Quick Filter Controls: Sleek Twitter Pill on Desktop, Clean 0-clutter header toggle on Mobile */}
         {isFiltersCollapsed ? (
-          <div className="absolute top-2 left-3 z-20 pointer-events-auto animate-in fade-in zoom-in-95 duration-200">
-            <button
-              type="button"
-              onClick={() => setIsFiltersCollapsed(false)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#090e1c]/90 hover:bg-[#0f172a] border border-white/15 text-xs font-semibold text-slate-200 shadow-2xl backdrop-blur-xl transition-all active:scale-95 hover:border-emerald-500/40 group"
-              title="Expand Quick Filters & Dialects (Shortcut: F)"
-              aria-label="Expand Quick Filters"
-            >
-              <SlidersHorizontal className="w-4 h-4 text-emerald-400 group-hover:rotate-12 transition-transform" />
-              {activeFilter !== 'all' && (
-                <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-mono capitalize">
-                  {activeFilter}
-                </span>
-              )}
-              {selectedDialect && (
-                <span className="px-1.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px] font-mono capitalize">
-                  {selectedDialect}
-                </span>
-              )}
-              {selectedMarketFilter && (
-                <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-mono capitalize">
-                  {selectedMarketFilter} Market
-                </span>
-              )}
-            </button>
-          </div>
+          <>
+            {/* Mobile Active Filter Badge (renders only when an active filter is active; 0 clutter otherwise) */}
+            {(activeFilter !== 'all' || selectedDialect || selectedMarketFilter) && (
+              <div className="lg:hidden absolute top-2.5 left-3 z-20 flex items-center gap-1.5 pointer-events-auto animate-in fade-in zoom-in-95 duration-150">
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/85 backdrop-blur-md border border-emerald-500/40 text-[10px] font-mono text-emerald-300 shadow-xl">
+                  <span className="capitalize">{activeFilter !== 'all' ? activeFilter : selectedDialect || selectedMarketFilter}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveFilter('all');
+                      setSelectedDialect(null);
+                      setSelectedMarketFilter(null);
+                    }}
+                    className="ml-1 text-slate-400 hover:text-white"
+                    title="Clear filter"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Desktop Twitter Pill Trigger */}
+            <div className="hidden lg:flex absolute top-3.5 left-4 z-20 items-center gap-2 pointer-events-auto animate-in fade-in zoom-in-95 duration-150">
+              <button
+                type="button"
+                onClick={() => setIsFiltersCollapsed(false)}
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#000000]/85 hover:bg-[#16181c] border border-[#2f3336] hover:border-emerald-500/40 text-xs font-semibold text-[#e7e9ea] shadow-xl backdrop-blur-xl transition-all active:scale-95 group"
+                title="Filter Settlements & Dialects (Shortcut: F)"
+                aria-label="Filter Settlements"
+              >
+                <Filter className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
+                <span>Filters & Continua</span>
+                {(activeFilter !== 'all' || selectedDialect || selectedMarketFilter) && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-mono font-semibold capitalize">
+                    {activeFilter !== 'all' ? activeFilter : selectedDialect || selectedMarketFilter}
+                  </span>
+                )}
+              </button>
+            </div>
+          </>
         ) : (
-          <div className="absolute top-2 left-0 right-0 z-20 px-3 py-1 flex flex-col gap-1.5 pointer-events-none animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="absolute top-2 left-0 right-0 z-20 px-3 py-1 flex flex-col gap-1.5 pointer-events-none animate-in fade-in slide-in-from-top-2 duration-200 lg:top-3.5 lg:left-4 lg:right-20 lg:p-3 lg:rounded-2xl lg:bg-[#000000]/90 lg:backdrop-blur-xl lg:border lg:border-[#2f3336] lg:shadow-2xl">
             {/* Row 1: Primary Status & Geographic Focal Zones */}
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pointer-events-auto w-full max-w-full pr-4 sm:pr-8">
               <button
                 type="button"
                 onClick={() => setIsFiltersCollapsed(true)}
-                className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#090e1c]/90 hover:bg-white/10 border border-white/15 text-slate-300 hover:text-white text-[11px] font-semibold backdrop-blur-md transition-all active:scale-95"
+                className="shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/80 hover:bg-white/10 border border-[#2f3336] text-slate-300 hover:text-white text-[11px] font-semibold backdrop-blur-md transition-all active:scale-95"
                 title="Collapse filters for clean map focus (Shortcut: F)"
               >
-                <ChevronUp className="w-3 h-3 text-emerald-400" />
-                <span className="hidden sm:inline text-[10px] font-mono">Hide</span>
+                <ChevronUp className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Hide</span>
               </button>
 
               <button
@@ -405,7 +438,6 @@ export default function HomePage() {
                       setShowDialects(true);
                       mapRef.current?.highlightDialectCluster(cluster);
                       setIsSidebarCollapsed(false);
-                      setMobileSheetState('half');
                     }
                   }}
                   className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold backdrop-blur-md transition-all active:scale-95 flex items-center gap-1.5 ${
@@ -526,7 +558,6 @@ export default function HomePage() {
             setSelectedFeature(feature);
             if (feature) {
               setIsSidebarCollapsed(false);
-              setMobileSheetState('half');
             }
           }}
           onCommunityAdded={loadCommunities}
@@ -556,6 +587,66 @@ export default function HomePage() {
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#090e1c]/80 border border-white/[0.08] text-[11px] font-mono text-slate-300 backdrop-blur-xl">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               <span>{communities.length} Communities Documented</span>
+            </div>
+          </div>
+        )}
+
+        {/* Mobile Twitter Map Selected Feature Floating Card */}
+        {selectedFeature && mobileTab === 'map' && (
+          <div className="lg:hidden fixed bottom-[64px] left-3 right-3 z-30 p-3.5 rounded-2xl bg-[#000000]/95 border border-[#2f3336] shadow-2xl backdrop-blur-xl animate-in slide-in-from-bottom-3 duration-200">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span
+                  className="w-3 h-3 rounded-full shrink-0 ring-2 ring-white/20"
+                  style={{ backgroundColor: selectedFeature.markerColor || '#10b981' }}
+                />
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold text-[#e7e9ea] truncate leading-tight">
+                    {selectedFeature.name}
+                  </h3>
+                  <p className="text-[11px] text-[#71767b] font-mono truncate leading-tight mt-0.5">
+                    {[selectedFeature.placeType || selectedFeature.type, selectedFeature.parentName].filter(Boolean).join(' · ')}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedFeature(null);
+                  mapRef.current?.resetView();
+                }}
+                className="p-1.5 rounded-full text-[#71767b] hover:text-white"
+                title="Dismiss"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Cultural detail snippet */}
+            {(selectedFeature.dialectGreeting || selectedFeature.whyMarked || selectedFeature.colorExplanation) && (
+              <p className="text-xs text-slate-300 mt-2 line-clamp-2 leading-relaxed">
+                {selectedFeature.dialectGreeting
+                  ? `"${selectedFeature.dialectGreeting}" · ${selectedFeature.dialect || ''}`
+                  : selectedFeature.whyMarked || selectedFeature.colorExplanation}
+              </p>
+            )}
+
+            {/* Actions: View in Explore + Reset */}
+            <div className="flex items-center justify-between gap-2 mt-3 pt-2.5 border-t border-[#2f3336]">
+              <span className="text-[10px] font-mono text-emerald-400">
+                {selectedFeature.colorLabel?.split('(')[0]?.trim() || 'Documented Place'}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('explore');
+                  setMobileTab('explore');
+                }}
+                className="px-3 py-1 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-xs font-semibold border border-emerald-500/40 flex items-center gap-1 active:scale-95 transition-all"
+              >
+                <span>Full Lore & Details</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
         )}
@@ -721,7 +812,7 @@ export default function HomePage() {
           <AtlasOverview
             communities={communities}
             isAddMode={isAddMode}
-            onToggleAddMode={() => setIsAddMode((p) => !p)}
+            onToggleAddMode={handleToggleAddMode}
             onSelectCommunity={(c) => {
               mapRef.current?.flyToCommunity(c);
             }}
@@ -801,338 +892,140 @@ export default function HomePage() {
         </div>
       </aside>
 
-      {/* Mobile Gestural Bottom Sheet (Floating overlay) */}
-      <div
-        className={`lg:hidden fixed left-0 right-0 z-30 transition-all duration-300 ease-out flex flex-col bg-[#070c18] border-t border-white/[0.12] shadow-[0_-12px_45px_rgba(0,0,0,0.85)] rounded-t-[24px] overflow-hidden ${
-          mobileSheetState === 'peek'
-            ? 'bottom-[56px] h-[66px]'
-            : mobileSheetState === 'half'
-            ? 'bottom-[56px] h-[52dvh]'
-            : 'bottom-[56px] h-[calc(100dvh-50px-56px)]'
-        }`}
-      >
-        {/* Touch Drag Handle & Swipe Listener */}
-        <div
-          className="shrink-0 pt-2 pb-1.5 flex flex-col items-center justify-center cursor-pointer active:opacity-75 touch-none bg-[#070c18]"
-          onTouchStart={handleSheetTouchStart}
-          onTouchEnd={handleSheetTouchEnd}
-          onClick={() => {
-            setMobileSheetState((prev) => (prev === 'peek' ? 'half' : prev === 'half' ? 'full' : 'peek'));
-          }}
-          role="button"
-          aria-label="Toggle drawer height"
-        >
-          <div className="sheet-drag-handle" />
-        </div>
+      {/* Mobile Dedicated Screen Views: In Twitter, every nav opens its own screen */}
+      {mobileTab !== 'map' && (
+        <main className="lg:hidden flex-1 min-h-0 w-full overflow-hidden flex flex-col bg-[#000000] pb-[53px]">
+          <AtlasOverview
+            communities={communities}
+            isAddMode={isAddMode}
+            onToggleAddMode={handleToggleAddMode}
+            onSelectCommunity={(c) => {
+              setMobileTab('map');
+              mapRef.current?.flyToCommunity(c);
+            }}
+            onFlyTo={(center, zoom) => {
+              setMobileTab('map');
+              mapRef.current?.flyTo(center, zoom);
+            }}
+            onResetView={() => {
+              setSelectedFeature(null);
+              mapRef.current?.resetView();
+            }}
+            showStates={showStates}
+            onToggleStates={setShowStates}
+            showLgas={showLgas}
+            onToggleLgas={setShowLgas}
+            showCommunities={showCommunities}
+            onToggleCommunities={setShowCommunities}
+            showWaterways={showWaterways}
+            onToggleWaterways={setShowWaterways}
+            showLandmarks={showLandmarks}
+            onToggleLandmarks={setShowLandmarks}
+            showDialects={showDialects}
+            onToggleDialects={setShowDialects}
+            showMigrationArcs={showMigrationArcs}
+            onToggleMigrationArcs={setShowMigrationArcs}
+            showHistoricalOverlay={showHistoricalOverlay}
+            onToggleHistoricalOverlay={setShowHistoricalOverlay}
+            historicalOpacity={historicalOpacity}
+            onHistoricalOpacityChange={setHistoricalOpacity}
+            showDensity={showDensity}
+            onToggleDensity={setShowDensity}
+            selectedFeature={selectedFeature}
+            onCloseSelected={() => {
+              setSelectedFeature(null);
+              mapRef.current?.resetView();
+            }}
+            onDocumentFeature={(feature) => {
+              let coords = feature.coordinates
+                ? { lon: feature.coordinates[0], lat: feature.coordinates[1] }
+                : mapRef.current?.getCenter?.() || { lon: 7.05, lat: 5.5 };
+              setPendingModal({
+                coords,
+                name: feature.name || '',
+              });
+              setIsAddMode(false);
+            }}
+            onCommunityUpdated={loadCommunities}
+            activeFilter={activeFilter}
+            onFilterChange={setActiveFilter}
+            onSelectFeature={setSelectedFeature}
+            onHighlightLgas={(lgas) => mapRef.current?.highlightLgas(lgas)}
+            onHighlightRegion={(codes, center, zoom) => mapRef.current?.highlightRegion(codes, center, zoom)}
+            onSelectLgaByCode={(code) => mapRef.current?.selectLgaByCode(code)}
+            onSelectState={(code) => mapRef.current?.selectStateByCode(code)}
+            onInspectMigrationArc={(arc) => {
+              setShowMigrationArcs(true);
+              setMobileTab('map');
+              mapRef.current?.inspectMigrationArc(arc);
+            }}
+            onSelectDialectCluster={(cluster) => {
+              setShowDialects(true);
+              mapRef.current?.highlightDialectCluster(cluster);
+            }}
+            onFilterMarketDay={(dayName) => {
+              const next = selectedMarketFilter === dayName ? null : dayName;
+              setSelectedMarketFilter(next);
+              setShowLandmarks(true);
+              mapRef.current?.filterLandmarksByMarketDay(next);
+            }}
+            selectedMarketFilter={selectedMarketFilter}
+            onFlyThroughCorridor={(corridorId) => {
+              setMobileTab('map');
+              mapRef.current?.startCinematicFlyThrough(corridorId);
+            }}
+            onOpenKindredMapping={(community) => {
+              setMobileTab('map');
+              mapRef.current?.openKindredMappingModal(undefined, community);
+            }}
+            activeTab={mobileTab as AtlasTab}
+            onTabChange={(tab) => {
+              if (tab === 'explore' || tab === 'culture' || tab === 'voices' || tab === 'archives') {
+                setMobileTab(tab);
+              }
+              setActiveTab(tab);
+            }}
+            hideTopTabs={true}
+          />
+        </main>
+      )}
 
-        {mobileSheetState === 'peek' ? (
-          /* MOBILE PEEK MINI BAR: Quick Search or Selected Feature Summary */
-          <div className="w-full h-[46px] px-3 flex items-center justify-between gap-2 overflow-hidden">
-            {selectedFeature ? (
-              <div className="flex items-center justify-between w-full min-w-0 gap-2">
-                <div
-                  className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
-                  onClick={() => setMobileSheetState('half')}
-                >
-                  <span
-                    className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-white/20"
-                    style={{ backgroundColor: selectedFeature.markerColor || '#10b981' }}
-                  />
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-white truncate leading-tight">{selectedFeature.name}</p>
-                    <p className="text-[10px] text-slate-400 truncate leading-tight">
-                      {[selectedFeature.placeType || selectedFeature.type, selectedFeature.parentName].filter(Boolean).join(' · ')}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setMobileSheetState('half')}
-                    className="px-2.5 py-1 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-[11px] font-semibold border border-emerald-500/30 flex items-center gap-1"
-                  >
-                    <span>Details</span>
-                    <ChevronUp className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedFeature(null);
-                      mapRef.current?.resetView();
-                    }}
-                    className="p-1 rounded-lg text-slate-400 hover:text-white"
-                    title="Clear selection"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between w-full gap-2">
-                <button
-                  type="button"
-                  onClick={() => setMobileSheetState('half')}
-                  className="flex-1 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/[0.05] border border-white/10 text-xs text-slate-300 text-left truncate active:bg-white/[0.08]"
-                >
-                  <Search className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span className="truncate">Search town, clan, or LGA…</span>
-                  <span className="ml-auto text-[10px] font-mono text-emerald-400/90 px-1.5 py-0.5 rounded bg-emerald-500/10 font-bold">
-                    {communities.length}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsAddMode(true);
-                    setMobileSheetState('peek');
-                  }}
-                  className="h-[32px] px-3 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-black font-bold text-xs flex items-center gap-1 shrink-0 shadow-lg shadow-emerald-500/20 active:scale-95"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add</span>
-                </button>
-              </div>
-            )}
-          </div>
-        ) : (
-          /* EXPANDED MOBILE SHEET: Title Bar + Full AtlasOverview Content */
-          <div className="h-full w-full min-h-0 flex flex-col">
-            <div
-              className="shrink-0 px-3.5 py-1.5 flex items-center justify-between border-b border-white/[0.06] bg-[#070c18]"
-              onTouchStart={handleSheetTouchStart}
-              onTouchEnd={handleSheetTouchEnd}
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-xs font-bold text-white truncate font-display">
-                  {selectedFeature
-                    ? selectedFeature.name
-                    : activeTab === 'explore'
-                    ? 'Explore Communities'
-                    : activeTab === 'culture'
-                    ? 'Cultural & Dialect Continuum'
-                    : activeTab === 'voices'
-                    ? 'Community Comments & Feed'
-                    : activeTab === 'archives'
-                    ? 'Archival Records'
-                    : 'Map Key & Legend'}
-                </span>
-                {selectedFeature && (
-                  <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0">
-                    {selectedFeature.placeType || selectedFeature.type}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setMobileSheetState((prev) => (prev === 'half' ? 'full' : 'half'))}
-                  className="p-1.5 rounded-lg text-slate-300 hover:text-white bg-white/[0.05] border border-white/10"
-                  title={mobileSheetState === 'full' ? 'Restore half height' : 'Expand full screen'}
-                >
-                  <ChevronUp className={`w-3.5 h-3.5 transition-transform ${mobileSheetState === 'full' ? 'rotate-180' : ''}`} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMobileSheetState('peek')}
-                  className="p-1.5 rounded-lg text-slate-300 hover:text-white bg-white/[0.05] border border-white/10"
-                  title="Minimize sheet to map"
-                >
-                  <ChevronDown className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
+      {/* Pre-2023 Twitter Floating Action Button (FAB) */}
+      <TwitterComposeFAB
+        onAddLocation={() => {
+          setMobileTab('map');
+          setIsAddMode(true);
+          setPendingModal({ coords: { lon: 7.05, lat: 5.5 }, name: '' });
+        }}
+        onAddVoice={() => setIsVoiceModalOpen(true)}
+      />
 
-            <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-              <AtlasOverview
-                communities={communities}
-                isAddMode={isAddMode}
-                onToggleAddMode={() => setIsAddMode((p) => !p)}
-                onSelectCommunity={(c) => {
-                  setMobileSheetState('peek');
-                  mapRef.current?.flyToCommunity(c);
-                }}
-                onFlyTo={(center, zoom) => mapRef.current?.flyTo(center, zoom)}
-                onResetView={() => {
-                  setSelectedFeature(null);
-                  mapRef.current?.resetView();
-                }}
-                showStates={showStates}
-                onToggleStates={setShowStates}
-                showLgas={showLgas}
-                onToggleLgas={setShowLgas}
-                showCommunities={showCommunities}
-                onToggleCommunities={setShowCommunities}
-                showWaterways={showWaterways}
-                onToggleWaterways={setShowWaterways}
-                showLandmarks={showLandmarks}
-                onToggleLandmarks={setShowLandmarks}
-                showDialects={showDialects}
-                onToggleDialects={setShowDialects}
-                showMigrationArcs={showMigrationArcs}
-                onToggleMigrationArcs={setShowMigrationArcs}
-                showHistoricalOverlay={showHistoricalOverlay}
-                onToggleHistoricalOverlay={setShowHistoricalOverlay}
-                historicalOpacity={historicalOpacity}
-                onHistoricalOpacityChange={setHistoricalOpacity}
-                showDensity={showDensity}
-                onToggleDensity={setShowDensity}
-                selectedFeature={selectedFeature}
-                onCloseSelected={() => {
-                  setSelectedFeature(null);
-                  mapRef.current?.resetView();
-                }}
-                onDocumentFeature={(feature) => {
-                  let coords = feature.coordinates
-                    ? { lon: feature.coordinates[0], lat: feature.coordinates[1] }
-                    : mapRef.current?.getCenter?.() || { lon: 7.05, lat: 5.5 };
-                  setPendingModal({
-                    coords,
-                    name: feature.name || '',
-                  });
-                  setIsAddMode(false);
-                }}
-                onCommunityUpdated={loadCommunities}
-                activeFilter={activeFilter}
-                onFilterChange={setActiveFilter}
-                onSelectFeature={setSelectedFeature}
-                onHighlightLgas={(lgas) => mapRef.current?.highlightLgas(lgas)}
-                onHighlightRegion={(codes, center, zoom) => mapRef.current?.highlightRegion(codes, center, zoom)}
-                onSelectLgaByCode={(code) => mapRef.current?.selectLgaByCode(code)}
-                onSelectState={(code) => mapRef.current?.selectStateByCode(code)}
-                onInspectMigrationArc={(arc) => {
-                  setShowMigrationArcs(true);
-                  mapRef.current?.inspectMigrationArc(arc);
-                }}
-                onSelectDialectCluster={(cluster) => {
-                  setShowDialects(true);
-                  mapRef.current?.highlightDialectCluster(cluster);
-                }}
-                onFilterMarketDay={(dayName) => {
-                  const next = selectedMarketFilter === dayName ? null : dayName;
-                  setSelectedMarketFilter(next);
-                  setShowLandmarks(true);
-                  mapRef.current?.filterLandmarksByMarketDay(next);
-                }}
-                selectedMarketFilter={selectedMarketFilter}
-                onFlyThroughCorridor={(corridorId) => {
-                  setMobileSheetState('peek');
-                  mapRef.current?.startCinematicFlyThrough(corridorId);
-                }}
-                onOpenKindredMapping={(community) => {
-                  setMobileSheetState('peek');
-                  mapRef.current?.openKindredMappingModal(undefined, community);
-                }}
-                activeTab={activeTab}
-                onTabChange={setActiveTab}
-                hideTopTabs={true}
-              />
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Pre-2023 Twitter Mobile Bottom Navigation Dock */}
+      <MobileTwitterBottomNav
+        activeTab={mobileTab}
+        onTabSelect={(tab: MobileTab) => {
+          setMobileTab(tab);
+          if (tab === 'map') {
+            setTimeout(() => mapRef.current?.resize(), 50);
+          }
+        }}
+        hasNewVoices={false}
+      />
 
-      {/* Mobile Bottom Navigation Bar (Thumb Dock) */}
-      <nav
-        aria-label="Mobile Navigation"
-        className="lg:hidden fixed bottom-0 left-0 right-0 h-[56px] z-40 bg-[#070b16]/95 backdrop-blur-2xl border-t border-white/10 px-1 flex items-center justify-around select-none pb-[env(safe-area-inset-bottom)]"
-      >
-        {/* 1. Map */}
-        <button
-          type="button"
-          onClick={() => setMobileSheetState('peek')}
-          className={`flex-1 flex flex-col items-center justify-center py-1 rounded-xl transition-all active:scale-90 ${
-            mobileSheetState === 'peek'
-              ? 'text-emerald-400 font-bold'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <MapIcon className="w-4 h-4 mb-0.5" />
-          <span className="text-[10px] tracking-tight">Map</span>
-          {mobileSheetState === 'peek' && (
-            <span className="w-1 h-1 rounded-full bg-emerald-400 mt-0.5 animate-pulse" />
-          )}
-        </button>
-
-        {/* 2. Explore */}
-        <button
-          type="button"
-          onClick={() => {
-            setActiveTab('explore');
-            setMobileSheetState((prev) => (prev === 'peek' ? 'half' : prev));
-          }}
-          className={`flex-1 flex flex-col items-center justify-center py-1 rounded-xl transition-all active:scale-90 ${
-            activeTab === 'explore' && mobileSheetState !== 'peek'
-              ? 'text-emerald-400 font-bold'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Compass className="w-4 h-4 mb-0.5" />
-          <span className="text-[10px] tracking-tight">Explore</span>
-          {activeTab === 'explore' && mobileSheetState !== 'peek' && (
-            <span className="w-1 h-1 rounded-full bg-emerald-400 mt-0.5 animate-pulse" />
-          )}
-        </button>
-
-        {/* 3. Culture */}
-        <button
-          type="button"
-          onClick={() => {
-            setActiveTab('culture');
-            setMobileSheetState((prev) => (prev === 'peek' ? 'half' : prev));
-          }}
-          className={`flex-1 flex flex-col items-center justify-center py-1 rounded-xl transition-all active:scale-90 ${
-            activeTab === 'culture' && mobileSheetState !== 'peek'
-              ? 'text-emerald-400 font-bold'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Sparkles className="w-4 h-4 mb-0.5" />
-          <span className="text-[10px] tracking-tight">Culture</span>
-          {activeTab === 'culture' && mobileSheetState !== 'peek' && (
-            <span className="w-1 h-1 rounded-full bg-emerald-400 mt-0.5 animate-pulse" />
-          )}
-        </button>
-
-        {/* 4. Comments */}
-        <button
-          type="button"
-          onClick={() => {
+      {/* Quick Twitter Voice Compose Modal */}
+      {isVoiceModalOpen && (
+        <TwitterVoiceModal
+          communities={communities}
+          selectedFeature={selectedFeature}
+          onClose={() => setIsVoiceModalOpen(false)}
+          onSuccess={() => {
+            setIsVoiceModalOpen(false);
+            loadCommunities();
             setActiveTab('voices');
-            setMobileSheetState((prev) => (prev === 'peek' ? 'half' : prev));
+            setMobileTab('voices');
           }}
-          className={`flex-1 flex flex-col items-center justify-center py-1 rounded-xl transition-all active:scale-90 ${
-            activeTab === 'voices' && mobileSheetState !== 'peek'
-              ? 'text-emerald-400 font-bold'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <MessageSquare className="w-4 h-4 mb-0.5" />
-          <span className="text-[10px] tracking-tight">Comments</span>
-          {activeTab === 'voices' && mobileSheetState !== 'peek' && (
-            <span className="w-1 h-1 rounded-full bg-emerald-400 mt-0.5 animate-pulse" />
-          )}
-        </button>
-
-        {/* 5. Archives */}
-        <button
-          type="button"
-          onClick={() => {
-            setActiveTab('archives');
-            setMobileSheetState((prev) => (prev === 'peek' ? 'half' : prev));
-          }}
-          className={`flex-1 flex flex-col items-center justify-center py-1 rounded-xl transition-all active:scale-90 ${
-            activeTab === 'archives' && mobileSheetState !== 'peek'
-              ? 'text-emerald-400 font-bold'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Archive className="w-4 h-4 mb-0.5" />
-          <span className="text-[10px] tracking-tight">Archives</span>
-          {activeTab === 'archives' && mobileSheetState !== 'peek' && (
-            <span className="w-1 h-1 rounded-full bg-emerald-400 mt-0.5 animate-pulse" />
-          )}
-        </button>
-      </nav>
+        />
+      )}
 
       {/* Global Add Community Documentation Modal */}
       {pendingModal && (

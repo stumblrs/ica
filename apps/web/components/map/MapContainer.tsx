@@ -223,11 +223,29 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
     }
   }, [is3D, basemapMode, pitchPreset, stopOrbit]);
 
-  const [isBasemapHudCollapsed, setIsBasemapHudCollapsed] = useState(false);
+  const [isMapControlsOpen, setIsMapControlsOpen] = useState(false);
+  const [showLayersPopover, setShowLayersPopover] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [showMobileLayersModal, setShowMobileLayersModal] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const waterwaysLoadedRef = useRef(false);
+
+  useEffect(() => {
+    function handleToggleControls() {
+      setIsMapControlsOpen((prev) => !prev);
+    }
+    function handleCloseControls() {
+      setIsMapControlsOpen(false);
+      setShowLayersPopover(false);
+    }
+    window.addEventListener('ica:toggle-map-controls', handleToggleControls);
+    window.addEventListener('ica:close-map-controls', handleCloseControls);
+    return () => {
+      window.removeEventListener('ica:toggle-map-controls', handleToggleControls);
+      window.removeEventListener('ica:close-map-controls', handleCloseControls);
+    };
+  }, []);
+
 
   function handleLocateUser() {
     if (!navigator.geolocation) {
@@ -308,6 +326,18 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
   const [flightBearing, setFlightBearing] = useState(0);
   const [flightPitch, setFlightPitch] = useState(64);
   const flightTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const hasActiveEffects = is3D || showDensity || !!activeFlightCorridor;
+    window.dispatchEvent(
+      new CustomEvent('ica:map-controls-state', {
+        detail: { isOpen: isMapControlsOpen, hasActiveEffects },
+      })
+    );
+    if (!isMapControlsOpen) {
+      setShowLayersPopover(false);
+    }
+  }, [isMapControlsOpen, is3D, showDensity, activeFlightCorridor]);
 
   const buildFlightCorridor = useCallback((corridorId: string): FlightCorridorItem | null => {
     let arc = ANCESTRAL_MIGRATION_ARCS.find((a) => a.id === corridorId);
@@ -2845,7 +2875,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
     <div className="relative w-full h-full min-h-[300px] overflow-hidden bg-[#060911]">
       {/* Placement mode banner */}
       {isAddMode && (
-        <div className={`absolute ${isFiltersCollapsed ? 'top-3' : 'top-[82px] sm:top-[86px]'} left-1/2 -translate-x-1/2 z-20 px-3.5 py-1.5 rounded-full bg-slate-950/95 border border-amber-400/50 text-amber-200 text-[11px] font-medium shadow-2xl flex items-center gap-2 whitespace-nowrap transition-all duration-200`}>
+        <div className="absolute top-3.5 sm:top-4 left-1/2 -translate-x-1/2 z-30 px-3.5 py-1.5 rounded-full bg-slate-950/95 border border-amber-400/50 text-amber-200 text-[11px] font-medium shadow-2xl flex items-center gap-2 whitespace-nowrap transition-all duration-200">
           <span className="h-2 w-2 rounded-full bg-amber-400 animate-ping" />
           Tap the map where the community is located
           <button type="button" onClick={() => setIsAddMode(false)} className="ml-1 text-amber-300/80 hover:text-white underline underline-offset-2">
@@ -2854,191 +2884,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         </div>
       )}
 
-      {/* Modern Basemap Style Toggle & 3D Tilt HUD (Desktop: Collapsible for clean map focus) */}
-      <div className={`absolute ${isFiltersCollapsed ? 'top-2.5 sm:top-3' : 'top-[82px] sm:top-[86px]'} right-3 sm:right-4 z-20 hidden sm:flex items-center transition-all duration-200`}>
-        {isBasemapHudCollapsed ? (
-          <button
-            type="button"
-            onClick={() => setIsBasemapHudCollapsed(false)}
-            className="h-9 w-9 rounded-xl bg-[#090e1c]/90 hover:bg-[#0f172a] border border-white/15 text-slate-200 hover:text-white shadow-2xl backdrop-blur-xl transition-all active:scale-95 hover:border-emerald-500/40 flex items-center justify-center relative group"
-            title="Expand Map Style, Density & 3D Controls"
-            aria-label="Expand Map Style Controls"
-          >
-            <Layers className="w-4 h-4 text-emerald-400 group-hover:rotate-12 transition-transform" />
-            {(is3D || showDensity) && (
-              <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-            )}
-          </button>
-        ) : (
-          <div className="flex items-center p-0.5 rounded-xl bg-[#090e1c]/90 backdrop-blur-xl border border-white/10 shadow-2xl gap-0.5 animate-in fade-in slide-in-from-right-2 duration-200">
-            <button
-              type="button"
-              onClick={() => onBasemapChange?.('dark')}
-              className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all ${
-                basemapMode === 'dark'
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-              title="Dark midnight glassmorphic cartography"
-            >
-              Dark
-            </button>
-            <button
-              type="button"
-              onClick={() => onBasemapChange?.('satellite')}
-              className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all ${
-                basemapMode === 'satellite'
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-              title="High-resolution satellite imagery"
-            >
-              Satellite
-            </button>
-            <button
-              type="button"
-              onClick={() => onBasemapChange?.('topo')}
-              className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all ${
-                basemapMode === 'topo'
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-              title="Topographic physical relief (Udi Hills, Nsukka plateau)"
-            >
-              Topographic
-            </button>
-            <button
-              type="button"
-              onClick={() => onBasemapChange?.('light')}
-              className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all ${
-                basemapMode === 'light'
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-              title="Clean academic cartography"
-            >
-              Light
-            </button>
 
-            <div className="w-px h-4 bg-white/10 mx-0.5" />
-
-            <button
-              type="button"
-              onClick={() => onToggleDensity?.(!showDensity)}
-              className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all flex items-center gap-1.5 ${
-                showDensity
-                  ? 'bg-amber-500/25 text-amber-300 border border-amber-500/50 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-              title="Toggle Derived Spatial Presence Heatmap"
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${showDensity ? 'bg-amber-400 animate-pulse' : 'bg-slate-500'}`} />
-              <span>Density Map</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={toggle3D}
-              className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all flex items-center gap-1.5 ${
-                is3D
-                  ? 'bg-amber-500/25 text-amber-300 border border-amber-500/50 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-              title="Toggle 3D Elevation Terrain, Physical Relief & Atmospheric Sky"
-            >
-              <Mountain className={`w-3 h-3 ${is3D ? 'text-amber-400' : 'text-slate-400'}`} />
-              <span>3D Terrain</span>
-              <span className={`w-1.5 h-1.5 rounded-full ${is3D ? 'bg-amber-400 animate-pulse' : 'bg-slate-500'}`} />
-            </button>
-
-            {is3D && (
-              <>
-                {/* 3D Tilt Angle Switcher */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const nextPitch = pitchPreset === 56 ? 74 : 56;
-                    setPitchPreset(nextPitch);
-                    map.current?.easeTo({ pitch: nextPitch, duration: 700 });
-                  }}
-                  className="px-2 py-1 rounded-lg text-[10px] font-mono font-medium text-amber-200/90 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-all"
-                  title="Switch between 56° Oblique angle and 74° Deep Horizon view"
-                >
-                  <span>{pitchPreset}°</span>
-                </button>
-
-                {/* 360° Cinematic Orbit */}
-                <button
-                  type="button"
-                  onClick={toggleOrbit}
-                  className={`px-2 py-1 rounded-lg text-[10px] font-mono font-medium transition-all flex items-center gap-1 ${
-                    isOrbiting
-                      ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/50 animate-pulse shadow-sm'
-                      : 'text-slate-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/10'
-                  }`}
-                  title={isOrbiting ? 'Stop 360° Drone Orbit' : 'Start 360° Drone Cinematic Orbit'}
-                >
-                  {isOrbiting ? <Pause className="w-2.5 h-2.5 text-emerald-400" /> : <Play className="w-2.5 h-2.5 text-amber-400" />}
-                  <span>{isOrbiting ? 'Orbiting' : 'Orbit'}</span>
-                </button>
-              </>
-            )}
-
-            {/* 3D Cinematic Fly-Through Trigger */}
-            <button
-              type="button"
-              onClick={() => {
-                if (activeFlightCorridor) {
-                  stopCinematicFlyThrough();
-                } else {
-                  startCinematicFlyThrough('nri-hegemony');
-                }
-              }}
-              className={`px-2 py-1 rounded-lg text-[10px] font-mono font-medium transition-all flex items-center gap-1 ${
-                activeFlightCorridor
-                  ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-500/50 shadow-sm animate-pulse'
-                  : 'text-slate-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/10'
-              }`}
-              title="3D Cinematic Fly-Through along ancestral migration arcs and waterways"
-            >
-              <Navigation className="w-3 h-3 text-cyan-400" />
-              <span>{activeFlightCorridor ? 'Exit Flight' : 'Fly 3D'}</span>
-            </button>
-
-            {/* Pin Kindred Landmark Trigger */}
-            <button
-              type="button"
-              onClick={() => {
-                const next = !isPinningKindred;
-                setIsPinningKindred(next);
-                isPinningKindredRef.current = next;
-              }}
-              className={`px-2 py-1 rounded-lg text-[10px] font-mono font-medium transition-all flex items-center gap-1 ${
-                isPinningKindred
-                  ? 'bg-teal-500/30 text-teal-300 border border-teal-500/50 shadow-sm ring-1 ring-teal-400'
-                  : 'text-slate-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/10'
-              }`}
-              title="Click map to micro-map an ancestral village square, kindred hall, or sacred grove"
-            >
-              <LandmarkIcon className="w-3 h-3 text-teal-400" />
-              <span>Pin Kindred</span>
-            </button>
-
-            <div className="w-px h-4 bg-white/10 mx-0.5" />
-
-            {/* Collapse HUD Button */}
-            <button
-              type="button"
-              onClick={() => setIsBasemapHudCollapsed(true)}
-              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-              title="Collapse into compact icon (clean map view)"
-              aria-label="Collapse map style bar"
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-      </div>
 
       {/* Dynamic Spatial Presence Heatmap Legend & Disclaimer Card */}
       {showDensity && (
@@ -3078,101 +2924,272 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         </div>
       )}
 
-      {/* Floating Action Controls Stack on Map */}
-      <div className={`absolute ${isFiltersCollapsed ? 'top-14 sm:top-14' : 'top-[82px] sm:top-[128px]'} right-3 sm:right-4 z-20 flex flex-col gap-2 items-center transition-all duration-200`}>
-        {/* Mobile & Desktop 3D Fly-Through Floating Button */}
-        <button
-          type="button"
-          onClick={() => {
-            if (activeFlightCorridor) {
-              stopCinematicFlyThrough();
-            } else {
-              startCinematicFlyThrough('nri-hegemony');
-            }
-          }}
-          className={`h-9 w-9 rounded-xl backdrop-blur-xl border flex items-center justify-center shadow-xl active:scale-95 transition-all ${
-            activeFlightCorridor
-              ? 'bg-cyan-500/25 border-cyan-400 text-cyan-300 ring-2 ring-cyan-400/40 animate-pulse'
-              : 'bg-[#090e1c]/90 border-white/15 text-slate-300 hover:text-white hover:border-cyan-500/40 hover:bg-[#0f172a]'
-          }`}
-          title={activeFlightCorridor ? 'Exit 3D Fly-Through' : '3D Cinematic Fly-Through'}
-          aria-label="3D Cinematic Fly-Through"
-        >
-          <Navigation className={`w-4 h-4 ${activeFlightCorridor ? 'text-cyan-300' : 'text-cyan-400'}`} />
-        </button>
+      {/* Unified Map Controls Island (Toggled from Top AppBar) */}
+      {isMapControlsOpen && (
+        <div className="absolute top-14 sm:top-4 right-3 sm:right-4 z-20 flex flex-col items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="flex flex-col items-center p-1 rounded-2xl bg-[#000000]/85 backdrop-blur-xl border border-[#2f3336] shadow-2xl gap-1">
+            {/* Close Button to hide controls when not in use */}
+            <button
+              type="button"
+              onClick={() => setIsMapControlsOpen(false)}
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all active:scale-95"
+              title="Close Map Tools"
+              aria-label="Close Map Tools"
+            >
+              <X className="w-4 h-4" />
+            </button>
 
-        {/* Mobile Basemap, Density & 3D Drawer Modal Trigger */}
-        <button
-          type="button"
-          onClick={() => setShowMobileLayersModal(true)}
-          className="sm:hidden h-9 w-9 rounded-xl bg-[#090e1c]/90 backdrop-blur-xl border border-white/15 text-slate-300 hover:text-white flex items-center justify-center shadow-xl active:scale-95 transition-all relative"
-          title="Change Basemap & Perspective"
-          aria-label="Change Basemap"
-        >
-          <Layers className="w-4 h-4 text-emerald-400" />
-          {(is3D || showDensity) && (
-            <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-          )}
-        </button>
+            <div className="w-5 h-px bg-[#2f3336] my-0.5" />
 
-        {/* Zoom In Button */}
-        <button
-          type="button"
-          onClick={() => {
-            if (map.current) map.current.zoomIn({ duration: 300 });
-          }}
-          className="h-9 w-9 rounded-xl bg-[#090e1c]/90 backdrop-blur-xl border border-white/15 text-slate-300 hover:text-white flex items-center justify-center shadow-xl active:scale-90 transition-all hover:border-emerald-500/40 hover:bg-[#0f172a]"
-          title="Zoom In (+)"
-          aria-label="Zoom In"
-        >
-          <Plus className="w-4 h-4 text-emerald-400" />
-        </button>
+            {/* Map Style & Layers */}
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.innerWidth < 640) {
+                  setShowMobileLayersModal(true);
+                } else {
+                  setShowLayersPopover((prev) => !prev);
+                }
+              }}
+              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-95 relative ${
+                showLayersPopover || showMobileLayersModal
+                  ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40'
+                  : 'text-slate-300 hover:text-white hover:bg-white/10'
+              }`}
+              title="Map Style & Layers (Basemap, 3D Terrain, Density)"
+              aria-label="Map Style & Layers"
+            >
+              <Layers className="w-4 h-4 text-emerald-400" />
+              {(is3D || showDensity) && (
+                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              )}
+            </button>
 
-        {/* Zoom Out Button */}
-        <button
-          type="button"
-          onClick={() => {
-            if (map.current) map.current.zoomOut({ duration: 300 });
-          }}
-          className="h-9 w-9 rounded-xl bg-[#090e1c]/90 backdrop-blur-xl border border-white/15 text-slate-300 hover:text-white flex items-center justify-center shadow-xl active:scale-90 transition-all hover:border-emerald-500/40 hover:bg-[#0f172a]"
-          title="Zoom Out (-)"
-          aria-label="Zoom Out"
-        >
-          <Minus className="w-4 h-4 text-emerald-400" />
-        </button>
+            {/* 3D Fly-Through Floating Button */}
+            <button
+              type="button"
+              onClick={() => {
+                if (activeFlightCorridor) {
+                  stopCinematicFlyThrough();
+                } else {
+                  startCinematicFlyThrough('nri-hegemony');
+                }
+              }}
+              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-95 ${
+                activeFlightCorridor
+                  ? 'bg-cyan-500/25 border border-cyan-400 text-cyan-300 ring-2 ring-cyan-400/40 animate-pulse'
+                  : 'text-slate-300 hover:text-white hover:bg-white/10'
+              }`}
+              title={activeFlightCorridor ? 'Exit 3D Fly-Through' : '3D Cinematic Fly-Through'}
+              aria-label="3D Cinematic Fly-Through"
+            >
+              <Navigation className={`w-4 h-4 ${activeFlightCorridor ? 'text-cyan-300' : 'text-cyan-400'}`} />
+            </button>
 
-        {/* GPS Locate Me Button */}
-        <button
-          type="button"
-          onClick={handleLocateUser}
-          className={`h-9 w-9 rounded-xl bg-[#090e1c]/90 backdrop-blur-xl border border-white/15 flex items-center justify-center shadow-xl active:scale-95 transition-all ${
-            isLocating ? 'text-amber-400 ring-2 ring-amber-400/40' : 'text-slate-300 hover:text-white'
-          }`}
-          title="Center on my current GPS location"
-          aria-label="Locate me"
-        >
-          {isLocating ? (
-            <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
-          ) : (
-            <Crosshair className="w-4 h-4 text-emerald-400" />
-          )}
-        </button>
+            {/* Recenter Map Button */}
+            <button
+              type="button"
+              onClick={() => {
+                if (map.current) {
+                  map.current.easeTo({ center: [7.25, 5.85], zoom: 6.8, pitch: is3D ? 52 : 0, bearing: is3D ? -15 : 0, duration: 800 });
+                }
+              }}
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/10 transition-all active:scale-95"
+              title="Recenter Map View"
+              aria-label="Recenter Map View"
+            >
+              <Compass className="w-4 h-4 text-emerald-400" />
+            </button>
 
-        {/* Recenter Map Button */}
-        <button
-          type="button"
-          onClick={() => {
-            if (map.current) {
-              map.current.easeTo({ center: [7.25, 5.85], zoom: 6.8, pitch: is3D ? 52 : 0, bearing: is3D ? -15 : 0, duration: 800 });
-            }
-          }}
-          className="h-9 w-9 rounded-xl bg-[#090e1c]/90 backdrop-blur-xl border border-white/15 text-slate-300 hover:text-white flex items-center justify-center shadow-xl active:scale-95 transition-all"
-          title="Recenter Map View"
-          aria-label="Recenter Map View"
-        >
-          <Compass className="w-4 h-4 text-emerald-400" />
-        </button>
-      </div>
+            {/* GPS Locate Me Button */}
+            <button
+              type="button"
+              onClick={handleLocateUser}
+              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-95 ${
+                isLocating ? 'text-amber-400 ring-2 ring-amber-400/40' : 'text-slate-300 hover:text-white hover:bg-white/10'
+              }`}
+              title="Center on my current GPS location"
+              aria-label="Locate me"
+            >
+              {isLocating ? (
+                <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
+              ) : (
+                <Crosshair className="w-4 h-4 text-emerald-400" />
+              )}
+            </button>
+
+            {/* Divider */}
+            <div className="w-5 h-px bg-[#2f3336] my-0.5" />
+
+            {/* Zoom In Button */}
+            <button
+              type="button"
+              onClick={() => {
+                if (map.current) map.current.zoomIn({ duration: 300 });
+              }}
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/10 transition-all active:scale-90"
+              title="Zoom In (+)"
+              aria-label="Zoom In"
+            >
+              <Plus className="w-4 h-4 text-emerald-400" />
+            </button>
+
+            {/* Zoom Out Button */}
+            <button
+              type="button"
+              onClick={() => {
+                if (map.current) map.current.zoomOut({ duration: 300 });
+              }}
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/10 transition-all active:scale-90"
+              title="Zoom Out (-)"
+              aria-label="Zoom Out"
+            >
+              <Minus className="w-4 h-4 text-emerald-400" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Desktop Layers & Perspective Popover */}
+      {isMapControlsOpen && showLayersPopover && (
+        <div className="hidden sm:block absolute top-4 right-16 z-30 w-80 rounded-2xl bg-[#000000]/95 backdrop-blur-xl border border-[#2f3336] p-4 shadow-2xl animate-in fade-in slide-in-from-right-2 duration-150">
+          <div className="flex items-center justify-between pb-2.5 mb-3 border-b border-[#2f3336]">
+            <div className="flex items-center gap-2">
+              <Layers className="w-4 h-4 text-emerald-400" />
+              <span className="text-xs font-bold text-[#e7e9ea]">Map Style & Perspectives</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowLayersPopover(false)}
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+              aria-label="Close layers menu"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Basemaps grid */}
+          <div className="grid grid-cols-2 gap-1.5 mb-3">
+            {[
+              { id: 'dark' as BasemapMode, label: 'Dark Midnight', desc: 'Glassmorphic' },
+              { id: 'satellite' as BasemapMode, label: 'Satellite', desc: 'High-res imagery' },
+              { id: 'topo' as BasemapMode, label: 'Topographic', desc: 'Physical relief' },
+              { id: 'light' as BasemapMode, label: 'Light', desc: 'Clean cartography' },
+            ].map((b) => (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => onBasemapChange?.(b.id)}
+                className={`p-2 rounded-xl border text-left transition-all ${
+                  basemapMode === b.id
+                    ? 'bg-emerald-500/20 border-emerald-500/60 text-emerald-300 ring-1 ring-emerald-500/40'
+                    : 'bg-white/[0.04] border-white/[0.08] text-slate-300 hover:border-white/20'
+                }`}
+              >
+                <span className="block text-[11px] font-bold text-white">{b.label}</span>
+                <span className="block text-[9px] text-slate-400">{b.desc}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* 3D Elevation Terrain Switch */}
+          <div className="pt-2.5 border-t border-[#2f3336] flex items-center justify-between">
+            <div>
+              <span className="block text-xs font-bold text-white flex items-center gap-1.5">
+                <Mountain className="w-3.5 h-3.5 text-amber-400" />
+                3D Elevation Terrain
+              </span>
+              <span className="block text-[10px] text-slate-400">
+                {is3D ? `Active (${pitchPreset}° angle)` : 'Physical hills & valleys'}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              {is3D && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextPitch = pitchPreset === 56 ? 74 : 56;
+                      setPitchPreset(nextPitch);
+                      map.current?.easeTo({ pitch: nextPitch, duration: 700 });
+                    }}
+                    className="px-2 py-1 rounded-lg text-[10px] font-mono text-amber-200 bg-white/5 border border-white/10 hover:bg-white/10"
+                    title="Switch pitch preset"
+                  >
+                    {pitchPreset}°
+                  </button>
+                  <button
+                    type="button"
+                    onClick={toggleOrbit}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-mono font-medium transition-all flex items-center gap-1 ${
+                      isOrbiting
+                        ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/50 animate-pulse'
+                        : 'bg-white/5 border border-white/10 text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    {isOrbiting ? <Pause className="w-2.5 h-2.5" /> : <Play className="w-2.5 h-2.5" />}
+                    <span>Orbit</span>
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={toggle3D}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                  is3D
+                    ? 'bg-amber-500/25 border border-amber-500/50 text-amber-300'
+                    : 'bg-white/5 border border-white/10 text-slate-300'
+                }`}
+              >
+                {is3D ? 'On' : 'Off'}
+              </button>
+            </div>
+          </div>
+
+          {/* Density Map Toggle */}
+          <div className="pt-2.5 border-t border-[#2f3336] flex items-center justify-between">
+            <div>
+              <span className="block text-xs font-bold text-white">Density Heatmap</span>
+              <span className="block text-[10px] text-slate-400">Spatial settlement concentration</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => onToggleDensity?.(!showDensity)}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                showDensity
+                  ? 'bg-amber-500/25 border border-amber-500/50 text-amber-300'
+                  : 'bg-white/5 border border-white/10 text-slate-300'
+              }`}
+            >
+              {showDensity ? 'Active' : 'Off'}
+            </button>
+          </div>
+
+          {/* Pin Kindred Landmark */}
+          <div className="pt-2.5 border-t border-[#2f3336] flex items-center justify-between">
+            <div>
+              <span className="block text-xs font-bold text-white">Pin Kindred Landmark</span>
+              <span className="block text-[10px] text-slate-400">Micro-map village squares</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const next = !isPinningKindred;
+                setIsPinningKindred(next);
+                isPinningKindredRef.current = next;
+              }}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 ${
+                isPinningKindred
+                  ? 'bg-teal-500/30 text-teal-300 border border-teal-500/50 ring-1 ring-teal-400'
+                  : 'bg-white/5 border border-white/10 text-slate-300'
+              }`}
+            >
+              <LandmarkIcon className="w-3 h-3 text-teal-400" />
+              <span>{isPinningKindred ? 'Active' : 'Pin'}</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Mobile Basemap, Density & 3D Drawer Modal */}
       {showMobileLayersModal && (

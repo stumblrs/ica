@@ -63,6 +63,9 @@ export function CommunityVoicesTab({
 }: CommunityVoicesTabProps) {
   const [comments, setComments] = useState<EnrichedComment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedState, setSelectedState] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -104,19 +107,21 @@ export function CommunityVoicesTab({
   }, [selectedFeature, communities]);
 
   useEffect(() => {
-    loadAllComments();
-  }, []);
+    loadInitialComments(selectedState);
+  }, [selectedState]);
 
-  async function loadAllComments() {
+  async function loadInitialComments(state = selectedState) {
     try {
       setLoading(true);
-      const res = await fetch('/api/comments');
+      const url = `/api/comments?limit=5${state !== 'all' ? `&state=${encodeURIComponent(state)}` : ''}`;
+      const res = await fetch(url);
       if (res.ok) {
-        const data: EnrichedComment[] = await res.json();
-        const sorted = Array.isArray(data)
-          ? data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-          : [];
+        const data = await res.json();
+        const items: EnrichedComment[] = Array.isArray(data) ? data : (data.comments || []);
+        const sorted = items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         setComments(sorted);
+        setNextCursor(data.nextCursor || null);
+        setHasMore(Boolean(data.hasMore));
 
         // Populate initial likes map
         const initialLikes: Record<string, number> = {};
@@ -129,6 +134,34 @@ export function CommunityVoicesTab({
       console.error('Failed to load comments:', err);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadMoreComments() {
+    if (loadingMore || !hasMore || !nextCursor) return;
+    try {
+      setLoadingMore(true);
+      const url = `/api/comments?limit=5&cursor=${encodeURIComponent(nextCursor)}${selectedState !== 'all' ? `&state=${encodeURIComponent(selectedState)}` : ''}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        const newItems: EnrichedComment[] = Array.isArray(data) ? data : (data.comments || []);
+        setComments((prev) => [...prev, ...newItems]);
+        setNextCursor(data.nextCursor || null);
+        setHasMore(Boolean(data.hasMore));
+
+        setLikesCountMap((prev) => {
+          const next = { ...prev };
+          newItems.forEach((c) => {
+            next[c.id] = c.likes ?? 0;
+          });
+          return next;
+        });
+      }
+    } catch (err) {
+      console.error('Failed to load more comments:', err);
+    } finally {
+      setLoadingMore(false);
     }
   }
 
@@ -283,33 +316,6 @@ export function CommunityVoicesTab({
   return (
     <div className="space-y-4 rise select-text">
       <div ref={topFeedRef} />
-
-      {/* FEED HEADER & REAL-TIME STATS BANNER */}
-      <section className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-950/40 via-[#0a1224] to-[#060a14] border border-emerald-500/20 relative overflow-hidden">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1">
-            <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase font-bold text-emerald-400">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Public Community Timeline</span>
-            </div>
-            <h3 className="font-display text-base sm:text-lg font-bold text-white">
-              Community Comments & Oral Feed
-            </h3>
-            <p className="text-[11px] text-slate-300 leading-relaxed">
-              Real-time microblog of oral histories, lineage facts, dialect greetings, and local updates across Igbo settlements.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={loadAllComments}
-            className="shrink-0 p-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-slate-300 hover:text-white transition-all active:scale-95"
-            title="Refresh Timeline"
-            aria-label="Refresh Timeline"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-emerald-400' : ''}`} />
-          </button>
-        </div>
-      </section>
 
       {/* TWEET-STYLE COMPOSER (Top of Feed) */}
       <section className="card p-3.5 border-emerald-500/25 bg-gradient-to-b from-white/[0.04] to-white/[0.01] shadow-xl">
@@ -523,33 +529,44 @@ export function CommunityVoicesTab({
           )}
         </div>
 
-        {/* State Filter Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar">
-          <button
-            type="button"
-            onClick={() => setSelectedState('all')}
-            className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all shrink-0 ${
-              selectedState === 'all'
-                ? 'bg-emerald-500 text-black shadow-sm'
-                : 'bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 border border-white/[0.06]'
-            }`}
-          >
-            All States ({comments.length})
-          </button>
-          {stateOptions.map((st) => (
+        {/* State Filter Chips with Compact Refresh Action */}
+        <div className="flex items-center justify-between gap-1.5 py-0.5">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
             <button
-              key={st}
               type="button"
-              onClick={() => setSelectedState(st)}
+              onClick={() => setSelectedState('all')}
               className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all shrink-0 ${
-                selectedState === st
+                selectedState === 'all'
                   ? 'bg-emerald-500 text-black shadow-sm'
                   : 'bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 border border-white/[0.06]'
               }`}
             >
-              {st}
+              All States ({comments.length})
             </button>
-          ))}
+            {stateOptions.map((st) => (
+              <button
+                key={st}
+                type="button"
+                onClick={() => setSelectedState(st)}
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all shrink-0 ${
+                  selectedState === st
+                    ? 'bg-emerald-500 text-black shadow-sm'
+                    : 'bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 border border-white/[0.06]'
+                }`}
+              >
+                {st}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => loadInitialComments(selectedState)}
+            className="shrink-0 p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-slate-400 hover:text-white transition-all active:scale-95"
+            title="Refresh Timeline"
+            aria-label="Refresh Timeline"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-emerald-400' : ''}`} />
+          </button>
         </div>
 
         {/* Category Pills */}
@@ -735,6 +752,36 @@ export function CommunityVoicesTab({
               </article>
             );
           })
+        )}
+
+        {/* Lazy Loading More Button / Egress Guard */}
+        {hasMore && (
+          <div className="pt-2 pb-3">
+            <button
+              type="button"
+              onClick={loadMoreComments}
+              disabled={loadingMore}
+              className="w-full py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-xs font-semibold text-slate-300 hover:text-white flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60"
+            >
+              {loadingMore ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                  <span>Loading older testimonies…</span>
+                </>
+              ) : (
+                <>
+                  <span>Load more oral testimonies (5 more)</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
+        {!hasMore && comments.length > 0 && (
+          <div className="py-4 text-center text-[11px] font-mono text-slate-500 border-t border-white/[0.06]">
+            ✨ You are all caught up with the documented timeline.
+          </div>
         )}
       </div>
     </div>
