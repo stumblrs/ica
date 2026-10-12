@@ -1614,8 +1614,18 @@ export function AtlasOverview(props: AtlasOverviewProps) {
             </section>
 
             <section>
-              <SectionTitle icon={MapPin}>Settlements & Markers</SectionTitle>
+              <SectionTitle icon={MapPin}>Settlements & Markers (Map of Igbo Land)</SectionTitle>
               <div className="card divide-y divide-white/[0.06]">
+                <div className="flex items-center gap-3 px-3 py-2.5">
+                  <span className="w-3.5 h-3.5 rounded-sm ring-2 ring-[#0b1120] shrink-0 bg-amber-400 border border-white" style={{ boxShadow: '0 0 10px rgba(251,191,36,0.85)' }} />
+                  <span className="text-[12px] font-semibold text-amber-300 w-28">Regional Capital</span>
+                  <span className="text-[11px] text-slate-300">Capitals on canonical Map of Igbo Land (Golden square ■)</span>
+                </div>
+                <div className="flex items-center gap-3 px-3 py-2.5">
+                  <span className="w-3.5 h-3.5 rounded-full ring-2 ring-[#0b1120] shrink-0 bg-emerald-500 border border-white" style={{ boxShadow: '0 0 10px rgba(16,185,129,0.7)' }} />
+                  <span className="text-[12px] font-semibold text-white w-28">Historic Town</span>
+                  <span className="text-[11px] text-slate-400">Canonical communities from Map of Igbo Land (Emerald dot ●)</span>
+                </div>
                 <div className="flex items-center gap-3 px-3 py-2.5">
                   <span className="w-3.5 h-3.5 rounded-full ring-2 ring-[#0b1120] shrink-0 bg-emerald-500" style={{ boxShadow: '0 0 10px rgba(16,185,129,0.7)' }} />
                   <span className="text-[12px] font-semibold text-white w-28">Igbo settlement</span>

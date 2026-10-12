@@ -4,8 +4,10 @@ import path from 'node:path';
 
 const INDEX_FILE = path.resolve(process.cwd(), 'public/data/search_index.json');
 const COMM_FILE = path.resolve(process.cwd(), 'public/data/communities_store.json');
+const CANONICAL_FILE = path.resolve(process.cwd(), 'public/data/igboland_canonical_towns.geojson');
 
 let cachedSearchIndex: any[] | null = null;
+let cachedCanonicalTowns: any[] | null = null;
 
 function getSearchIndex(): any[] {
   if (cachedSearchIndex) return cachedSearchIndex;
@@ -16,6 +18,20 @@ function getSearchIndex(): any[] {
     }
   } catch (err) {
     console.error('Failed reading search index:', err);
+  }
+  return [];
+}
+
+function getCanonicalTowns(): any[] {
+  if (cachedCanonicalTowns) return cachedCanonicalTowns;
+  try {
+    if (fs.existsSync(CANONICAL_FILE)) {
+      const data = JSON.parse(fs.readFileSync(CANONICAL_FILE, 'utf8'));
+      cachedCanonicalTowns = data.features || [];
+      return cachedCanonicalTowns || [];
+    }
+  } catch (err) {
+    console.error('Failed reading canonical towns:', err);
   }
   return [];
 }
@@ -64,6 +80,41 @@ export async function GET(req: NextRequest) {
           center: [c.longitude, c.latitude],
           verificationStatus: c.verificationStatus || 'verified',
           priority: c.name.toLowerCase().startsWith(q) ? 1 : 2
+        });
+      }
+    }
+  }
+
+  // 1b. Check canonical towns & capitals from "Map of Igbo Land: Communities and Towns" (igbo.jpg)
+  const canonicalTowns = getCanonicalTowns();
+  for (const f of canonicalTowns) {
+    const p = f.properties || {};
+    const nameLower = (p.name || '').toLowerCase();
+    const lgaLower = (p.lgaName || '').toLowerCase();
+    const stateLower = (p.stateName || '').toLowerCase();
+    const isCapital = p.category === 'capital';
+
+    const startsWithName = nameLower.startsWith(q);
+    const containsName = nameLower.includes(q);
+    const matchesLga = lgaLower.includes(q);
+    const matchesState = stateLower.includes(q);
+
+    if (containsName || matchesLga || matchesState) {
+      const key = `canonical-${nameLower}-${lgaLower}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        results.push({
+          id: f.id || `canonical-${nameLower}`,
+          source: 'canonical',
+          category: p.category,
+          type: isCapital ? 'capital' : 'town',
+          typeLabel: isCapital ? 'Capital City (Map of Igbo Land)' : 'Historic Town (Map of Igbo Land)',
+          name: p.name,
+          lgaName: p.lgaName,
+          stateName: p.stateName,
+          historicalSignificance: p.historicalSignificance,
+          center: f.geometry?.coordinates,
+          priority: startsWithName ? 1 : containsName ? 2 : 3,
         });
       }
     }

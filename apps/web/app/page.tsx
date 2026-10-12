@@ -115,6 +115,43 @@ export default function HomePage() {
     setMobileTab('map');
   }, []);
 
+  const handleSelectCommunity = useCallback((c: any) => {
+    // 1. Switch to Map view on mobile
+    setMobileTab('map');
+
+    // 2. Perform map camera flight with retries so canvas is unhidden and resized
+    const trigger = () => {
+      if (mapRef.current) {
+        mapRef.current.resize();
+        mapRef.current.flyToCommunity(c);
+      }
+    };
+
+    trigger();
+    requestAnimationFrame(() => {
+      trigger();
+      setTimeout(trigger, 80);
+      setTimeout(trigger, 260);
+    });
+  }, []);
+
+  const handleFlyTo = useCallback((center: [number, number], zoom: number) => {
+    setMobileTab('map');
+    const trigger = () => {
+      if (mapRef.current) {
+        mapRef.current.resize();
+        mapRef.current.flyTo(center, zoom);
+      }
+    };
+
+    trigger();
+    requestAnimationFrame(() => {
+      trigger();
+      setTimeout(trigger, 80);
+      setTimeout(trigger, 260);
+    });
+  }, []);
+
   // Global Keyboard shortcuts: "[" or "]" toggles sidebar collapse, Esc clears selection, "f" toggles filters
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -791,10 +828,8 @@ export default function HomePage() {
             communities={communities}
             isAddMode={isAddMode}
             onToggleAddMode={handleToggleAddMode}
-            onSelectCommunity={(c) => {
-              mapRef.current?.flyToCommunity(c);
-            }}
-            onFlyTo={(center, zoom) => mapRef.current?.flyTo(center, zoom)}
+            onSelectCommunity={handleSelectCommunity}
+            onFlyTo={handleFlyTo}
             onResetView={() => {
               setSelectedFeature(null);
               mapRef.current?.resetView();
@@ -878,14 +913,8 @@ export default function HomePage() {
             communities={communities}
             isAddMode={isAddMode}
             onToggleAddMode={handleToggleAddMode}
-            onSelectCommunity={(c) => {
-              setMobileTab('map');
-              mapRef.current?.flyToCommunity(c);
-            }}
-            onFlyTo={(center, zoom) => {
-              setMobileTab('map');
-              mapRef.current?.flyTo(center, zoom);
-            }}
+            onSelectCommunity={handleSelectCommunity}
+            onFlyTo={handleFlyTo}
             onResetView={() => {
               setSelectedFeature(null);
               mapRef.current?.resetView();

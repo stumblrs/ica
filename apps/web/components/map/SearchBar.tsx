@@ -170,8 +170,11 @@ export function SearchBar({ onSelectCommunity }: SearchBarProps) {
                           <button
                             key={`amb-${ambItem.id || ambItem.name}-${ambItem.lgaName}`}
                             type="button"
-                            onMouseDown={(e) => {
+                            onPointerDown={(e) => {
                               e.preventDefault();
+                              handleSelectItem(ambItem);
+                            }}
+                            onClick={() => {
                               handleSelectItem(ambItem);
                             }}
                             className="p-2.5 sm:p-2 rounded-xl bg-white/[0.04] hover:bg-emerald-500/15 active:bg-emerald-500/25 border border-white/[0.08] hover:border-emerald-500/40 text-left transition-colors group touch-manipulation min-h-[44px]"
@@ -198,7 +201,7 @@ export function SearchBar({ onSelectCommunity }: SearchBarProps) {
                         <button
                           key={item.id ?? `${item.name}-${item.latitude}`}
                           type="button"
-                          onMouseDown={(e) => {
+                          onPointerDown={(e) => {
                             e.preventDefault();
                             handleSelectItem(item);
                           }}

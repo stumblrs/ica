@@ -1,0 +1,846 @@
+{
+  "type": "FeatureCollection",
+  "name": "Map of Igbo Land: Communities and Towns",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "igbo-enugu",
+      "properties": {
+        "id": "igbo-enugu",
+        "name": "Enugu",
+        "category": "capital",
+        "typeLabel": "Capital City",
+        "stateName": "Enugu",
+        "lgaName": "Enugu North",
+        "region": "heartland",
+        "historicalSignificance": "Historic capital of the Eastern Region & Coal City, nestled beneath the Udi escarpment."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.5086, 6.4584] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-awka",
+      "properties": {
+        "id": "igbo-awka",
+        "name": "Awka",
+        "category": "capital",
+        "typeLabel": "Capital City",
+        "stateName": "Anambra",
+        "lgaName": "Awka South",
+        "region": "heartland",
+        "historicalSignificance": "Ancient metallurgy and blacksmithing capital of Ala Igbo, seat of Anambra State."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.0700, 6.2209] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-asaba",
+      "properties": {
+        "id": "igbo-asaba",
+        "name": "Asaba",
+        "category": "capital",
+        "typeLabel": "Capital City",
+        "stateName": "Delta",
+        "lgaName": "Oshimili South",
+        "region": "anioma",
+        "historicalSignificance": "Ancient Ahaba on the western bank of the River Niger, historic Anioma capital."
+      },
+      "geometry": { "type": "Point", "coordinates": [6.7329, 6.1982] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-owerri",
+      "properties": {
+        "id": "igbo-owerri",
+        "name": "Owerri",
+        "category": "capital",
+        "typeLabel": "Capital City",
+        "stateName": "Imo",
+        "lgaName": "Owerri Municipal",
+        "region": "heartland",
+        "historicalSignificance": "Cultural heartland capital of Imo State between the Otamiri and Nworie rivers."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.0260, 5.4832] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-umuahia",
+      "properties": {
+        "id": "igbo-umuahia",
+        "name": "Umuahia",
+        "category": "capital",
+        "typeLabel": "Capital City",
+        "stateName": "Abia",
+        "lgaName": "Umuahia North",
+        "region": "heartland",
+        "historicalSignificance": "Capital of Abia State, historic agricultural trading center and wartime capital."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.5248, 5.5267] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-abakaliki",
+      "properties": {
+        "id": "igbo-abakaliki",
+        "name": "Abakaliki",
+        "category": "capital",
+        "typeLabel": "Capital City",
+        "stateName": "Ebonyi",
+        "lgaName": "Abakaliki",
+        "region": "cross_river_basin",
+        "historicalSignificance": "Agrarian powerhouse and capital of Ebonyi State, renowned for rice and lead mining heritage."
+      },
+      "geometry": { "type": "Point", "coordinates": [8.1137, 6.3249] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-portharcourt",
+      "properties": {
+        "id": "igbo-portharcourt",
+        "name": "Port Harcourt (Igweocha)",
+        "category": "capital",
+        "typeLabel": "Capital City",
+        "stateName": "Rivers",
+        "lgaName": "Port Harcourt",
+        "region": "coastal",
+        "historicalSignificance": "Historic coastal terminal and capital of Rivers State, indigenous Ikwerre settlement of Igweocha."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.0134, 4.8156] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-agbor",
+      "properties": {
+        "id": "igbo-agbor",
+        "name": "Agbor",
+        "category": "capital",
+        "typeLabel": "Historic Capital / Town",
+        "stateName": "Delta",
+        "lgaName": "Ika South",
+        "region": "anioma",
+        "historicalSignificance": "Ancient seat of the Dein of Agbor, leading city-state of the Ika Igbo nation."
+      },
+      "geometry": { "type": "Point", "coordinates": [6.1934, 6.2536] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-igbanke",
+      "properties": {
+        "id": "igbo-igbanke",
+        "name": "Igbanke",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Edo",
+        "lgaName": "Orhionmwon",
+        "region": "anioma",
+        "historicalSignificance": "Westernmost Ika Igbo confederation of six autonomous communities bordering Edo."
+      },
+      "geometry": { "type": "Point", "coordinates": [6.1432, 6.4258] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-ekpon",
+      "properties": {
+        "id": "igbo-ekpon",
+        "name": "Ekpon",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Edo",
+        "lgaName": "Igueben",
+        "region": "anioma",
+        "historicalSignificance": "Historic border community along the northwestern cultural boundary."
+      },
+      "geometry": { "type": "Point", "coordinates": [6.3210, 6.4800] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-issele-ukwu",
+      "properties": {
+        "id": "igbo-issele-ukwu",
+        "name": "Isele-Ukwu",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Delta",
+        "lgaName": "Aniocha North",
+        "region": "anioma",
+        "historicalSignificance": "Paramount kingdom of Enuani, spiritual origin of several western Igbo lineages."
+      },
+      "geometry": { "type": "Point", "coordinates": [6.4802, 6.3050] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-ogwashi-ukwu",
+      "properties": {
+        "id": "igbo-ogwashi-ukwu",
+        "name": "Ogwashi-Ukwu",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Delta",
+        "lgaName": "Aniocha South",
+        "region": "anioma",
+        "historicalSignificance": "Major Anioma cultural hub, epicenter of the pre-colonial Ekumeku anti-colonial resistance."
+      },
+      "geometry": { "type": "Point", "coordinates": [6.5230, 6.1830] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-igbo-uzo",
+      "properties": {
+        "id": "igbo-igbo-uzo",
+        "name": "Igbo-Uzo (Ibusa)",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Delta",
+        "lgaName": "Oshimili North",
+        "region": "anioma",
+        "historicalSignificance": "Ancient settlement founded by Prince Umejei of Isu, pivotal Anioma intellectual center."
+      },
+      "geometry": { "type": "Point", "coordinates": [6.6342, 6.1856] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-illah",
+      "properties": {
+        "id": "igbo-illah",
+        "name": "Illah",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Delta",
+        "lgaName": "Oshimili North",
+        "region": "anioma",
+        "historicalSignificance": "Ancient riverine trade port on the western bank of the River Niger."
+      },
+      "geometry": { "type": "Point", "coordinates": [6.6800, 6.4100] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-ubulu-ukwu",
+      "properties": {
+        "id": "igbo-ubulu-ukwu",
+        "name": "Ubulu-Ukwu",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Delta",
+        "lgaName": "Aniocha South",
+        "region": "anioma",
+        "historicalSignificance": "Historic kingdom famed for traditional medicine, smithing, and forest trade networks."
+      },
+      "geometry": { "type": "Point", "coordinates": [6.4350, 6.2300] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-kwale",
+      "properties": {
+        "id": "igbo-kwale",
+        "name": "Kwale",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Delta",
+        "lgaName": "Ndokwa West",
+        "region": "anioma",
+        "historicalSignificance": "Commercial capital of the Ndokwa/Ukwuani clan in the southern western Igbo belt."
+      },
+      "geometry": { "type": "Point", "coordinates": [6.4350, 5.7100] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-aboh",
+      "properties": {
+        "id": "igbo-aboh",
+        "name": "Aboh",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Delta",
+        "lgaName": "Ndokwa East",
+        "region": "anioma",
+        "historicalSignificance": "Powerful pre-colonial maritime empire at the apex of the Niger Delta."
+      },
+      "geometry": { "type": "Point", "coordinates": [6.5300, 5.5450] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-ndoni",
+      "properties": {
+        "id": "igbo-ndoni",
+        "name": "Ndoni",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Rivers",
+        "lgaName": "Ogba/Egbema/Ndoni",
+        "region": "coastal",
+        "historicalSignificance": "Ancient trading crossroads on the eastern bank of the River Niger bifurcation."
+      },
+      "geometry": { "type": "Point", "coordinates": [6.6000, 5.5500] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-osekwenike",
+      "properties": {
+        "id": "igbo-osekwenike",
+        "name": "Osekwenike",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Delta",
+        "lgaName": "Ndokwa East",
+        "region": "anioma",
+        "historicalSignificance": "Riverine settlement along the southern Niger aquatic highway."
+      },
+      "geometry": { "type": "Point", "coordinates": [6.4500, 5.3800] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-owa-iru",
+      "properties": {
+        "id": "igbo-owa-iru",
+        "name": "Owa-Iru",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Delta",
+        "lgaName": "Ika North East",
+        "region": "anioma",
+        "historicalSignificance": "Core settlement of the Owa Kingdom in the northern Ika plains."
+      },
+      "geometry": { "type": "Point", "coordinates": [6.2200, 6.2100] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-enugwu-ezike",
+      "properties": {
+        "id": "igbo-enugwu-ezike",
+        "name": "Enugwu-Ezike",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Enugu",
+        "lgaName": "Igbo Eze North",
+        "region": "northern_borderlands",
+        "historicalSignificance": "Northern bastion of Ala Igbo, famed for palm wine culture, ancient masquerade lore, and dense population."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.4450, 6.9850] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-nsukka",
+      "properties": {
+        "id": "igbo-nsukka",
+        "name": "Nsukka",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Enugu",
+        "lgaName": "Nsukka",
+        "region": "northern_borderlands",
+        "historicalSignificance": "Historic academic university town and center of ancient iron smelting culture."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.3958, 6.8569] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-avurugo",
+      "properties": {
+        "id": "igbo-avurugo",
+        "name": "Avurugo",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Kogi",
+        "lgaName": "Ibaji",
+        "region": "northern_borderlands",
+        "historicalSignificance": "Northern borderlands continuum settlement connecting Igbo and Igala trade."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.2800, 7.0800] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-akpanya",
+      "properties": {
+        "id": "igbo-akpanya",
+        "name": "Akpanya",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Kogi",
+        "lgaName": "Igalamela-Odolu",
+        "region": "northern_borderlands",
+        "historicalSignificance": "Northern frontier market settlement situated on the ancestral trade route."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.3200, 7.0500] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-ogurugu",
+      "properties": {
+        "id": "igbo-ogurugu",
+        "name": "Ogurugu",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Enugu",
+        "lgaName": "Uzo Uwani",
+        "region": "northern_borderlands",
+        "historicalSignificance": "Ancient river port on the Omambala River linking Nsukka to the River Niger."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.0500, 6.9200] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-onitsha",
+      "properties": {
+        "id": "igbo-onitsha",
+        "name": "Onitsha",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Anambra",
+        "lgaName": "Onitsha North",
+        "region": "heartland",
+        "historicalSignificance": "Legendary commercial gateway of West Africa, seat of the Obi of Onitsha on the River Niger."
+      },
+      "geometry": { "type": "Point", "coordinates": [6.7865, 6.1528] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-ogbaru",
+      "properties": {
+        "id": "igbo-ogbaru",
+        "name": "Ogbaru",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Anambra",
+        "lgaName": "Ogbaru",
+        "region": "heartland",
+        "historicalSignificance": "Riverine agricultural haven along the fertile eastern floodplains of the River Niger."
+      },
+      "geometry": { "type": "Point", "coordinates": [6.7300, 5.9500] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-atani",
+      "properties": {
+        "id": "igbo-atani",
+        "name": "Atani",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Anambra",
+        "lgaName": "Ogbaru",
+        "region": "heartland",
+        "historicalSignificance": "Historic fishing port and capital of the Ogbaru clan."
+      },
+      "geometry": { "type": "Point", "coordinates": [6.7500, 6.0100] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-aguleri",
+      "properties": {
+        "id": "igbo-aguleri",
+        "name": "Aguleri",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Anambra",
+        "lgaName": "Anambra East",
+        "region": "heartland",
+        "historicalSignificance": "Sacred ancestral cradle of the Eri clan along the Omambala River."
+      },
+      "geometry": { "type": "Point", "coordinates": [6.8850, 6.3450] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-otuocha",
+      "properties": {
+        "id": "igbo-otuocha",
+        "name": "Otuocha",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Anambra",
+        "lgaName": "Anambra East",
+        "region": "heartland",
+        "historicalSignificance": "Vibrant riverine trading hub and Omambala bridgehead."
+      },
+      "geometry": { "type": "Point", "coordinates": [6.8500, 6.3350] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-nri",
+      "properties": {
+        "id": "igbo-nri",
+        "name": "Nri",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Anambra",
+        "lgaName": "Anocha",
+        "region": "heartland",
+        "historicalSignificance": "Spiritual homeland of Igbo civilization, source of the Ozo title, peace pacts, and Eze Nri divine kingship."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.0300, 6.1550] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-nnewi",
+      "properties": {
+        "id": "igbo-nnewi",
+        "name": "Nnewi",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Anambra",
+        "lgaName": "Nnewi North",
+        "region": "heartland",
+        "historicalSignificance": "Anaedo kingdom, Africa's foremost automotive and indigenous manufacturing hub."
+      },
+      "geometry": { "type": "Point", "coordinates": [6.9168, 6.0199] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-ihiala",
+      "properties": {
+        "id": "igbo-ihiala",
+        "name": "Ihiala",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Anambra",
+        "lgaName": "Ihiala",
+        "region": "heartland",
+        "historicalSignificance": "Historic gateway linking the Anambra plains to the Orlu uplands."
+      },
+      "geometry": { "type": "Point", "coordinates": [6.8600, 5.8600] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-ngwo",
+      "properties": {
+        "id": "igbo-ngwo",
+        "name": "Ngwo",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Enugu",
+        "lgaName": "Udi",
+        "region": "heartland",
+        "historicalSignificance": "Ancient highland settlement with sacred caves, pine forests, and guardian of Milken Hill."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.4350, 6.4450] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-udi",
+      "properties": {
+        "id": "igbo-udi",
+        "name": "Udi",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Enugu",
+        "lgaName": "Udi",
+        "region": "heartland",
+        "historicalSignificance": "Scenic highland plateau clan with deep political and traditional heritage."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.3200, 6.3200] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-ezeagu",
+      "properties": {
+        "id": "igbo-ezeagu",
+        "name": "Ezeagu",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Enugu",
+        "lgaName": "Ezeagu",
+        "region": "heartland",
+        "historicalSignificance": "Cultural territory known for the sacred Iheneke caves and pristine natural springs."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.2000, 6.4200] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-awgu",
+      "properties": {
+        "id": "igbo-awgu",
+        "name": "Awgu",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Enugu",
+        "lgaName": "Awgu",
+        "region": "heartland",
+        "historicalSignificance": "Dramatic hills, terraced farming, and historical missionary educational outpost."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.4800, 6.0800] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-nkanu",
+      "properties": {
+        "id": "igbo-nkanu",
+        "name": "Nkanu",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Enugu",
+        "lgaName": "Nkanu West",
+        "region": "heartland",
+        "historicalSignificance": "Vast eastern agricultural clan known for deep communal solidarity and Oji River tributaries."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.5800, 6.3800] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-izzi",
+      "properties": {
+        "id": "igbo-izzi",
+        "name": "Izzi",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Ebonyi",
+        "lgaName": "Izzi",
+        "region": "cross_river_basin",
+        "historicalSignificance": "Major northeastern clan renowned for rich soil, communal yam festivals, and warrior traditions."
+      },
+      "geometry": { "type": "Point", "coordinates": [8.1800, 6.4500] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-ezza",
+      "properties": {
+        "id": "igbo-ezza",
+        "name": "Ezza",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Ebonyi",
+        "lgaName": "Ezza North",
+        "region": "cross_river_basin",
+        "historicalSignificance": "Elder clan of the central Ebonyi basin with expansive historical migrations."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.9800, 6.1800] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-effium",
+      "properties": {
+        "id": "igbo-effium",
+        "name": "Effium",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Ebonyi",
+        "lgaName": "Ohaukwu",
+        "region": "cross_river_basin",
+        "historicalSignificance": "Northern Ebonyi agricultural trading community on the Benue boundary."
+      },
+      "geometry": { "type": "Point", "coordinates": [8.0500, 6.6300] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-afikpo",
+      "properties": {
+        "id": "igbo-afikpo",
+        "name": "Afikpo (Ehugbo)",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Ebonyi",
+        "lgaName": "Afikpo North",
+        "region": "cross_river_basin",
+        "historicalSignificance": "Ancient matrilineal and age-grade society overlooking the Cross River basin, famed for pottery and monoliths."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.9350, 5.8850] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-ugwuta",
+      "properties": {
+        "id": "igbo-ugwuta",
+        "name": "Ugwuta (Oguta)",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Imo",
+        "lgaName": "Oguta",
+        "region": "heartland",
+        "historicalSignificance": "Mystical confluence of the blue Oguta Lake and muddy Urashi River, historic palm oil naval port."
+      },
+      "geometry": { "type": "Point", "coordinates": [6.8100, 5.7100] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-orlu",
+      "properties": {
+        "id": "igbo-orlu",
+        "name": "Orlu",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Imo",
+        "lgaName": "Orlu",
+        "region": "heartland",
+        "historicalSignificance": "Second commercial hub of Imo State, seat of the ancient Orlu senatorial cultural zone."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.0350, 5.7950] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-okigwe",
+      "properties": {
+        "id": "igbo-okigwe",
+        "name": "Okigwe",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Imo",
+        "lgaName": "Okigwe",
+        "region": "heartland",
+        "historicalSignificance": "Hilly railway junction and administrative hub, known for cattle markets and scenic escarpments."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.3500, 5.8300] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-isuikwuato",
+      "properties": {
+        "id": "igbo-isuikwuato",
+        "name": "Isuikwuato",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Abia",
+        "lgaName": "Isuikwuato",
+        "region": "heartland",
+        "historicalSignificance": "Land of warriors and leaders across the Otamiri-Imo divide."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.4800, 5.7200] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-mbaise",
+      "properties": {
+        "id": "igbo-mbaise",
+        "name": "Mbaise",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Imo",
+        "lgaName": "Aboh-Mbaise",
+        "region": "heartland",
+        "historicalSignificance": "Five clans of Mbaise, cultural cradle of the pan-Igbo new yam festival and academic excellence."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.2800, 5.5300] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-bende",
+      "properties": {
+        "id": "igbo-bende",
+        "name": "Bende",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Abia",
+        "lgaName": "Bende",
+        "region": "heartland",
+        "historicalSignificance": "Historic central market capital and colonial division headquarters of southern Ala Igbo."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.6350, 5.5600] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-ohafia",
+      "properties": {
+        "id": "igbo-ohafia",
+        "name": "Ohafia",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Abia",
+        "lgaName": "Ohafia",
+        "region": "heartland",
+        "historicalSignificance": "Legendary warrior clan renowned for their martial bravery and the iconic Ohafia War Dance (Ikpirikpi Ogu)."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.8500, 5.6200] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-arochukwu",
+      "properties": {
+        "id": "igbo-arochukwu",
+        "name": "Arochukwu",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Abia",
+        "lgaName": "Arochukwu",
+        "region": "heartland",
+        "historicalSignificance": "Ancient mercantile and diplomatic empire, seat of the Eze Aro and historic Ibini Ukpabi oracle."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.9100, 5.3900] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-aba",
+      "properties": {
+        "id": "igbo-aba",
+        "name": "Aba",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Abia",
+        "lgaName": "Aba South",
+        "region": "heartland",
+        "historicalSignificance": "Enyimba City, manufacturing engine of West Africa, home of the historic 1929 Aba Women's War."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.3667, 5.1167] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-azumini",
+      "properties": {
+        "id": "igbo-azumini",
+        "name": "Azumini",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Abia",
+        "lgaName": "Ukwa East",
+        "region": "coastal",
+        "historicalSignificance": "Famous crystal Blue River settlement, historic palm oil export port to the Atlantic."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.4300, 4.9600] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-elele",
+      "properties": {
+        "id": "igbo-elele",
+        "name": "Elele",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Rivers",
+        "lgaName": "Ikwerre",
+        "region": "coastal",
+        "historicalSignificance": "Strategic commercial crossroads in the Ikwerre plains, renowned for pilgrimage and agricultural trade."
+      },
+      "geometry": { "type": "Point", "coordinates": [6.8200, 5.1000] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-obigbo",
+      "properties": {
+        "id": "igbo-obigbo",
+        "name": "Obigbo (Oyigbo)",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Rivers",
+        "lgaName": "Oyigbo",
+        "region": "coastal",
+        "historicalSignificance": "Crucial railway junction and industrial corridor linking Abia, Imo, and Port Harcourt."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.1300, 4.8800] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-opobo",
+      "properties": {
+        "id": "igbo-opobo",
+        "name": "Opobo",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Rivers",
+        "lgaName": "Opobo/Nkoro",
+        "region": "coastal",
+        "historicalSignificance": "Island kingdom founded in 1870 by King Jaja of Opobo, dominant Atlantic palm oil trade state."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.5300, 4.5200] }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-ubani",
+      "properties": {
+        "id": "igbo-ubani",
+        "name": "Ubani (Bonny)",
+        "category": "town",
+        "typeLabel": "Town / Community",
+        "stateName": "Rivers",
+        "lgaName": "Bonny",
+        "region": "coastal",
+        "historicalSignificance": "Ancient coastal island city-state and Atlantic gateway, pivotal in pre-colonial and modern maritime trade."
+      },
+      "geometry": { "type": "Point", "coordinates": [7.1700, 4.4500] }
+    }
+  ]
+}

@@ -855,31 +855,48 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
   useImperativeHandle(ref, () => ({
     flyToCommunity(item: any) {
       if (!map.current) return;
-      const lon = item.longitude ?? (item.center ? item.center[0] : null);
-      const lat = item.latitude ?? (item.center ? item.center[1] : null);
+      const lon = item.longitude ?? (item.center ? item.center[0] : (item.coordinates ? item.coordinates[0] : null));
+      const lat = item.latitude ?? (item.center ? item.center[1] : (item.coordinates ? item.coordinates[1] : null));
 
       const isLga = item.type === 'lga';
-      let zoom = 14.0;
+      let zoom = 14.5;
       if (isLga) {
-        zoom = 10.5;
+        zoom = 13.0;
+      } else if (item.type === 'capital' || item.category === 'capital') {
+        zoom = 13.5;
       } else if (item.type === 'city') {
-        zoom = 12.8;
+        zoom = 14.0;
       } else if (item.type === 'town') {
-        zoom = 13.8;
+        zoom = 14.5;
       } else if (item.type === 'market' || item.type === 'marketplace' || item.type === 'landmark') {
-        zoom = 14.2;
+        zoom = 14.8;
       } else if (item.type === 'village' || item.type === 'community' || item.source === 'community') {
-        zoom = 14.6;
+        zoom = 15.2;
       }
 
       if (lon != null && lat != null) {
-        map.current.flyTo({
-          center: [lon, lat],
-          zoom,
-          speed: 1.25,
-          curve: 1.4,
-          essential: true,
-        });
+        const executeCameraFly = () => {
+          if (!map.current) return;
+          try {
+            map.current.resize();
+            map.current.flyTo({
+              center: [lon, lat],
+              zoom,
+              speed: 1.45,
+              curve: 1.25,
+              essential: true,
+            });
+          } catch {
+            try {
+              map.current.jumpTo({ center: [lon, lat], zoom });
+            } catch {}
+          }
+        };
+
+        // Execute immediately and queue retries to guarantee execution once canvas layout unhides
+        executeCameraFly();
+        setTimeout(executeCameraFly, 60);
+        setTimeout(executeCameraFly, 220);
       }
 
       const lgaCode = item.lgaCode ?? item.lgaId ?? (isLga ? item.code : null);
@@ -965,6 +982,29 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           colorLabel: 'Golden Amber (Cultural Marker)',
           colorExplanation: 'Marked in golden amber to highlight documented traditional markets (e.g. Eke, Orie, Afor, Nkwo four-day market cycle) and civic landmarks.',
           whyMarked: 'Cultural and civic point of interest catalogued by HOTOSM / OpenStreetMap.',
+          nearestRiver,
+          dialectCluster,
+        });
+      } else if (item.source === 'canonical' || item.category === 'capital') {
+        const isCapital = item.category === 'capital' || item.type === 'capital';
+        const markerColor = isCapital ? '#f59e0b' : '#10b981';
+        if (lon != null && lat != null) {
+          highlightPoint([lon, lat], markerColor, item.name, subLabel || (isCapital ? 'Capital City' : 'Historic Town'));
+        }
+        onSelectRef.current({
+          type: 'settlement',
+          name: item.name,
+          parentName: [item.lgaName && `${item.lgaName} LGA`, item.stateName && `${item.stateName} State`].filter(Boolean).join(', '),
+          code: item.id,
+          coordinates: lon != null && lat != null ? [lon, lat] : undefined,
+          zone: 'southeast',
+          placeType: isCapital ? 'Capital City (Map of Igbo Land)' : 'Historic Town (Map of Igbo Land)',
+          markerColor,
+          colorLabel: isCapital ? 'Golden Square: Regional Capital' : 'Emerald Node: Historic Town',
+          colorExplanation: isCapital
+            ? `Prominent administrative and cultural capital designated on the canonical 'Map of Igbo Land: Communities and Towns'.`
+            : `Documented historic Igbo town and community designated on the canonical 'Map of Igbo Land: Communities and Towns'.`,
+          whyMarked: item.historicalSignificance || `Canonical community from the historical Map of Igbo Land (${item.stateName || 'Igboland'}).`,
           nearestRiver,
           dialectCluster,
         });
@@ -1849,6 +1889,118 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         },
       });
 
+      // ── Canonical Map of Igbo Land: Communities & Towns (igbo.jpg) ──
+      if (!mapInstance.hasImage('capital-square-icon')) {
+        const cCanvas = document.createElement('canvas');
+        cCanvas.width = 24;
+        cCanvas.height = 24;
+        const cCtx = cCanvas.getContext('2d');
+        if (cCtx) {
+          cCtx.fillStyle = '#050811';
+          cCtx.fillRect(1, 1, 22, 22);
+          cCtx.fillStyle = '#f59e0b';
+          cCtx.fillRect(3, 3, 18, 18);
+          cCtx.fillStyle = '#ffffff';
+          cCtx.fillRect(7, 7, 10, 10);
+          mapInstance.addImage('capital-square-icon', cCtx.getImageData(0, 0, 24, 24));
+        }
+      }
+
+      mapInstance.addSource('igboland-canonical-source', {
+        type: 'geojson',
+        data: '/data/igboland_canonical_towns.geojson',
+      });
+
+      // 1. Regional Capitals Glow (Square aura)
+      mapInstance.addLayer({
+        id: 'igboland-canonical-capitals-glow',
+        type: 'circle',
+        source: 'igboland-canonical-source',
+        filter: ['==', ['get', 'category'], 'capital'],
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 4, 14, 8, 22, 12, 32],
+          'circle-color': '#f59e0b',
+          'circle-opacity': 0.38,
+          'circle-blur': 0.85,
+        },
+      });
+
+      // 2. Regional Capitals Symbol & Label (Prominent square badge + bold label)
+      mapInstance.addLayer({
+        id: 'igboland-canonical-capitals-symbol',
+        type: 'symbol',
+        source: 'igboland-canonical-source',
+        filter: ['==', ['get', 'category'], 'capital'],
+        layout: {
+          'icon-image': 'capital-square-icon',
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 4, 0.75, 8, 0.95, 12, 1.2],
+          'icon-allow-overlap': true,
+          'text-field': '{name}',
+          'text-size': ['interpolate', ['linear'], ['zoom'], 4, 11, 7, 13, 10, 15],
+          'text-font': ['Noto Sans Bold'],
+          'text-offset': [0, 1.1],
+          'text-anchor': 'top',
+          'text-allow-overlap': true,
+        },
+        paint: {
+          'text-color': '#fef08a',
+          'text-halo-color': '#020617',
+          'text-halo-width': 2.5,
+        },
+      });
+
+      // 3. Historic Towns Glow
+      mapInstance.addLayer({
+        id: 'igboland-canonical-towns-glow',
+        type: 'circle',
+        source: 'igboland-canonical-source',
+        filter: ['==', ['get', 'category'], 'town'],
+        minzoom: 6.0,
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 7, 9, 12, 12, 18],
+          'circle-color': '#10b981',
+          'circle-opacity': 0.35,
+          'circle-blur': 0.65,
+        },
+      });
+
+      // 4. Historic Towns Points (Emerald nodes with crisp white border)
+      mapInstance.addLayer({
+        id: 'igboland-canonical-towns-points',
+        type: 'circle',
+        source: 'igboland-canonical-source',
+        filter: ['==', ['get', 'category'], 'town'],
+        minzoom: 6.0,
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 4, 8, 5.5, 11, 8],
+          'circle-color': '#10b981',
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#ffffff',
+        },
+      });
+
+      // 5. Historic Towns Labels
+      mapInstance.addLayer({
+        id: 'igboland-canonical-towns-labels',
+        type: 'symbol',
+        source: 'igboland-canonical-source',
+        filter: ['==', ['get', 'category'], 'town'],
+        minzoom: 6.5,
+        layout: {
+          'text-field': '{name}',
+          'text-size': ['interpolate', ['linear'], ['zoom'], 6.5, 10.5, 9, 12.5, 12, 14],
+          'text-font': ['Noto Sans Regular'],
+          'text-offset': [0, 1.0],
+          'text-anchor': 'top',
+          'text-allow-overlap': false,
+        },
+        paint: {
+          'text-color': '#e2e8f0',
+          'text-halo-color': '#070b14',
+          'text-halo-width': 2.2,
+        },
+      });
+
       // ── Selected Point Marker (Target Pin / Beacon for Search & Click) ──
       mapInstance.addSource('selected-point-source', {
         type: 'geojson',
@@ -2180,10 +2332,23 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           zoom: Number(mapInstance.getZoom().toFixed(1)),
         });
 
-        const layers = ['communities-points', 'kindred-landmarks-points', 'landmarks-points', 'reference-settlements-points', 'settlements-points', 'lgas-fill', 'states-fill'].filter(
+        const layers = [
+          'igboland-canonical-capitals-symbol',
+          'igboland-canonical-towns-points',
+          'communities-points',
+          'kindred-landmarks-points',
+          'landmarks-points',
+          'reference-settlements-points',
+          'settlements-points',
+          'lgas-fill',
+          'states-fill'
+        ].filter(
           (l) => mapInstance.getLayer(l) && mapInstance.getLayoutProperty(l, 'visibility') !== 'none'
         );
         const feats = mapInstance.queryRenderedFeatures(e.point, { layers });
+        const canonicalCapital = feats.find((f) => f.layer.id === 'igboland-canonical-capitals-symbol');
+        const canonicalTown = feats.find((f) => f.layer.id === 'igboland-canonical-towns-points');
+        const canonical = canonicalCapital || canonicalTown;
         const community = feats.find((f) => f.layer.id === 'communities-points');
         const kindred = feats.find((f) => f.layer.id === 'kindred-landmarks-points');
         const landmark = feats.find((f) => f.layer.id === 'landmarks-points');
@@ -2192,11 +2357,31 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         const lga = feats.find((f) => f.layer.id === 'lgas-fill');
         const state = feats.find((f) => f.layer.id === 'states-fill');
 
-        const isDotHovered = Boolean(community || kindred || landmark || referenceSettlement || settlement);
+        const isDotHovered = Boolean(canonical || community || kindred || landmark || referenceSettlement || settlement);
         mapInstance.getCanvas().style.cursor = isAddActive() || isPinningKindredRef.current ? 'crosshair' : isDotHovered || state || lga ? 'pointer' : '';
 
         const stateCode = (state?.properties?.admin1Pcod ?? lga?.properties?.admin1Pcod ?? settlement?.properties?.adm1_pcode ?? landmark?.properties?.adm1_pcode) as string | undefined;
         mapInstance.setFilter('states-hover', ['==', ['get', 'admin1Pcod'], stateCode ?? '']);
+
+        // 0. If hovering a canonical town or regional capital (from igbo.jpg)
+        if (canonical) {
+          const p = canonical.properties as any;
+          const isCapital = p.category === 'capital';
+          setHover({
+            x: e.point.x,
+            y: e.point.y,
+            name: p.name,
+            typeBadge: isCapital ? 'MAP OF IGBO LAND: REGIONAL CAPITAL' : 'MAP OF IGBO LAND: HISTORIC TOWN',
+            state: p.stateName ? `${p.stateName} State` : undefined,
+            lga: p.lgaName ? `${p.lgaName} LGA` : undefined,
+            zone: 'southeast',
+            colorLabel: isCapital ? 'Golden Square: Regional Capital' : 'Emerald Node: Historic Town',
+            colorBg: isCapital ? 'bg-amber-500/15' : 'bg-emerald-500/15',
+            colorBorder: isCapital ? 'border-amber-500/40' : 'border-emerald-500/40',
+            colorText: isCapital ? 'text-amber-300' : 'text-emerald-300',
+          });
+          return;
+        }
 
         // 1. If hovering a kindred landmark dot
         if (kindred) {
@@ -2347,6 +2532,8 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         }
 
         const layers = [
+          'igboland-canonical-capitals-symbol',
+          'igboland-canonical-towns-points',
           'communities-points',
           'kindred-landmarks-points',
           'landmarks-points',
@@ -2357,6 +2544,9 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           'states-fill',
         ].filter((l) => mapInstance.getLayer(l) && mapInstance.getLayoutProperty(l, 'visibility') !== 'none');
         const feats = mapInstance.queryRenderedFeatures(e.point, { layers });
+        const canonicalCapital = feats.find((f) => f.layer.id === 'igboland-canonical-capitals-symbol');
+        const canonicalTown = feats.find((f) => f.layer.id === 'igboland-canonical-towns-points');
+        const canonical = canonicalCapital || canonicalTown;
         const community = feats.find((f) => f.layer.id === 'communities-points');
         const kindred = feats.find((f) => f.layer.id === 'kindred-landmarks-points');
         const landmark = feats.find((f) => f.layer.id === 'landmarks-points');
@@ -2364,6 +2554,37 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         const migrationFeature = feats.find((f) => f.layer.id === 'migration-lines' || f.layer.id === 'migration-hubs');
         const lga = feats.find((f) => f.layer.id === 'lgas-fill');
         const state = feats.find((f) => f.layer.id === 'states-fill');
+
+        if (canonical) {
+          const p = canonical.properties as any;
+          const isCapital = p.category === 'capital';
+          const coords = (canonical.geometry as any)?.coordinates as [number, number] | undefined;
+          const markerColor = isCapital ? '#f59e0b' : '#10b981';
+          const subLabel = [p.lgaName && `${p.lgaName} LGA`, p.stateName && `${p.stateName} State`].filter(Boolean).join(', ');
+          if (coords) highlightPoint(coords, markerColor, p.name, subLabel || (isCapital ? 'Capital City' : 'Historic Town'));
+
+          const nearestRiver = coords ? calculateNearestWaterway(coords[0], coords[1]) : undefined;
+          const dialectCluster = getDialectForLocation(p.stateName, p.lgaName);
+
+          onSelectRef.current({
+            type: 'settlement',
+            name: p.name,
+            code: p.id,
+            coordinates: coords,
+            parentName: subLabel,
+            zone: 'southeast',
+            placeType: isCapital ? 'Capital City (Map of Igbo Land)' : 'Historic Town (Map of Igbo Land)',
+            markerColor,
+            colorLabel: isCapital ? 'Golden Square: Regional Capital' : 'Emerald Node: Historic Town',
+            colorExplanation: isCapital
+              ? `Prominent administrative and cultural capital designated on the canonical 'Map of Igbo Land: Communities and Towns'.`
+              : `Documented historic Igbo town and community designated on the canonical 'Map of Igbo Land: Communities and Towns'.`,
+            whyMarked: p.historicalSignificance || `Canonical community from the historical Map of Igbo Land (${p.stateName || 'Igboland'}).`,
+            nearestRiver,
+            dialectCluster,
+          });
+          return;
+        }
 
         if (kindred) {
           const p = kindred.properties as any;
@@ -2814,7 +3035,16 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
   useEffect(() => {
     if (!loaded || !map.current) return;
     const v = showCommunities ? 'visible' : 'none';
-    ['communities-glow', 'communities-points', 'communities-labels'].forEach((l) => map.current!.getLayer(l) && map.current!.setLayoutProperty(l, 'visibility', v));
+    [
+      'communities-glow',
+      'communities-points',
+      'communities-labels',
+      'igboland-canonical-capitals-glow',
+      'igboland-canonical-capitals-symbol',
+      'igboland-canonical-towns-glow',
+      'igboland-canonical-towns-points',
+      'igboland-canonical-towns-labels',
+    ].forEach((l) => map.current!.getLayer(l) && map.current!.setLayoutProperty(l, 'visibility', v));
   }, [showCommunities, loaded]);
 
   useEffect(() => {
