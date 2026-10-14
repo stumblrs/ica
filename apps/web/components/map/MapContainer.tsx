@@ -12,9 +12,12 @@ import { calculateNearestWaterway, getDialectForLocation, type DialectCluster, A
 
 export interface SelectedFeature {
   type: 'state' | 'lga' | 'community' | 'settlement' | 'landmark' | 'migration' | 'region';
+  id?: string;
   name: string;
   parentName?: string;
   code?: string;
+  lgaName?: string;
+  stateName?: string;
   coordinates?: [number, number];
   identityStatus?: string;
   verificationStatus?: string;
@@ -96,11 +99,13 @@ interface MapContainerProps {
   activeFilter?: FilterDotType;
   onFilterChange?: (filter: FilterDotType) => void;
   isFiltersCollapsed?: boolean;
+  onAddMedia?: (feature: SelectedFeature) => void;
 }
 
 interface HoverInfo {
   x: number;
   y: number;
+  lngLat?: [number, number];
   name?: string;
   typeBadge?: string;
   state?: string;
@@ -110,6 +115,7 @@ interface HoverInfo {
   colorBg?: string;
   colorBorder?: string;
   colorText?: string;
+  featureData?: SelectedFeature;
 }
 
 function responsivePadding(el: HTMLElement | null) {
@@ -144,6 +150,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
     activeFilter = 'all',
     onFilterChange,
     isFiltersCollapsed = false,
+    onAddMedia,
   },
   ref
 ) {
@@ -159,6 +166,8 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
   const [pendingCoords, setPendingCoords] = useState<{ lon: number; lat: number } | null>(null);
   const [pendingName, setPendingName] = useState<string>('');
   const [hover, setHover] = useState<HoverInfo | null>(null);
+  const isOverCardRef = useRef(false);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [cursorCoords, setCursorCoords] = useState<{ lat: number; lng: number; zoom: number } | null>(null);
   const [is3D, setIs3D] = useState(false);
   const [pitchPreset, setPitchPreset] = useState<number>(56);
@@ -2358,6 +2367,10 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         const lga = feats.find((f) => f.layer.id === 'lgas-fill');
         const state = feats.find((f) => f.layer.id === 'states-fill');
 
+        if (isOverCardRef.current) {
+          return;
+        }
+
         const isDotHovered = Boolean(community || kindred || referenceSettlement || settlement || landmark || canonical);
         mapInstance.getCanvas().style.cursor = isAddActive() || isPinningKindredRef.current ? 'crosshair' : isDotHovered || state || lga ? 'pointer' : '';
 
@@ -2366,7 +2379,13 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
 
         // 1. If hovering a community submission dot
         if (community) {
+          if (hoverTimeoutRef.current) {
+            clearTimeout(hoverTimeoutRef.current);
+            hoverTimeoutRef.current = null;
+          }
           const p = community.properties as any;
+          const coords = (community.geometry?.type === 'Point' ? (community.geometry as any).coordinates : [e.lngLat.lng, e.lngLat.lat]) as [number, number];
+          const pt = mapInstance.project(coords);
           const isChallenged = p.verification_status === 'challenged';
           const isPending = p.verification_status === 'pending';
           const colorLabel = isChallenged ? 'Challenged Submission' : isPending ? 'Pending Community' : 'Verified Igbo Community';
@@ -2377,8 +2396,9 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
             : { bg: 'bg-emerald-500/15', border: 'border-emerald-500/40', text: 'text-emerald-300' };
 
           setHover({
-            x: e.point.x,
-            y: e.point.y,
+            x: Math.round(pt.x),
+            y: Math.round(pt.y),
+            lngLat: coords,
             name: p.name,
             typeBadge: 'Community Submission',
             state: p.state_name ? `${p.state_name} State` : undefined,
@@ -2388,16 +2408,34 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
             colorBg: colorCls.bg,
             colorBorder: colorCls.border,
             colorText: colorCls.text,
+            featureData: {
+              type: 'community',
+              id: p.id,
+              name: p.name,
+              code: p.id,
+              coordinates: coords,
+              lgaName: p.lga_name,
+              stateName: p.state_name,
+              parentName: `${p.lga_name || ''} LGA, ${p.state_name || ''} State`,
+              media: p.evidence_urls || [],
+            },
           });
           return;
         }
 
         // 2. If hovering a kindred landmark dot
         if (kindred) {
+          if (hoverTimeoutRef.current) {
+            clearTimeout(hoverTimeoutRef.current);
+            hoverTimeoutRef.current = null;
+          }
           const p = kindred.properties as any;
+          const coords = (kindred.geometry?.type === 'Point' ? (kindred.geometry as any).coordinates : [e.lngLat.lng, e.lngLat.lat]) as [number, number];
+          const pt = mapInstance.project(coords);
           setHover({
-            x: e.point.x,
-            y: e.point.y,
+            x: Math.round(pt.x),
+            y: Math.round(pt.y),
+            lngLat: coords,
             name: p.name,
             typeBadge: `ỤMỤNNA: ${(p.category || 'LANDMARK').toUpperCase().replace('_', ' ')}`,
             state: p.communityName ? `${p.communityName}` : undefined,
@@ -2407,16 +2445,31 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
             colorBg: 'bg-cyan-500/15',
             colorBorder: 'border-cyan-500/40',
             colorText: 'text-cyan-300',
+            featureData: {
+              type: 'landmark',
+              id: `kindred-${p.id || p.name}`,
+              name: p.name,
+              coordinates: coords,
+              parentName: `${p.umunnaName || ''}, ${p.communityName || ''}`,
+              media: [],
+            },
           });
           return;
         }
 
         // 3. If hovering a 13-state reference settlement / village (Sky Blue, e.g. Okpuno)
         if (referenceSettlement) {
+          if (hoverTimeoutRef.current) {
+            clearTimeout(hoverTimeoutRef.current);
+            hoverTimeoutRef.current = null;
+          }
           const p = referenceSettlement.properties as any;
+          const coords = (referenceSettlement.geometry?.type === 'Point' ? (referenceSettlement.geometry as any).coordinates : [e.lngLat.lng, e.lngLat.lat]) as [number, number];
+          const pt = mapInstance.project(coords);
           setHover({
-            x: e.point.x,
-            y: e.point.y,
+            x: Math.round(pt.x),
+            y: Math.round(pt.y),
+            lngLat: coords,
             name: p.name || 'Local Settlement',
             typeBadge: p.ward ? `WARD: ${(p.ward || '').toUpperCase()}` : 'VILLAGE / SETTLEMENT',
             state: p.state ? `${p.state} State` : undefined,
@@ -2426,20 +2479,38 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
             colorBg: 'bg-sky-500/15',
             colorBorder: 'border-sky-500/40',
             colorText: 'text-sky-300',
+            featureData: {
+              type: 'settlement',
+              id: `ref-${p.osm_id || p.name || 'settlement'}`,
+              name: p.name || 'Local Settlement',
+              code: p.wardCode || p.osm_id,
+              coordinates: coords,
+              lgaName: p.lga,
+              stateName: p.state,
+              parentName: `${p.lga || ''} LGA, ${p.state || ''} State`,
+              media: [],
+            },
           });
           return;
         }
 
         // 4. If hovering a regional settlement dot
         if (settlement) {
+          if (hoverTimeoutRef.current) {
+            clearTimeout(hoverTimeoutRef.current);
+            hoverTimeoutRef.current = null;
+          }
           const p = settlement.properties as any;
+          const coords = (settlement.geometry?.type === 'Point' ? (settlement.geometry as any).coordinates : [e.lngLat.lng, e.lngLat.lat]) as [number, number];
+          const pt = mapInstance.project(coords);
           const isSE = p.adm1_pcode ? SE_STATE_CODES.includes(p.adm1_pcode) : false;
           const isIdentified = p.adm2_pcode ? identifiedRef.current.includes(p.adm2_pcode) : false;
           const isIgboArea = isSE || isIdentified;
 
           setHover({
-            x: e.point.x,
-            y: e.point.y,
+            x: Math.round(pt.x),
+            y: Math.round(pt.y),
+            lngLat: coords,
             name: p.name || 'Settlement',
             typeBadge: p.place ? `${p.place}`.toUpperCase() : 'SETTLEMENT',
             state: p.adm1_name ? `${p.adm1_name} State` : undefined,
@@ -2449,16 +2520,33 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
             colorBg: isIgboArea ? 'bg-emerald-500/15' : 'bg-red-500/15',
             colorBorder: isIgboArea ? 'border-emerald-500/40' : 'border-red-500/40',
             colorText: isIgboArea ? 'text-emerald-300' : 'text-red-300',
+            featureData: {
+              type: 'settlement',
+              id: `settlement-${p.osm_id || p.name || 'settlement'}`,
+              name: p.name || 'Settlement',
+              coordinates: coords,
+              lgaName: p.adm2_name,
+              stateName: p.adm1_name,
+              parentName: `${p.adm2_name || ''} LGA, ${p.adm1_name || ''} State`,
+              media: [],
+            },
           });
           return;
         }
 
         // 5. If hovering a cultural landmark / market dot (Amber)
         if (landmark) {
+          if (hoverTimeoutRef.current) {
+            clearTimeout(hoverTimeoutRef.current);
+            hoverTimeoutRef.current = null;
+          }
           const p = landmark.properties as any;
+          const coords = (landmark.geometry?.type === 'Point' ? (landmark.geometry as any).coordinates : [e.lngLat.lng, e.lngLat.lat]) as [number, number];
+          const pt = mapInstance.project(coords);
           setHover({
-            x: e.point.x,
-            y: e.point.y,
+            x: Math.round(pt.x),
+            y: Math.round(pt.y),
+            lngLat: coords,
             name: p.name || 'Traditional Landmark / Market',
             typeBadge: p.amenity ? `${p.amenity}`.toUpperCase() : 'CULTURAL LANDMARK',
             state: p.adm1_name ? `${p.adm1_name} State` : undefined,
@@ -2468,17 +2556,34 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
             colorBg: 'bg-amber-500/15',
             colorBorder: 'border-amber-500/40',
             colorText: 'text-amber-300',
+            featureData: {
+              type: 'landmark',
+              id: `landmark-${p.osm_id || p.name || 'landmark'}`,
+              name: p.name || 'Cultural Landmark',
+              coordinates: coords,
+              lgaName: p.adm2_name,
+              stateName: p.adm1_name,
+              parentName: `${p.adm2_name || ''} LGA, ${p.adm1_name || ''} State`,
+              media: [],
+            },
           });
           return;
         }
 
         // 6. If hovering a canonical town or regional capital (from igbo.jpg)
         if (canonical) {
+          if (hoverTimeoutRef.current) {
+            clearTimeout(hoverTimeoutRef.current);
+            hoverTimeoutRef.current = null;
+          }
           const p = canonical.properties as any;
           const isCapital = p.category === 'capital';
+          const coords = (canonical.geometry?.type === 'Point' ? (canonical.geometry as any).coordinates : [e.lngLat.lng, e.lngLat.lat]) as [number, number];
+          const pt = mapInstance.project(coords);
           setHover({
-            x: e.point.x,
-            y: e.point.y,
+            x: Math.round(pt.x),
+            y: Math.round(pt.y),
+            lngLat: coords,
             name: p.name,
             typeBadge: isCapital ? 'MAP OF IGBO LAND: REGIONAL CAPITAL' : 'MAP OF IGBO LAND: HISTORIC TOWN',
             state: p.stateName ? `${p.stateName} State` : undefined,
@@ -2488,27 +2593,63 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
             colorBg: isCapital ? 'bg-amber-500/15' : 'bg-emerald-500/15',
             colorBorder: isCapital ? 'border-amber-500/40' : 'border-emerald-500/40',
             colorText: isCapital ? 'text-amber-300' : 'text-emerald-300',
+            featureData: {
+              type: 'community',
+              id: `canonical-${p.name}`,
+              name: p.name,
+              coordinates: coords,
+              lgaName: p.lgaName,
+              stateName: p.stateName,
+              parentName: `${p.lgaName || ''} LGA, ${p.stateName || ''} State`,
+              media: [],
+            },
           });
           return;
         }
 
         if (!stateCode) {
-          setHover(null);
+          if (!hoverTimeoutRef.current && !isOverCardRef.current) {
+            hoverTimeoutRef.current = setTimeout(() => {
+              if (!isOverCardRef.current) {
+                setHover(null);
+              }
+            }, 300);
+          }
           return;
         }
 
         const lgaCode = lga?.properties?.admin2Pcod as string | undefined;
-        setHover({
-          x: e.point.x,
-          y: e.point.y,
-          state: (state?.properties?.admin1Name ?? lga?.properties?.admin1Name) as string,
-          lga: lga?.properties?.admin2Name as string | undefined,
-          zone: zoneOf(stateCode, lgaCode),
+        if (!hoverTimeoutRef.current && !isOverCardRef.current) {
+          hoverTimeoutRef.current = setTimeout(() => {
+            if (!isOverCardRef.current) {
+              setHover({
+                x: e.point.x,
+                y: e.point.y,
+                state: (state?.properties?.admin1Name ?? lga?.properties?.admin1Name) as string,
+                lga: lga?.properties?.admin2Name as string | undefined,
+                zone: zoneOf(stateCode, lgaCode),
+              });
+            }
+          }, 300);
+        }
+      });
+
+      mapInstance.on('move', () => {
+        setHover((prev) => {
+          if (!prev || !prev.lngLat) return prev;
+          const pt = mapInstance.project(prev.lngLat);
+          return {
+            ...prev,
+            x: Math.round(pt.x),
+            y: Math.round(pt.y),
+          };
         });
       });
 
       mapInstance.on('mouseout', () => {
-        setHover(null);
+        if (!isOverCardRef.current) {
+          setHover(null);
+        }
         if (mapInstance.getLayer('states-hover')) {
           mapInstance.setFilter('states-hover', ['==', ['get', 'admin1Pcod'], '']);
         }
@@ -3606,21 +3747,35 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         </div>
       )}
 
-      {/* Hover tooltip (pointer devices) */}
+      {/* Stationed, Interactive Hover Card */}
       {hover && !isAddMode && (
         <div
-          className="pointer-events-none absolute z-20 hidden sm:block"
-          style={{ left: hover.x + 14, top: hover.y + 14 }}
+          className="pointer-events-auto absolute z-30 hidden sm:block animate-in fade-in-50 zoom-in-95 duration-150"
+          style={{
+            left: Math.max(12, Math.min(hover.x + 12, (mapContainer.current?.clientWidth || 800) - 295)),
+            top: Math.max(12, Math.min(hover.y - 28, (mapContainer.current?.clientHeight || 600) - 220)),
+          }}
+          onMouseEnter={() => {
+            isOverCardRef.current = true;
+            if (hoverTimeoutRef.current) {
+              clearTimeout(hoverTimeoutRef.current);
+              hoverTimeoutRef.current = null;
+            }
+          }}
+          onMouseLeave={() => {
+            isOverCardRef.current = false;
+            setHover(null);
+          }}
         >
-          <div className="rounded-xl bg-slate-950/95 border border-white/10 shadow-2xl px-3 py-2.5 min-w-[180px] max-w-[280px]">
+          <div className="rounded-2xl bg-[#080d1a]/95 backdrop-blur-xl border border-emerald-500/30 shadow-2xl p-3 min-w-[210px] max-w-[280px]">
             {hover.typeBadge && (
-              <div className="flex items-center gap-1.5 mb-1">
-                <span className="text-[9px] uppercase font-mono font-bold tracking-wider px-1.5 py-0.5 rounded bg-white/10 text-slate-300 border border-white/10">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <span className="text-[9px] uppercase font-mono font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
                   {hover.typeBadge}
                 </span>
               </div>
             )}
-            <p className="text-[13px] font-bold text-white font-display leading-tight">
+            <p className="text-[14px] font-bold text-white font-display leading-tight">
               {hover.name || hover.state || 'Location'}
             </p>
             {(hover.name ? (hover.lga || hover.state) : hover.lga) && (
@@ -3629,7 +3784,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
               </p>
             )}
             {hover.colorLabel ? (
-              <span className={`inline-block mt-2 text-[9px] uppercase tracking-wider font-mono font-semibold px-1.5 py-0.5 rounded border ${hover.colorBg} ${hover.colorBorder} ${hover.colorText}`}>
+              <span className={`inline-block mt-2 text-[9px] uppercase tracking-wider font-mono font-semibold px-2 py-0.5 rounded-md border ${hover.colorBg} ${hover.colorBorder} ${hover.colorText}`}>
                 {hover.colorLabel}
               </span>
             ) : (
@@ -3638,13 +3793,38 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
               </span>
             )}
 
-            {/* Quick Upload / Attach Hint */}
-            <div className="mt-2 pt-2 border-t border-white/10 flex items-center justify-between text-[10px]">
-              <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                <Camera className="w-3 h-3 text-emerald-400" /> Click to view / add photo or video
-              </span>
-              <span className="text-[9px] text-slate-400 font-mono">Select</span>
-            </div>
+            {/* Stationed, Interactive Upload Photo / Video Button */}
+            {hover.featureData && onAddMedia && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const targetFeature = hover.featureData!;
+                  setHover(null);
+                  onAddMedia(targetFeature);
+                }}
+                className="w-full mt-2.5 py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-black font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/25 active:scale-95 transition-all cursor-pointer"
+                title={`Upload photos or video URLs directly for ${hover.name}`}
+              >
+                <Camera className="w-3.5 h-3.5 text-black" />
+                <span>+ Upload Photo / Video</span>
+              </button>
+            )}
+
+            {/* Quick Inspect button */}
+            {hover.featureData && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectFeature(hover.featureData!);
+                  setHover(null);
+                }}
+                className="w-full mt-1.5 py-1 px-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-[10px] font-mono flex items-center justify-center gap-1 transition-colors cursor-pointer"
+              >
+                <span>Click to inspect details</span>
+              </button>
+            )}
           </div>
         </div>
       )}

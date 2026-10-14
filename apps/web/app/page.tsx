@@ -608,6 +608,7 @@ export default function HomePage() {
           activeFilter={activeFilter}
           onFilterChange={setActiveFilter}
           isFiltersCollapsed={isFiltersCollapsed}
+          onAddMedia={setPendingMediaUploadFeature}
         />
 
         {/* Floating Quick Map HUD / Expand Trigger (visible on desktop when collapsed) */}
