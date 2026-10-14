@@ -871,19 +871,19 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
       const lat = item.latitude ?? (item.center ? item.center[1] : (item.coordinates ? item.coordinates[1] : null));
 
       const isLga = item.type === 'lga';
-      let zoom = 15.0;
+      let zoom = 15.2;
       if (isLga) {
         zoom = 13.0;
       } else if (item.type === 'capital' || item.category === 'capital') {
-        zoom = 14.0;
-      } else if (item.type === 'city') {
         zoom = 14.5;
-      } else if (item.type === 'town') {
+      } else if (item.type === 'city') {
         zoom = 14.8;
-      } else if (item.type === 'market' || item.type === 'marketplace' || item.type === 'landmark') {
+      } else if (item.type === 'town') {
         zoom = 15.0;
+      } else if (item.type === 'market' || item.type === 'marketplace' || item.type === 'landmark') {
+        zoom = 15.3;
       } else if (item.type === 'village' || item.type === 'community' || item.source === 'community') {
-        zoom = 15.2;
+        zoom = 15.5;
       }
 
       if (lon != null && lat != null) {
@@ -917,6 +917,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
       const dialectCluster = isIgboArea ? getDialectForLocation(item.stateName, item.lgaName) : undefined;
 
       const subLabel = [
+        item.wardName && `Ward: ${item.wardName}`,
         item.lgaName && `${item.lgaName} LGA`,
         item.stateName && `${item.stateName} State`,
       ].filter(Boolean).join(', ');
@@ -930,7 +931,10 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         }
         onSelectRef.current({
           type: 'community',
+          id: item.id,
           name: item.name,
+          lgaName: item.lgaName,
+          stateName: item.stateName,
           code: item.id,
           coordinates: [lon, lat],
           parentName: [item.lgaName && `${item.lgaName} LGA`, item.stateName && `${item.stateName} State`].filter(Boolean).join(', '),
@@ -955,6 +959,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         }
         onSelectRef.current({
           type: 'lga',
+          id: item.id,
           name: item.name,
           code: item.lgaCode,
           coordinates: lon != null && lat != null ? [lon, lat] : undefined,
@@ -978,7 +983,10 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         }
         onSelectRef.current({
           type: 'landmark',
+          id: item.id,
           name: item.name,
+          lgaName: item.lgaName,
+          stateName: item.stateName,
           parentName: [item.lgaName && `${item.lgaName} LGA`, item.stateName && `${item.stateName} State`].filter(Boolean).join(', '),
           code: item.id,
           coordinates: lon != null && lat != null ? [lon, lat] : undefined,
@@ -998,7 +1006,10 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         }
         onSelectRef.current({
           type: 'settlement',
+          id: item.id,
           name: item.name,
+          lgaName: item.lgaName,
+          stateName: item.stateName,
           parentName: [item.lgaName && `${item.lgaName} LGA`, item.stateName && `${item.stateName} State`].filter(Boolean).join(', '),
           code: item.id,
           coordinates: lon != null && lat != null ? [lon, lat] : undefined,
@@ -1021,8 +1032,11 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         }
         onSelectRef.current({
           type: 'settlement',
+          id: item.id,
           name: item.name,
-          parentName: [item.lgaName && `${item.lgaName} LGA`, item.stateName && `${item.stateName} State`].filter(Boolean).join(', '),
+          lgaName: item.lgaName,
+          stateName: item.stateName,
+          parentName: [item.wardName && `Ward: ${item.wardName}`, item.lgaName && `${item.lgaName} LGA`, item.stateName && `${item.stateName} State`].filter(Boolean).join(', '),
           code: item.id,
           coordinates: lon != null && lat != null ? [lon, lat] : undefined,
           placeType,

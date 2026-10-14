@@ -119,17 +119,54 @@ export default function HomePage() {
   }, []);
 
   const handleSelectCommunity = useCallback((c: any) => {
-    // 1. Switch to Map view on mobile and collapse sidebar on desktop
+    // 1. Switch to Map view on mobile and collapse sidebar on desktop so map is fully visible
     setMobileTab('map');
     setIsSidebarCollapsed(true);
     setPendingNavTarget(c);
 
-    // 2. Perform map camera flight
+    const lon = c.longitude ?? (c.center ? c.center[0] : (c.coordinates ? c.coordinates[0] : null));
+    const lat = c.latitude ?? (c.center ? c.center[1] : (c.coordinates ? c.coordinates[1] : null));
+    const coords = lon != null && lat != null ? ([lon, lat] as [number, number]) : undefined;
+
+    // Immediately switch the floating card and inspection context to the exact settlement clicked
+    const targetFeature: SelectedFeature = {
+      type:
+        c.type === 'lga'
+          ? 'lga'
+          : c.type === 'community' || c.source === 'community'
+          ? 'community'
+          : c.type === 'landmark' || c.type === 'market' || c.type === 'marketplace'
+          ? 'landmark'
+          : 'settlement',
+      id: c.id,
+      name: c.name,
+      code: c.id,
+      coordinates: coords,
+      lgaName: c.lgaName,
+      stateName: c.stateName,
+      parentName: [
+        c.wardName && `Ward: ${c.wardName}`,
+        c.lgaName && `${c.lgaName} LGA`,
+        c.stateName && `${c.stateName} State`,
+      ]
+        .filter(Boolean)
+        .join(', '),
+      zone: 'southeast',
+      placeType: c.typeLabel || (c.type ? `${c.type.charAt(0).toUpperCase()}${c.type.slice(1)}` : 'Settlement'),
+      colorLabel: 'Selected Location',
+      markerColor: '#10b981',
+      media: c.media || [],
+    };
+    setSelectedFeature(targetFeature);
+
+    // 2. Perform map camera flight with slight delay so container unhides and resizes
     requestAnimationFrame(() => {
-      if (mapRef.current) {
-        mapRef.current.resize();
-        mapRef.current.flyToCommunity(c);
-      }
+      setTimeout(() => {
+        if (mapRef.current) {
+          mapRef.current.resize();
+          mapRef.current.flyToCommunity(c);
+        }
+      }, 50);
     });
   }, []);
 
@@ -143,7 +180,7 @@ export default function HomePage() {
           mapRef.current.resize();
           mapRef.current.flyToCommunity(target);
         }
-      }, 60);
+      }, 120);
       return () => clearTimeout(timer);
     }
   }, [mobileTab, pendingNavTarget]);
@@ -594,9 +631,6 @@ export default function HomePage() {
           setIsAddMode={setIsAddMode}
           onSelectFeature={(feature) => {
             setSelectedFeature(feature);
-            if (feature) {
-              setIsSidebarCollapsed(false);
-            }
           }}
           onCommunityAdded={loadCommunities}
           onOpenAddModal={(coords, name) => {

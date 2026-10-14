@@ -222,7 +222,7 @@ export function SearchBar({ onSelectCommunity }: SearchBarProps) {
                               </span>
                             </div>
                             <span className="text-[11px] text-slate-400 block truncate mt-0.5">
-                              {[item.lgaName && `${item.lgaName} LGA`, item.stateName && `${item.stateName} State`].filter(Boolean).join(', ') || item.stateName || 'Nigeria'}
+                              {[item.wardName && `Ward: ${item.wardName}`, item.lgaName && `${item.lgaName} LGA`, item.stateName && `${item.stateName} State`].filter(Boolean).join(', ') || item.stateName || 'Nigeria'}
                             </span>
                           </div>
                           <MapPin className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400 shrink-0" />
