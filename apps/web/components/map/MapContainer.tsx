@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import maplibregl from 'maplibre-gl';
-import { Layers, Crosshair, Loader2, X, Compass, ChevronLeft, ChevronRight, Plus, Minus, Mountain, Play, Pause, Navigation, Landmark as LandmarkIcon } from 'lucide-react';
+import { Layers, Crosshair, Loader2, X, Compass, ChevronLeft, ChevronRight, Plus, Minus, Mountain, Play, Pause, Navigation, Landmark as LandmarkIcon, Camera } from 'lucide-react';
 import { AddCommunityModal } from '../forms/AddCommunityModal';
 import { CinematicFlyThroughHUD, type FlightCorridorItem, type WaypointInfo } from './CinematicFlyThroughHUD';
 import { KindredMicroMappingModal } from './KindredMicroMappingModal';
@@ -2329,76 +2329,42 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         });
 
         const layers = [
-          'igboland-canonical-capitals-symbol',
-          'igboland-canonical-towns-points',
           'communities-points',
+          'communities-labels',
           'kindred-landmarks-points',
-          'landmarks-points',
           'reference-settlements-points',
+          'reference-settlements-labels',
           'settlements-points',
+          'settlements-labels',
+          'landmarks-points',
+          'landmarks-labels',
+          'igboland-canonical-towns-points',
+          'igboland-canonical-towns-labels',
+          'igboland-canonical-capitals-symbol',
           'lgas-fill',
           'states-fill'
         ].filter(
           (l) => mapInstance.getLayer(l) && mapInstance.getLayoutProperty(l, 'visibility') !== 'none'
         );
         const feats = mapInstance.queryRenderedFeatures(e.point, { layers });
-        const canonicalCapital = feats.find((f) => f.layer.id === 'igboland-canonical-capitals-symbol');
-        const canonicalTown = feats.find((f) => f.layer.id === 'igboland-canonical-towns-points');
-        const canonical = canonicalCapital || canonicalTown;
-        const community = feats.find((f) => f.layer.id === 'communities-points');
+        const community = feats.find((f) => f.layer.id === 'communities-points' || f.layer.id === 'communities-labels');
         const kindred = feats.find((f) => f.layer.id === 'kindred-landmarks-points');
-        const landmark = feats.find((f) => f.layer.id === 'landmarks-points');
-        const referenceSettlement = feats.find((f) => f.layer.id === 'reference-settlements-points');
-        const settlement = feats.find((f) => f.layer.id === 'settlements-points');
+        const referenceSettlement = feats.find((f) => f.layer.id === 'reference-settlements-points' || f.layer.id === 'reference-settlements-labels');
+        const settlement = feats.find((f) => f.layer.id === 'settlements-points' || f.layer.id === 'settlements-labels');
+        const landmark = feats.find((f) => f.layer.id === 'landmarks-points' || f.layer.id === 'landmarks-labels');
+        const canonicalTown = feats.find((f) => f.layer.id === 'igboland-canonical-towns-points' || f.layer.id === 'igboland-canonical-towns-labels');
+        const canonicalCapital = feats.find((f) => f.layer.id === 'igboland-canonical-capitals-symbol');
+        const canonical = canonicalCapital || canonicalTown;
         const lga = feats.find((f) => f.layer.id === 'lgas-fill');
         const state = feats.find((f) => f.layer.id === 'states-fill');
 
-        const isDotHovered = Boolean(canonical || community || kindred || landmark || referenceSettlement || settlement);
+        const isDotHovered = Boolean(community || kindred || referenceSettlement || settlement || landmark || canonical);
         mapInstance.getCanvas().style.cursor = isAddActive() || isPinningKindredRef.current ? 'crosshair' : isDotHovered || state || lga ? 'pointer' : '';
 
         const stateCode = (state?.properties?.admin1Pcod ?? lga?.properties?.admin1Pcod ?? settlement?.properties?.adm1_pcode ?? landmark?.properties?.adm1_pcode) as string | undefined;
         mapInstance.setFilter('states-hover', ['==', ['get', 'admin1Pcod'], stateCode ?? '']);
 
-        // 0. If hovering a canonical town or regional capital (from igbo.jpg)
-        if (canonical) {
-          const p = canonical.properties as any;
-          const isCapital = p.category === 'capital';
-          setHover({
-            x: e.point.x,
-            y: e.point.y,
-            name: p.name,
-            typeBadge: isCapital ? 'MAP OF IGBO LAND: REGIONAL CAPITAL' : 'MAP OF IGBO LAND: HISTORIC TOWN',
-            state: p.stateName ? `${p.stateName} State` : undefined,
-            lga: p.lgaName ? `${p.lgaName} LGA` : undefined,
-            zone: 'southeast',
-            colorLabel: isCapital ? 'Golden Square: Regional Capital' : 'Emerald Node: Historic Town',
-            colorBg: isCapital ? 'bg-amber-500/15' : 'bg-emerald-500/15',
-            colorBorder: isCapital ? 'border-amber-500/40' : 'border-emerald-500/40',
-            colorText: isCapital ? 'text-amber-300' : 'text-emerald-300',
-          });
-          return;
-        }
-
-        // 1. If hovering a kindred landmark dot
-        if (kindred) {
-          const p = kindred.properties as any;
-          setHover({
-            x: e.point.x,
-            y: e.point.y,
-            name: p.name,
-            typeBadge: `ỤMỤNNA: ${(p.category || 'LANDMARK').toUpperCase().replace('_', ' ')}`,
-            state: p.communityName ? `${p.communityName}` : undefined,
-            lga: p.umunnaName ? `Ụmụnna: ${p.umunnaName}` : undefined,
-            zone: 'southeast',
-            colorLabel: 'Cyan: Kindred (Ụmụnna) Landmark',
-            colorBg: 'bg-cyan-500/15',
-            colorBorder: 'border-cyan-500/40',
-            colorText: 'text-cyan-300',
-          });
-          return;
-        }
-
-        // 2. If hovering a community submission dot
+        // 1. If hovering a community submission dot
         if (community) {
           const p = community.properties as any;
           const isChallenged = p.verification_status === 'challenged';
@@ -2426,37 +2392,37 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           return;
         }
 
-        // 2. If hovering a cultural landmark / market dot (Amber)
-        if (landmark) {
-          const p = landmark.properties as any;
+        // 2. If hovering a kindred landmark dot
+        if (kindred) {
+          const p = kindred.properties as any;
           setHover({
             x: e.point.x,
             y: e.point.y,
-            name: p.name || 'Traditional Landmark / Market',
-            typeBadge: p.amenity ? `${p.amenity}`.toUpperCase() : 'CULTURAL LANDMARK',
-            state: p.adm1_name ? `${p.adm1_name} State` : undefined,
-            lga: p.adm2_name ? `${p.adm2_name} LGA` : undefined,
-            zone: zoneOf(p.adm1_pcode, p.adm2_pcode),
-            colorLabel: 'Amber: Traditional Market / Cultural Landmark',
-            colorBg: 'bg-amber-500/15',
-            colorBorder: 'border-amber-500/40',
-            colorText: 'text-amber-300',
+            name: p.name,
+            typeBadge: `ỤMỤNNA: ${(p.category || 'LANDMARK').toUpperCase().replace('_', ' ')}`,
+            state: p.communityName ? `${p.communityName}` : undefined,
+            lga: p.umunnaName ? `Ụmụnna: ${p.umunnaName}` : undefined,
+            zone: 'southeast',
+            colorLabel: 'Cyan: Kindred (Ụmụnna) Landmark',
+            colorBg: 'bg-cyan-500/15',
+            colorBorder: 'border-cyan-500/40',
+            colorText: 'text-cyan-300',
           });
           return;
         }
 
-        // 3. If hovering a 13-state reference settlement / village (Sky Blue)
+        // 3. If hovering a 13-state reference settlement / village (Sky Blue, e.g. Okpuno)
         if (referenceSettlement) {
           const p = referenceSettlement.properties as any;
           setHover({
             x: e.point.x,
             y: e.point.y,
             name: p.name || 'Local Settlement',
-            typeBadge: p.ward ? `WARD: ${(p.ward || '').toUpperCase()}` : 'REFERENCE SETTLEMENT',
+            typeBadge: p.ward ? `WARD: ${(p.ward || '').toUpperCase()}` : 'VILLAGE / SETTLEMENT',
             state: p.state ? `${p.state} State` : undefined,
             lga: p.lga ? `${p.lga} LGA` : undefined,
             zone: 'southeast',
-            colorLabel: p.wardCode ? `Ward: ${p.ward || ''} (${p.wardCode})` : 'GRID3 Reference Settlement',
+            colorLabel: p.wardCode ? `Ward: ${p.ward || ''} (${p.wardCode})` : 'Documented Settlement / Village',
             colorBg: 'bg-sky-500/15',
             colorBorder: 'border-sky-500/40',
             colorText: 'text-sky-300',
@@ -2483,6 +2449,45 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
             colorBg: isIgboArea ? 'bg-emerald-500/15' : 'bg-red-500/15',
             colorBorder: isIgboArea ? 'border-emerald-500/40' : 'border-red-500/40',
             colorText: isIgboArea ? 'text-emerald-300' : 'text-red-300',
+          });
+          return;
+        }
+
+        // 5. If hovering a cultural landmark / market dot (Amber)
+        if (landmark) {
+          const p = landmark.properties as any;
+          setHover({
+            x: e.point.x,
+            y: e.point.y,
+            name: p.name || 'Traditional Landmark / Market',
+            typeBadge: p.amenity ? `${p.amenity}`.toUpperCase() : 'CULTURAL LANDMARK',
+            state: p.adm1_name ? `${p.adm1_name} State` : undefined,
+            lga: p.adm2_name ? `${p.adm2_name} LGA` : undefined,
+            zone: zoneOf(p.adm1_pcode, p.adm2_pcode),
+            colorLabel: 'Amber: Traditional Market / Cultural Landmark',
+            colorBg: 'bg-amber-500/15',
+            colorBorder: 'border-amber-500/40',
+            colorText: 'text-amber-300',
+          });
+          return;
+        }
+
+        // 6. If hovering a canonical town or regional capital (from igbo.jpg)
+        if (canonical) {
+          const p = canonical.properties as any;
+          const isCapital = p.category === 'capital';
+          setHover({
+            x: e.point.x,
+            y: e.point.y,
+            name: p.name,
+            typeBadge: isCapital ? 'MAP OF IGBO LAND: REGIONAL CAPITAL' : 'MAP OF IGBO LAND: HISTORIC TOWN',
+            state: p.stateName ? `${p.stateName} State` : undefined,
+            lga: p.lgaName ? `${p.lgaName} LGA` : undefined,
+            zone: 'southeast',
+            colorLabel: isCapital ? 'Golden Square: Regional Capital' : 'Emerald Node: Historic Town',
+            colorBg: isCapital ? 'bg-amber-500/15' : 'bg-emerald-500/15',
+            colorBorder: isCapital ? 'border-amber-500/40' : 'border-emerald-500/40',
+            colorText: isCapital ? 'text-amber-300' : 'text-emerald-300',
           });
           return;
         }
@@ -2528,80 +2533,44 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         }
 
         const layers = [
-          'igboland-canonical-capitals-symbol',
-          'igboland-canonical-towns-points',
           'communities-points',
+          'communities-labels',
           'kindred-landmarks-points',
-          'landmarks-points',
+          'reference-settlements-points',
+          'reference-settlements-labels',
           'settlements-points',
+          'settlements-labels',
+          'landmarks-points',
+          'landmarks-labels',
+          'igboland-canonical-towns-points',
+          'igboland-canonical-towns-labels',
+          'igboland-canonical-capitals-symbol',
           'migration-lines',
           'migration-hubs',
           'lgas-fill',
           'states-fill',
         ].filter((l) => mapInstance.getLayer(l) && mapInstance.getLayoutProperty(l, 'visibility') !== 'none');
-        const feats = mapInstance.queryRenderedFeatures(e.point, { layers });
-        const canonicalCapital = feats.find((f) => f.layer.id === 'igboland-canonical-capitals-symbol');
-        const canonicalTown = feats.find((f) => f.layer.id === 'igboland-canonical-towns-points');
-        const canonical = canonicalCapital || canonicalTown;
-        const community = feats.find((f) => f.layer.id === 'communities-points');
+
+        // Tap tolerance bounding box (16x16px) around click point
+        const tapBox: [maplibregl.PointLike, maplibregl.PointLike] = [
+          [e.point.x - 8, e.point.y - 8],
+          [e.point.x + 8, e.point.y + 8],
+        ];
+        const feats = mapInstance.queryRenderedFeatures(tapBox, { layers });
+
+        const community = feats.find((f) => f.layer.id === 'communities-points' || f.layer.id === 'communities-labels');
         const kindred = feats.find((f) => f.layer.id === 'kindred-landmarks-points');
-        const landmark = feats.find((f) => f.layer.id === 'landmarks-points');
-        const settlement = feats.find((f) => f.layer.id === 'settlements-points');
+        const referenceSettlement = feats.find((f) => f.layer.id === 'reference-settlements-points' || f.layer.id === 'reference-settlements-labels');
+        const settlement = feats.find((f) => f.layer.id === 'settlements-points' || f.layer.id === 'settlements-labels');
+        const landmark = feats.find((f) => f.layer.id === 'landmarks-points' || f.layer.id === 'landmarks-labels');
+        const canonicalTown = feats.find((f) => f.layer.id === 'igboland-canonical-towns-points' || f.layer.id === 'igboland-canonical-towns-labels');
+        const canonicalCapital = feats.find((f) => f.layer.id === 'igboland-canonical-capitals-symbol');
+        const canonical = canonicalCapital || canonicalTown;
         const migrationFeature = feats.find((f) => f.layer.id === 'migration-lines' || f.layer.id === 'migration-hubs');
         const lga = feats.find((f) => f.layer.id === 'lgas-fill');
         const state = feats.find((f) => f.layer.id === 'states-fill');
 
-        if (canonical) {
-          const p = canonical.properties as any;
-          const isCapital = p.category === 'capital';
-          const coords = (canonical.geometry as any)?.coordinates as [number, number] | undefined;
-          const markerColor = isCapital ? '#f59e0b' : '#10b981';
-          const subLabel = [p.lgaName && `${p.lgaName} LGA`, p.stateName && `${p.stateName} State`].filter(Boolean).join(', ');
-          if (coords) highlightPoint(coords, markerColor, p.name, subLabel || (isCapital ? 'Capital City' : 'Historic Town'));
-
-          const nearestRiver = coords ? calculateNearestWaterway(coords[0], coords[1]) : undefined;
-          const dialectCluster = getDialectForLocation(p.stateName, p.lgaName);
-
-          onSelectRef.current({
-            type: 'settlement',
-            name: p.name,
-            code: p.id,
-            coordinates: coords,
-            parentName: subLabel,
-            zone: 'southeast',
-            placeType: isCapital ? 'Capital City (Map of Igbo Land)' : 'Historic Town (Map of Igbo Land)',
-            markerColor,
-            colorLabel: isCapital ? 'Golden Square: Regional Capital' : 'Emerald Node: Historic Town',
-            colorExplanation: isCapital
-              ? `Prominent administrative and cultural capital designated on the canonical 'Map of Igbo Land: Communities and Towns'.`
-              : `Documented historic Igbo town and community designated on the canonical 'Map of Igbo Land: Communities and Towns'.`,
-            whyMarked: p.historicalSignificance || `Canonical community from the historical Map of Igbo Land (${p.stateName || 'Igboland'}).`,
-            nearestRiver,
-            dialectCluster,
-          });
-          return;
-        }
-
-        if (kindred) {
-          const p = kindred.properties as any;
-          const coords = (kindred.geometry as any)?.coordinates as [number, number] | undefined;
-          if (coords) highlightPoint(coords, '#06b6d4');
-          const nearestRiver = coords ? calculateNearestWaterway(coords[0], coords[1]) : undefined;
-          onSelectRef.current({
-            type: 'landmark',
-            name: p.name,
-            parentName: [p.communityName, p.umunnaName && `Kindred (${p.umunnaName})`].filter(Boolean).join(' • '),
-            coordinates: coords,
-            placeType: `Kindred Landmark (${(p.category || 'heritage').replace('_', ' ')})`,
-            markerColor: '#06b6d4',
-            colorLabel: 'Cyan: Kindred (Ụmụnna) Landmark',
-            colorExplanation: p.description || 'Community-mapped ancestral village square, kindred hall, or sacred grove.',
-            whyMarked: `Documented by native contributors. Category: ${p.category}. Custodian lineage: ${p.umunnaName || 'Communal'}.`,
-            nearestRiver,
-          });
-          return;
-        }
-
+        // 1. If community submission clicked
         if (community) {
           const p = community.properties as any;
           const lifecycle = p.lifecycleStatus || p.lifecycle_status || 'ACTIVE';
@@ -2657,6 +2626,86 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
             colorLabel,
             colorExplanation,
             whyMarked: 'Documented participatory community record submitted to substantiate cultural geography.',
+            nearestRiver,
+            dialectCluster,
+          });
+          return;
+        }
+
+        // 2. If kindred landmark clicked
+        if (kindred) {
+          const p = kindred.properties as any;
+          const coords = (kindred.geometry as any)?.coordinates as [number, number] | undefined;
+          if (coords) highlightPoint(coords, '#06b6d4');
+          const nearestRiver = coords ? calculateNearestWaterway(coords[0], coords[1]) : undefined;
+          onSelectRef.current({
+            type: 'landmark',
+            name: p.name,
+            parentName: [p.communityName, p.umunnaName && `Kindred (${p.umunnaName})`].filter(Boolean).join(' • '),
+            coordinates: coords,
+            placeType: `Kindred Landmark (${(p.category || 'heritage').replace('_', ' ')})`,
+            markerColor: '#06b6d4',
+            colorLabel: 'Cyan: Kindred (Ụmụnna) Landmark',
+            colorExplanation: p.description || 'Community-mapped ancestral village square, kindred hall, or sacred grove.',
+            whyMarked: `Documented by native contributors. Category: ${p.category}. Custodian lineage: ${p.umunnaName || 'Communal'}.`,
+            nearestRiver,
+          });
+          return;
+        }
+
+        // 3. If local settlement / village clicked (e.g. Okpuno in Awka!)
+        if (referenceSettlement) {
+          const p = referenceSettlement.properties as any;
+          const coords = (referenceSettlement.geometry as any)?.coordinates as [number, number] | undefined;
+          const parent = [p.lga && `${p.lga} LGA`, p.state && `${p.state} State`].filter(Boolean).join(', ');
+          if (coords) highlightPoint(coords, '#38bdf8', p.name, parent || 'Local Settlement');
+
+          const nearestRiver = coords ? calculateNearestWaterway(coords[0], coords[1]) : undefined;
+          const dialectCluster = getDialectForLocation(p.state, p.lga);
+
+          onSelectRef.current({
+            type: 'settlement',
+            name: p.name || 'Local Settlement',
+            parentName: parent,
+            code: p.id || p.osm_id || `${p.name}-${p.lga || 'local'}`,
+            coordinates: coords,
+            zone: 'southeast',
+            placeType: p.ward ? `Settlement / Village (Ward: ${p.ward})` : 'Settlement / Village',
+            markerColor: '#38bdf8',
+            colorLabel: 'Sky Blue (Documented Settlement / Village)',
+            colorExplanation: `Documented settlement (${p.name}) in ${p.lga || 'local'} LGA, ${p.state || 'Southeast'} State. Native contributors can link photos, videos, and oral records.`,
+            whyMarked: `Settlement footprint catalogued by GRID3 Nigeria / HOTOSM in ${p.lga || 'local'} jurisdiction.`,
+            nearestRiver,
+            dialectCluster,
+          });
+          return;
+        }
+
+        if (canonical) {
+          const p = canonical.properties as any;
+          const isCapital = p.category === 'capital';
+          const coords = (canonical.geometry as any)?.coordinates as [number, number] | undefined;
+          const markerColor = isCapital ? '#f59e0b' : '#10b981';
+          const subLabel = [p.lgaName && `${p.lgaName} LGA`, p.stateName && `${p.stateName} State`].filter(Boolean).join(', ');
+          if (coords) highlightPoint(coords, markerColor, p.name, subLabel || (isCapital ? 'Capital City' : 'Historic Town'));
+
+          const nearestRiver = coords ? calculateNearestWaterway(coords[0], coords[1]) : undefined;
+          const dialectCluster = getDialectForLocation(p.stateName, p.lgaName);
+
+          onSelectRef.current({
+            type: 'settlement',
+            name: p.name,
+            code: p.id,
+            coordinates: coords,
+            parentName: subLabel,
+            zone: 'southeast',
+            placeType: isCapital ? 'Capital City (Map of Igbo Land)' : 'Historic Town (Map of Igbo Land)',
+            markerColor,
+            colorLabel: isCapital ? 'Golden Square: Regional Capital' : 'Emerald Node: Historic Town',
+            colorExplanation: isCapital
+              ? `Prominent administrative and cultural capital designated on the canonical 'Map of Igbo Land: Communities and Towns'.`
+              : `Documented historic Igbo town and community designated on the canonical 'Map of Igbo Land: Communities and Towns'.`,
+            whyMarked: p.historicalSignificance || `Canonical community from the historical Map of Igbo Land (${p.stateName || 'Igboland'}).`,
             nearestRiver,
             dialectCluster,
           });
@@ -3588,6 +3637,14 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
                 {zoneStyles[hover.zone].label}
               </span>
             )}
+
+            {/* Quick Upload / Attach Hint */}
+            <div className="mt-2 pt-2 border-t border-white/10 flex items-center justify-between text-[10px]">
+              <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                <Camera className="w-3 h-3 text-emerald-400" /> Click to view / add photo or video
+              </span>
+              <span className="text-[9px] text-slate-400 font-mono">Select</span>
+            </div>
           </div>
         </div>
       )}

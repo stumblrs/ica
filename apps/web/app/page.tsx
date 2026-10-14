@@ -31,6 +31,7 @@ import { MobileTwitterBottomNav, type MobileTab } from '@/components/layout/Mobi
 import { TwitterComposeFAB } from '@/components/layout/TwitterComposeFAB';
 import { TwitterVoiceModal } from '@/components/community/TwitterVoiceModal';
 import { MapFeatureFloatingCard } from '@/components/map/MapFeatureFloatingCard';
+import { QuickMediaUploadModal } from '@/components/common/QuickMediaUploadModal';
 import { SE_STATE_CODES, IGBO_IDENTIFIED_LGAS, BEYOND_SOUTHEAST_REGIONS } from '@/lib/geo';
 import { DIALECT_CLUSTERS, getIgboMarketDay, IGBO_MARKET_DAYS } from '@/lib/cultural';
 import { getOfflineSettlementsList } from '@/lib/offlineStorage';
@@ -76,6 +77,7 @@ export default function HomePage() {
   } | null>(null);
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [pendingNavTarget, setPendingNavTarget] = useState<any | null>(null);
+  const [pendingMediaUploadFeature, setPendingMediaUploadFeature] = useState<SelectedFeature | null>(null);
 
   const loadCommunities = useCallback(async () => {
     try {
@@ -652,6 +654,7 @@ export default function HomePage() {
               setIsSidebarCollapsed(false);
             }}
             onAddVoice={() => setIsVoiceModalOpen(true)}
+            onAddMedia={setPendingMediaUploadFeature}
           />
         )}
       </section>
@@ -888,6 +891,7 @@ export default function HomePage() {
               mapRef.current?.startCinematicFlyThrough(corridorId);
             }}
             onOpenKindredMapping={(community) => mapRef.current?.openKindredMappingModal(undefined, community)}
+            onAddMedia={setPendingMediaUploadFeature}
             activeTab={activeTab}
             onTabChange={setActiveTab}
             hideTopTabs={false}
@@ -976,6 +980,7 @@ export default function HomePage() {
               setMobileTab('map');
               mapRef.current?.openKindredMappingModal(undefined, community);
             }}
+            onAddMedia={setPendingMediaUploadFeature}
             activeTab={mobileTab as AtlasTab}
             onTabChange={(tab) => {
               if (tab === 'explore' || tab === 'culture' || tab === 'voices' || tab === 'archives') {
@@ -1035,6 +1040,27 @@ export default function HomePage() {
             setPendingModal(null);
             loadCommunities();
             mapRef.current?.refreshCommunities();
+          }}
+        />
+      )}
+
+      {/* Quick Media Upload Modal for any settlement / village / city */}
+      {pendingMediaUploadFeature && (
+        <QuickMediaUploadModal
+          feature={pendingMediaUploadFeature}
+          onClose={() => setPendingMediaUploadFeature(null)}
+          onSuccess={(community, mediaItem) => {
+            setPendingMediaUploadFeature(null);
+            loadCommunities();
+            mapRef.current?.refreshCommunities();
+            setSelectedFeature((prev) => {
+              if (!prev) return prev;
+              const existingMedia = prev.media || [];
+              return {
+                ...prev,
+                media: [mediaItem, ...existingMedia],
+              };
+            });
           }}
         />
       )}

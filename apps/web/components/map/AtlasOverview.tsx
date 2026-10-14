@@ -111,6 +111,7 @@ interface AtlasOverviewProps {
   onDocumentFeature?: (feature: SelectedFeature) => void;
   onPinNearby?: (feature: SelectedFeature) => void;
   onCommunityUpdated?: () => void;
+  onAddMedia?: (feature: SelectedFeature) => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
   activeFilter?: FilterDotType;
@@ -184,6 +185,7 @@ export function AtlasOverview(props: AtlasOverviewProps) {
     onDocumentFeature,
     onPinNearby,
     onCommunityUpdated,
+    onAddMedia,
     onToggleCollapse,
     activeFilter = 'all',
     onFilterChange,
@@ -633,6 +635,19 @@ export function AtlasOverview(props: AtlasOverviewProps) {
                     ? 'Outside the Southeast, but home to documented communities that identify as Igbo — so it carries the homeland colour.'
                     : 'No Igbo-identifying communities documented here yet. Know one? Add it to the atlas.'}
                 </p>
+              )}
+
+              {/* Quick Upload / Link Media Action Button */}
+              {onAddMedia && (
+                <button
+                  type="button"
+                  onClick={() => onAddMedia(selectedFeature)}
+                  className="w-full mt-2.5 py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-cyan-500/20 hover:from-emerald-500/35 hover:to-teal-500/35 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95"
+                  title={`Upload or link photos and videos for ${selectedFeature.name}`}
+                >
+                  <Camera className="w-4 h-4 text-emerald-400" />
+                  <span>+ Upload Photo / Video to {selectedFeature.name}</span>
+                </button>
               )}
 
               {selectedFeature.type === 'community' ? (

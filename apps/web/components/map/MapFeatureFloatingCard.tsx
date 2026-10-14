@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { X, MapPin, Sparkles, ChevronRight, Waves, MessageSquarePlus, Navigation, Play, Film } from 'lucide-react';
+import { X, MapPin, Sparkles, ChevronRight, Waves, MessageSquarePlus, Navigation, Play, Film, Camera } from 'lucide-react';
 import type { SelectedFeature } from './MapContainer';
 import { AudioPronunciationPlayer } from '@/components/cultural/AudioPronunciationPlayer';
 
@@ -12,6 +12,7 @@ interface MapFeatureFloatingCardProps {
   onPinNearby: (feature: SelectedFeature) => void;
   onViewLore: () => void;
   onAddVoice?: () => void;
+  onAddMedia?: (feature: SelectedFeature) => void;
 }
 
 export function MapFeatureFloatingCard({
@@ -21,6 +22,7 @@ export function MapFeatureFloatingCard({
   onPinNearby,
   onViewLore,
   onAddVoice,
+  onAddMedia,
 }: MapFeatureFloatingCardProps) {
   const isCommunity = feature.type === 'community';
   const isReference = !isCommunity;
@@ -161,6 +163,18 @@ export function MapFeatureFloatingCard({
 
       {/* Action Buttons Row */}
       <div className="mt-3.5 pt-3 border-t border-white/10 flex flex-col gap-2">
+        {onAddMedia && (
+          <button
+            type="button"
+            onClick={() => onAddMedia(feature)}
+            className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-cyan-500/20 hover:from-emerald-500/35 hover:to-teal-500/35 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95"
+            title={`Upload or link photos and videos directly for ${feature.name}`}
+          >
+            <Camera className="w-4 h-4 text-emerald-400" />
+            <span>+ Upload Photo / Video to {feature.name}</span>
+          </button>
+        )}
+
         {isReference ? (
           <>
             <div className="grid grid-cols-2 gap-2">
