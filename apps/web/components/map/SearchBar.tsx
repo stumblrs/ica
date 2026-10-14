@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, MapPin, X, Loader2 } from 'lucide-react';
+import { Search, MapPin, X, Loader2, Camera } from 'lucide-react';
 
 interface SearchBarProps {
   onSelectCommunity: (community: any) => void;
@@ -220,6 +220,12 @@ export function SearchBar({ onSelectCommunity }: SearchBarProps) {
                               <span className={`text-[9px] uppercase font-mono px-1 py-0.2 rounded border ${g.badgeColor}`}>
                                 {item.typeLabel || (item.type === 'lga' ? 'LGA' : item.type)}
                               </span>
+                              {item.hasMedia && (
+                                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 flex items-center gap-1 font-bold animate-pulse">
+                                  <Camera className="w-2.5 h-2.5 text-emerald-400" />
+                                  <span>{item.mediaCount} media</span>
+                                </span>
+                              )}
                             </div>
                             <span className="text-[11px] text-slate-400 block truncate mt-0.5">
                               {[item.wardName && `Ward: ${item.wardName}`, item.lgaName && `${item.lgaName} LGA`, item.stateName && `${item.stateName} State`].filter(Boolean).join(', ') || item.stateName || 'Nigeria'}

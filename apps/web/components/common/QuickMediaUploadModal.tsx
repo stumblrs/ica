@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { X, Camera, Film, Link as LinkIcon, CheckCircle2, AlertCircle, Loader2, Sparkles, MapPin } from 'lucide-react';
 import { parseMediaUrl, type MediaItem } from '@/lib/media';
+import { getUserProfile, getContributorSignature, type UserProfile } from '@/lib/user-profile';
 
 interface QuickMediaUploadModalProps {
   feature: {
@@ -24,10 +25,20 @@ export function QuickMediaUploadModal({
 }: QuickMediaUploadModalProps) {
   const [url, setUrl] = useState('');
   const [caption, setCaption] = useState('');
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [contributorName, setContributorName] = useState('');
   const [credit, setCredit] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    const p = getUserProfile();
+    setProfile(p);
+    if (p.autoSignContributions) {
+      const sig = getContributorSignature(p);
+      if (sig) setContributorName(sig);
+    }
+  }, []);
 
   // Live parsed preview
   const parsedPreview: MediaItem | null = React.useMemo(() => {
@@ -77,7 +88,31 @@ export function QuickMediaUploadModal({
       }
 
       const data = await res.json();
-      onSuccess(data.community, data.mediaItem);
+
+      // Immediate client-side offline persistence cache
+      try {
+        if (typeof window !== 'undefined') {
+          const raw = localStorage.getItem('ica_local_media_store');
+          const localStore: any[] = raw ? JSON.parse(raw) : [];
+          const idx = localStore.findIndex(
+            (item) => (item.name || '').trim().toLowerCase() === feature.name.trim().toLowerCase()
+          );
+          if (idx !== -1) {
+            localStore[idx].media = [data.mediaItem || mediaItem, ...(localStore[idx].media || [])];
+          } else {
+            localStore.unshift({
+              name: feature.name,
+              coordinates: feature.coordinates,
+              lgaName,
+              stateName,
+              media: [data.mediaItem || mediaItem],
+            });
+          }
+          localStorage.setItem('ica_local_media_store', JSON.stringify(localStore));
+        }
+      } catch {}
+
+      onSuccess(data.community, data.mediaItem || mediaItem);
       onClose();
     } catch (err: any) {
       setError(err.message || 'Error uploading media URL.');
@@ -201,9 +236,19 @@ export function QuickMediaUploadModal({
           {/* Contributor & Source Attributions */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-300">
-                Your Name / Alias (Optional)
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold text-slate-300">
+                  Your Name / Alias (Optional)
+                </label>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent('ica:open-profile'))}
+                  className="text-[10px] text-emerald-400 hover:text-emerald-300 hover:underline font-mono"
+                  title="Edit profile & handle"
+                >
+                  {profile?.username ? `@${profile.username}` : '+ Set @username'}
+                </button>
+              </div>
               <input
                 type="text"
                 placeholder="e.g. Native resident, clan historian"

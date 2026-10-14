@@ -16,9 +16,11 @@ import {
   BookOpen,
   Layers,
   Search,
+  User,
 } from 'lucide-react';
 import type { MobileTab } from './MobileTwitterBottomNav';
 import type { AtlasTab } from '@/components/map/AtlasOverview';
+import { getUserProfile, type UserProfile } from '@/lib/user-profile';
 
 interface MobileTwitterHeaderProps {
   activeTab: MobileTab;
@@ -44,6 +46,18 @@ export function MobileTwitterHeader({
   onResetView,
 }: MobileTwitterHeaderProps) {
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+
+  React.useEffect(() => {
+    setProfile(getUserProfile());
+    function handleUpdate(e: Event) {
+      const customEvent = e as CustomEvent<UserProfile>;
+      if (customEvent.detail) setProfile(customEvent.detail);
+      else setProfile(getUserProfile());
+    }
+    window.addEventListener('ica:profile-updated', handleUpdate);
+    return () => window.removeEventListener('ica:profile-updated', handleUpdate);
+  }, []);
 
   // Determine current title/view text
   const getHeaderTitle = () => {
@@ -144,8 +158,8 @@ export function MobileTwitterHeader({
             <div className="p-4 border-b border-[#2f3336]">
               <div className="flex items-center justify-between mb-3">
                 <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-400 p-[2px]">
-                  <div className="w-full h-full rounded-full bg-[#070b16] flex items-center justify-center">
-                    <span className="font-mono text-sm font-black text-emerald-300">ICA</span>
+                  <div className="w-full h-full rounded-full bg-[#070b16] flex items-center justify-center font-bold text-emerald-400 font-['Outfit'] text-xl">
+                    {profile?.avatarSymbol || 'ọ'}
                   </div>
                 </div>
                 <button
@@ -158,12 +172,27 @@ export function MobileTwitterHeader({
               </div>
 
               <h2 className="text-base font-bold text-[#e7e9ea] leading-tight">
-                Igbo Cultural Atlas
+                {profile?.displayName || 'Igbo Cultural Atlas'}
               </h2>
-              <p className="text-xs text-[#71767b] font-mono mt-0.5">@igbo_atlas_collective</p>
+              <p className="text-xs text-emerald-400 font-mono mt-0.5">
+                {profile?.username ? `@${profile.username}` : '@anonymous_contributor'}
+              </p>
+
+              {/* Edit Profile Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsProfileDrawerOpen(false);
+                  window.dispatchEvent(new CustomEvent('ica:open-profile'));
+                }}
+                className="mt-3 w-full py-1.5 px-3 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-xs font-semibold text-emerald-300 flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <User className="w-3.5 h-3.5" />
+                <span>{profile?.username ? 'Edit Profile & Settings' : 'Set Your @username'}</span>
+              </button>
 
               {/* Stats row like Twitter followers/following */}
-              <div className="flex items-center gap-4 mt-3 pt-2 text-xs">
+              <div className="flex items-center gap-4 mt-3 pt-2 text-xs border-t border-[#2f3336]/60">
                 <div>
                   <span className="font-bold text-[#e7e9ea]">{communitiesCount.toLocaleString()}</span>{' '}
                   <span className="text-[#71767b]">Places</span>

@@ -1,108 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'node:fs';
-import path from 'node:path';
 import { prisma } from '@/lib/prisma';
 import { revalidateAtlasData } from '@/lib/revalidation';
 import { parseMediaUrl } from '@/lib/media';
-
-function getStorePaths(): string[] {
-  const p1 = path.resolve(process.cwd(), 'public/data/communities_store.json');
-  const p2 = path.resolve(process.cwd(), 'apps/web/public/data/communities_store.json');
-  const p3 = path.resolve(__dirname, '../../../../public/data/communities_store.json');
-  const p4 = path.resolve(__dirname, '../../../public/data/communities_store.json');
-  return Array.from(new Set([p1, p2, p3, p4]));
-}
-
-function readStore(): any[] {
-  for (const p of getStorePaths()) {
-    try {
-      if (fs.existsSync(p)) {
-        const data = JSON.parse(fs.readFileSync(p, 'utf8'));
-        if (Array.isArray(data)) return data;
-      }
-    } catch {}
-  }
-  return [];
-}
-
-function writeStore(records: any[]) {
-  const targets = [
-    path.resolve(process.cwd(), 'public/data/communities_store.json'),
-    path.resolve(process.cwd(), 'apps/web/public/data/communities_store.json'),
-  ];
-  for (const t of targets) {
-    try {
-      fs.mkdirSync(path.dirname(t), { recursive: true });
-      fs.writeFileSync(t, JSON.stringify(records, null, 2), 'utf8');
-    } catch {}
-  }
-}
-
-function fallbackStoreSave(params: {
-  communityId?: string;
-  name: string;
-  latitude?: number;
-  longitude?: number;
-  lgaName?: string;
-  stateName?: string;
-  mediaEvidenceItem: any;
-}) {
-  const { communityId, name, latitude, longitude, lgaName, stateName, mediaEvidenceItem } = params;
-  const store = readStore();
-  const nameNorm = name.trim().toLowerCase();
-
-  let targetIndex = store.findIndex((c) => communityId && c.id === communityId);
-  if (targetIndex === -1) {
-    targetIndex = store.findIndex((c) => (c.name || '').trim().toLowerCase() === nameNorm);
-  }
-
-  let resultCommunity: any;
-  let action: 'appended' | 'created';
-
-  if (targetIndex !== -1) {
-    const existing = store[targetIndex];
-    if (!Array.isArray(existing.evidence)) {
-      existing.evidence = existing.evidenceJson ? JSON.parse(existing.evidenceJson) : [];
-    }
-    existing.evidence.unshift(mediaEvidenceItem);
-    existing.updatedAt = new Date().toISOString();
-    store[targetIndex] = existing;
-    resultCommunity = existing;
-    action = 'appended';
-  } else {
-    const lat = typeof latitude === 'number' ? latitude : 6.22;
-    const lon = typeof longitude === 'number' ? longitude : 7.05;
-    const newRecord = {
-      id: communityId || 'comm-' + Date.now(),
-      name: name.trim(),
-      type: 'settlement',
-      description: `Documented settlement ${name.trim()} with community visual media.`,
-      latitude: lat,
-      longitude: lon,
-      stateId: 'SE',
-      stateName: stateName?.trim() || 'Anambra',
-      lgaId: 'LGA',
-      lgaName: lgaName?.trim() || 'Awka South',
-      identityStatus: 'confirmed_igbo',
-      languageStatus: 'Central Igbo dialect',
-      historicalStatus: 'Documented visual media record',
-      verificationStatus: 'verified',
-      lifecycleStatus: 'ACTIVE',
-      confidence: 0.85,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      evidence: [mediaEvidenceItem],
-      confirmationsCount: 1,
-      challengesCount: 0,
-    };
-    store.unshift(newRecord);
-    resultCommunity = newRecord;
-    action = 'created';
-  }
-
-  writeStore(store);
-  return { community: resultCommunity, action };
-}
+import { saveMediaToStore } from '@/lib/community-store';
 
 /**
  * POST /api/communities/media
@@ -204,7 +104,7 @@ export async function POST(req: NextRequest) {
         } catch {}
 
         // Keep local store in sync
-        fallbackStoreSave({ communityId: updated.id, name, latitude, longitude, lgaName, stateName, mediaEvidenceItem });
+        saveMediaToStore({ communityId: updated.id, name, latitude, longitude, lgaName, stateName, mediaEvidenceItem });
         revalidateAtlasData();
 
         return NextResponse.json({
@@ -244,7 +144,7 @@ export async function POST(req: NextRequest) {
         });
 
         // Keep local store in sync
-        fallbackStoreSave({ communityId: newCommunity.id, name, latitude, longitude, lgaName, stateName, mediaEvidenceItem });
+        saveMediaToStore({ communityId: newCommunity.id, name, latitude, longitude, lgaName, stateName, mediaEvidenceItem });
         revalidateAtlasData();
 
         return NextResponse.json({
@@ -262,7 +162,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Resilient fallback: Save directly to communities_store.json
-    const { community: savedCommunity, action } = fallbackStoreSave({
+    const { community: savedCommunity, action } = saveMediaToStore({
       communityId,
       name,
       latitude,

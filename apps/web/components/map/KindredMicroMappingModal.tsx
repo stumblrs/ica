@@ -19,6 +19,7 @@ import {
 import { saveKindredLandmarkOffline, type KindredLandmarkItem } from '@/lib/offlineStorage';
 import { MediaUrlInput } from '@/components/common/MediaUrlInput';
 import type { MediaItem } from '@/lib/media';
+import { getUserProfile, getContributorSignature, type UserProfile } from '@/lib/user-profile';
 
 interface KindredMicroMappingModalProps {
   isOpen: boolean;
@@ -94,12 +95,22 @@ export function KindredMicroMappingModal({
   const [selectedCommunityId, setSelectedCommunityId] = useState(initialCommunity?.id || '');
   const [description, setDescription] = useState('');
   const [contributorName, setContributorName] = useState('');
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [lon, setLon] = useState<string>(initialCoords ? initialCoords.lon.toFixed(6) : '');
   const [lat, setLat] = useState<string>(initialCoords ? initialCoords.lat.toFixed(6) : '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [mediaList, setMediaList] = useState<MediaItem[]>([]);
+
+  React.useEffect(() => {
+    const p = getUserProfile();
+    setProfile(p);
+    if (p.autoSignContributions) {
+      const sig = getContributorSignature(p);
+      if (sig) setContributorName(sig);
+    }
+  }, []);
 
   // Update coords if initialCoords changes
   React.useEffect(() => {
@@ -412,9 +423,18 @@ export function KindredMicroMappingModal({
 
             {/* Contributor Name */}
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">
-                Contributor / Kindred Elder Name (Optional)
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-medium text-slate-300">
+                  Contributor / Kindred Elder Name (Optional)
+                </label>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent('ica:open-profile'))}
+                  className="text-[10px] text-emerald-400 hover:text-emerald-300 hover:underline font-mono"
+                >
+                  {profile?.username ? `@${profile.username}` : '+ Set @username'}
+                </button>
+              </div>
               <input
                 type="text"
                 placeholder="e.g. Mazi C. Okeke"

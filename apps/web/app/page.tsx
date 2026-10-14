@@ -82,12 +82,52 @@ export default function HomePage() {
   const loadCommunities = useCallback(async () => {
     try {
       const res = await fetch('/api/communities', { cache: 'no-store' });
+      let list: any[] = [];
       if (res.ok) {
-        setCommunities(await res.json());
+        list = await res.json();
       } else {
-        const offlineList = await getOfflineSettlementsList();
-        if (offlineList.length > 0) setCommunities(offlineList);
+        list = await getOfflineSettlementsList();
       }
+
+      // Merge local client media cache if any exists in browser storage
+      if (typeof window !== 'undefined') {
+        try {
+          const raw = localStorage.getItem('ica_local_media_store');
+          if (raw) {
+            const localStore = JSON.parse(raw);
+            if (Array.isArray(localStore)) {
+              for (const item of localStore) {
+                const idx = list.findIndex(
+                  (c) => (c.name || '').trim().toLowerCase() === (item.name || '').trim().toLowerCase()
+                );
+                if (idx !== -1) {
+                  const existingEv = list[idx].evidence || [];
+                  const combined = [...(item.media || []), ...existingEv];
+                  const seenUrls = new Set<string>();
+                  list[idx].evidence = combined.filter((m: any) => {
+                    if (!m?.url || seenUrls.has(m.url)) return false;
+                    seenUrls.add(m.url);
+                    return true;
+                  });
+                } else if (item.name && item.media?.length > 0) {
+                  list.unshift({
+                    id: 'local-' + Date.now(),
+                    name: item.name,
+                    type: 'settlement',
+                    latitude: item.coordinates ? item.coordinates[1] : 6.22,
+                    longitude: item.coordinates ? item.coordinates[0] : 7.05,
+                    lgaName: item.lgaName,
+                    stateName: item.stateName,
+                    evidence: item.media,
+                  });
+                }
+              }
+            }
+          }
+        } catch {}
+      }
+
+      if (list.length > 0) setCommunities(list);
     } catch {
       const offlineList = await getOfflineSettlementsList();
       if (offlineList.length > 0) setCommunities(offlineList);
@@ -128,6 +168,25 @@ export default function HomePage() {
     const lat = c.latitude ?? (c.center ? c.center[1] : (c.coordinates ? c.coordinates[1] : null));
     const coords = lon != null && lat != null ? ([lon, lat] as [number, number]) : undefined;
 
+    // Resolve attached media from community list or client store if search item had none
+    let attachedMedia = c.media || [];
+    if (!attachedMedia || attachedMedia.length === 0) {
+      const matchName = (c.name || '').trim().toLowerCase();
+      const matched = communities.find((com) => (com.name || '').trim().toLowerCase() === matchName);
+      if (matched && matched.evidence && matched.evidence.length > 0) {
+        attachedMedia = matched.evidence;
+      } else if (typeof window !== 'undefined') {
+        try {
+          const raw = localStorage.getItem('ica_local_media_store');
+          if (raw) {
+            const localStore = JSON.parse(raw);
+            const found = localStore.find((it: any) => (it.name || '').trim().toLowerCase() === matchName);
+            if (found && Array.isArray(found.media)) attachedMedia = found.media;
+          }
+        } catch {}
+      }
+    }
+
     // Immediately switch the floating card and inspection context to the exact settlement clicked
     const targetFeature: SelectedFeature = {
       type:
@@ -155,7 +214,7 @@ export default function HomePage() {
       placeType: c.typeLabel || (c.type ? `${c.type.charAt(0).toUpperCase()}${c.type.slice(1)}` : 'Settlement'),
       colorLabel: 'Selected Location',
       markerColor: '#10b981',
-      media: c.media || [],
+      media: attachedMedia,
     };
     setSelectedFeature(targetFeature);
 
@@ -643,6 +702,7 @@ export default function HomePage() {
           onFilterChange={setActiveFilter}
           isFiltersCollapsed={isFiltersCollapsed}
           onAddMedia={setPendingMediaUploadFeature}
+          communities={communities}
         />
 
         {/* Floating Quick Map HUD / Expand Trigger (visible on desktop when collapsed) */}

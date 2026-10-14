@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import maplibregl from 'maplibre-gl';
-import { Layers, Crosshair, Loader2, X, Compass, ChevronLeft, ChevronRight, Plus, Minus, Mountain, Play, Pause, Navigation, Landmark as LandmarkIcon, Camera } from 'lucide-react';
+import { Layers, Crosshair, Loader2, X, Compass, ChevronLeft, ChevronRight, Plus, Minus, Mountain, Play, Pause, Navigation, Landmark as LandmarkIcon, Camera, Film } from 'lucide-react';
 import { AddCommunityModal } from '../forms/AddCommunityModal';
 import { CinematicFlyThroughHUD, type FlightCorridorItem, type WaypointInfo } from './CinematicFlyThroughHUD';
 import { KindredMicroMappingModal } from './KindredMicroMappingModal';
@@ -100,6 +100,7 @@ interface MapContainerProps {
   onFilterChange?: (filter: FilterDotType) => void;
   isFiltersCollapsed?: boolean;
   onAddMedia?: (feature: SelectedFeature) => void;
+  communities?: any[];
 }
 
 interface HoverInfo {
@@ -116,6 +117,9 @@ interface HoverInfo {
   colorBorder?: string;
   colorText?: string;
   featureData?: SelectedFeature;
+  hasMedia?: boolean;
+  mediaCount?: number;
+  mediaPreview?: any;
 }
 
 function responsivePadding(el: HTMLElement | null) {
@@ -151,6 +155,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
     onFilterChange,
     isFiltersCollapsed = false,
     onAddMedia,
+    communities,
   },
   ref
 ) {
@@ -162,6 +167,97 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
   identifiedRef.current = identifiedLgas;
   const onOpenAddModalRef = useRef(onOpenAddModal);
   onOpenAddModalRef.current = onOpenAddModal;
+
+  // Media Lookup Index for instant settlement photo/video detection
+  const mediaIndexRef = useRef<Map<string, any[]>>(new Map());
+
+  const updateMediaIndex = useCallback((comms?: any[]) => {
+    const nextMap = new Map<string, any[]>();
+    if (Array.isArray(comms)) {
+      for (const c of comms) {
+        let ev = Array.isArray(c.evidence) ? c.evidence : [];
+        if (ev.length === 0 && typeof c.evidenceJson === 'string') {
+          try {
+            ev = JSON.parse(c.evidenceJson);
+          } catch {}
+        }
+        if (ev.length > 0) {
+          if (c.name) nextMap.set(c.name.trim().toLowerCase(), ev);
+          if (c.id) nextMap.set(c.id.trim().toLowerCase(), ev);
+        }
+      }
+    }
+    // Check client localStorage cache
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('ica_local_media_store');
+        if (raw) {
+          const localStore = JSON.parse(raw);
+          if (Array.isArray(localStore)) {
+            for (const item of localStore) {
+              if (item.name && Array.isArray(item.media) && item.media.length > 0) {
+                const k = item.name.trim().toLowerCase();
+                const existing = nextMap.get(k) || [];
+                const combined = [...item.media, ...existing];
+                const seenUrls = new Set<string>();
+                const deduped = combined.filter((m: any) => {
+                  if (!m?.url || seenUrls.has(m.url)) return false;
+                  seenUrls.add(m.url);
+                  return true;
+                });
+                nextMap.set(k, deduped);
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+    mediaIndexRef.current = nextMap;
+  }, []);
+
+  useEffect(() => {
+    updateMediaIndex(communities);
+  }, [communities, updateMediaIndex]);
+
+  // Initial mount load of media store
+  useEffect(() => {
+    fetch('/api/communities', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) updateMediaIndex(data);
+      })
+      .catch(() => {});
+  }, [updateMediaIndex]);
+
+  const getMediaForLocation = useCallback((name?: string, id?: string): any[] => {
+    const mapStore = mediaIndexRef.current;
+    if (name) {
+      const n = name.trim().toLowerCase();
+      if (mapStore.has(n)) return mapStore.get(n)!;
+      const stripped = n.replace(/^(ref-|settlement-|comm-|canonical-)/, '');
+      if (mapStore.has(stripped)) return mapStore.get(stripped)!;
+    }
+    if (id) {
+      const i = id.trim().toLowerCase();
+      if (mapStore.has(i)) return mapStore.get(i)!;
+    }
+    // Direct localStorage fallback check
+    if (typeof window !== 'undefined' && name) {
+      try {
+        const raw = localStorage.getItem('ica_local_media_store');
+        if (raw) {
+          const localStore = JSON.parse(raw);
+          if (Array.isArray(localStore)) {
+            const found = localStore.find(
+              (it: any) => (it.name || '').trim().toLowerCase() === name.trim().toLowerCase()
+            );
+            if (found && Array.isArray(found.media)) return found.media;
+          }
+        }
+      } catch {}
+    }
+    return [];
+  }, []);
 
   const [pendingCoords, setPendingCoords] = useState<{ lon: number; lat: number } | null>(null);
   const [pendingName, setPendingName] = useState<string>('');
@@ -922,6 +1018,8 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         item.stateName && `${item.stateName} State`,
       ].filter(Boolean).join(', ');
 
+      const attachedMedia = item.media?.length ? item.media : getMediaForLocation(item.name, item.id);
+
       if (item.source === 'community' || item.type === 'community') {
         const isChallenged = item.verificationStatus === 'challenged';
         const isPending = item.verificationStatus === 'pending';
@@ -951,6 +1049,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           whyMarked: 'Documented participatory community record submitted to substantiate cultural geography.',
           nearestRiver,
           dialectCluster,
+          media: attachedMedia,
         });
       } else if (isLga) {
         const markerColor = isIgboArea ? '#10b981' : '#64748b';
@@ -976,6 +1075,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           whyMarked: `Administrative LGA boundary in ${item.stateName ? item.stateName + ' State' : 'Nigeria'}.`,
           nearestRiver,
           dialectCluster,
+          media: attachedMedia,
         });
       } else if (item.type === 'market' || item.type === 'marketplace' || item.type === 'landmark') {
         if (lon != null && lat != null) {
@@ -997,6 +1097,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           whyMarked: 'Cultural and civic point of interest catalogued by HOTOSM / OpenStreetMap.',
           nearestRiver,
           dialectCluster,
+          media: attachedMedia,
         });
       } else if (item.source === 'canonical' || item.category === 'capital') {
         const isCapital = item.category === 'capital' || item.type === 'capital';
@@ -1023,6 +1124,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           whyMarked: item.historicalSignificance || `Canonical community from the historical Map of Igbo Land (${item.stateName || 'Igboland'}).`,
           nearestRiver,
           dialectCluster,
+          media: attachedMedia,
         });
       } else {
         const placeType = item.type ? `${item.type.charAt(0).toUpperCase()}${item.type.slice(1)}` : 'Settlement';
@@ -1048,6 +1150,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           whyMarked: `Physical settlement footprint catalogued by GRID3 Nigeria / HOTOSM. Classified as a ${item.type || 'settlement'}.`,
           nearestRiver,
           dialectCluster,
+          media: attachedMedia,
         });
       }
     },
@@ -1065,6 +1168,12 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
       src?.setData('/api/map/communities.geojson');
       const densitySrc = map.current?.getSource('density-source') as maplibregl.GeoJSONSource | undefined;
       densitySrc?.setData('/api/map/igbo-density.geojson');
+      fetch('/api/communities', { cache: 'no-store' })
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data)) updateMediaIndex(data);
+        })
+        .catch(() => {});
     },
     openAddModal(coords, name) {
       if (onOpenAddModalRef.current) {
@@ -1908,6 +2017,39 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         },
       });
 
+      // Visual map indicator for settlements, towns, and communities with photos/videos
+      mapInstance.addLayer({
+        id: 'communities-media-pulse',
+        type: 'circle',
+        source: 'communities-source',
+        filter: ['==', ['get', 'hasMedia'], true],
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 4, 12, 8, 18, 12, 26],
+          'circle-color': '#10b981',
+          'circle-opacity': 0.38,
+          'circle-blur': 0.75,
+        },
+      });
+
+      mapInstance.addLayer({
+        id: 'communities-media-badge',
+        type: 'symbol',
+        source: 'communities-source',
+        filter: ['==', ['get', 'hasMedia'], true],
+        minzoom: 7.5,
+        layout: {
+          'text-field': '📷',
+          'text-size': ['interpolate', ['linear'], ['zoom'], 7.5, 11, 10, 14, 13, 17],
+          'text-offset': [0.95, -0.95],
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
+        },
+        paint: {
+          'text-halo-color': '#020617',
+          'text-halo-width': 2.0,
+        },
+      });
+
       // ── Canonical Map of Igbo Land: Communities & Towns (igbo.jpg) ──
       if (!mapInstance.hasImage('capital-square-icon')) {
         const cCanvas = document.createElement('canvas');
@@ -2352,6 +2494,8 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         });
 
         const layers = [
+          'communities-media-badge',
+          'communities-media-pulse',
           'communities-points',
           'communities-labels',
           'kindred-landmarks-points',
@@ -2370,7 +2514,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           (l) => mapInstance.getLayer(l) && mapInstance.getLayoutProperty(l, 'visibility') !== 'none'
         );
         const feats = mapInstance.queryRenderedFeatures(e.point, { layers });
-        const community = feats.find((f) => f.layer.id === 'communities-points' || f.layer.id === 'communities-labels');
+        const community = feats.find((f) => f.layer.id === 'communities-points' || f.layer.id === 'communities-labels' || f.layer.id === 'communities-media-badge' || f.layer.id === 'communities-media-pulse');
         const kindred = feats.find((f) => f.layer.id === 'kindred-landmarks-points');
         const referenceSettlement = feats.find((f) => f.layer.id === 'reference-settlements-points' || f.layer.id === 'reference-settlements-labels');
         const settlement = feats.find((f) => f.layer.id === 'settlements-points' || f.layer.id === 'settlements-labels');
@@ -2409,6 +2553,9 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
             ? { bg: 'bg-amber-500/15', border: 'border-amber-500/40', text: 'text-amber-300' }
             : { bg: 'bg-emerald-500/15', border: 'border-emerald-500/40', text: 'text-emerald-300' };
 
+          const attachedMedia = getMediaForLocation(p.name, p.id);
+          const hasMedia = attachedMedia.length > 0;
+
           setHover({
             x: Math.round(pt.x),
             y: Math.round(pt.y),
@@ -2422,6 +2569,9 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
             colorBg: colorCls.bg,
             colorBorder: colorCls.border,
             colorText: colorCls.text,
+            hasMedia,
+            mediaCount: attachedMedia.length,
+            mediaPreview: attachedMedia[0],
             featureData: {
               type: 'community',
               id: p.id,
@@ -2431,7 +2581,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
               lgaName: p.lga_name,
               stateName: p.state_name,
               parentName: `${p.lga_name || ''} LGA, ${p.state_name || ''} State`,
-              media: p.evidence_urls || [],
+              media: attachedMedia,
             },
           });
           return;
@@ -2446,6 +2596,9 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           const p = kindred.properties as any;
           const coords = (kindred.geometry?.type === 'Point' ? (kindred.geometry as any).coordinates : [e.lngLat.lng, e.lngLat.lat]) as [number, number];
           const pt = mapInstance.project(coords);
+          const attachedMedia = getMediaForLocation(p.name, p.id);
+          const hasMedia = attachedMedia.length > 0;
+
           setHover({
             x: Math.round(pt.x),
             y: Math.round(pt.y),
@@ -2459,13 +2612,16 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
             colorBg: 'bg-cyan-500/15',
             colorBorder: 'border-cyan-500/40',
             colorText: 'text-cyan-300',
+            hasMedia,
+            mediaCount: attachedMedia.length,
+            mediaPreview: attachedMedia[0],
             featureData: {
               type: 'landmark',
               id: `kindred-${p.id || p.name}`,
               name: p.name,
               coordinates: coords,
               parentName: `${p.umunnaName || ''}, ${p.communityName || ''}`,
-              media: [],
+              media: attachedMedia,
             },
           });
           return;
@@ -2480,6 +2636,9 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           const p = referenceSettlement.properties as any;
           const coords = (referenceSettlement.geometry?.type === 'Point' ? (referenceSettlement.geometry as any).coordinates : [e.lngLat.lng, e.lngLat.lat]) as [number, number];
           const pt = mapInstance.project(coords);
+          const attachedMedia = getMediaForLocation(p.name, p.osm_id || p.wardCode);
+          const hasMedia = attachedMedia.length > 0;
+
           setHover({
             x: Math.round(pt.x),
             y: Math.round(pt.y),
@@ -2493,6 +2652,9 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
             colorBg: 'bg-sky-500/15',
             colorBorder: 'border-sky-500/40',
             colorText: 'text-sky-300',
+            hasMedia,
+            mediaCount: attachedMedia.length,
+            mediaPreview: attachedMedia[0],
             featureData: {
               type: 'settlement',
               id: `ref-${p.osm_id || p.name || 'settlement'}`,
@@ -2502,7 +2664,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
               lgaName: p.lga,
               stateName: p.state,
               parentName: `${p.lga || ''} LGA, ${p.state || ''} State`,
-              media: [],
+              media: attachedMedia,
             },
           });
           return;
@@ -2520,6 +2682,8 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           const isSE = p.adm1_pcode ? SE_STATE_CODES.includes(p.adm1_pcode) : false;
           const isIdentified = p.adm2_pcode ? identifiedRef.current.includes(p.adm2_pcode) : false;
           const isIgboArea = isSE || isIdentified;
+          const attachedMedia = getMediaForLocation(p.name, p.osm_id);
+          const hasMedia = attachedMedia.length > 0;
 
           setHover({
             x: Math.round(pt.x),
@@ -2534,6 +2698,9 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
             colorBg: isIgboArea ? 'bg-emerald-500/15' : 'bg-red-500/15',
             colorBorder: isIgboArea ? 'border-emerald-500/40' : 'border-red-500/40',
             colorText: isIgboArea ? 'text-emerald-300' : 'text-red-300',
+            hasMedia,
+            mediaCount: attachedMedia.length,
+            mediaPreview: attachedMedia[0],
             featureData: {
               type: 'settlement',
               id: `settlement-${p.osm_id || p.name || 'settlement'}`,
@@ -2542,7 +2709,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
               lgaName: p.adm2_name,
               stateName: p.adm1_name,
               parentName: `${p.adm2_name || ''} LGA, ${p.adm1_name || ''} State`,
-              media: [],
+              media: attachedMedia,
             },
           });
           return;
@@ -2557,6 +2724,9 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           const p = landmark.properties as any;
           const coords = (landmark.geometry?.type === 'Point' ? (landmark.geometry as any).coordinates : [e.lngLat.lng, e.lngLat.lat]) as [number, number];
           const pt = mapInstance.project(coords);
+          const attachedMedia = getMediaForLocation(p.name, p.osm_id);
+          const hasMedia = attachedMedia.length > 0;
+
           setHover({
             x: Math.round(pt.x),
             y: Math.round(pt.y),
@@ -2570,6 +2740,9 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
             colorBg: 'bg-amber-500/15',
             colorBorder: 'border-amber-500/40',
             colorText: 'text-amber-300',
+            hasMedia,
+            mediaCount: attachedMedia.length,
+            mediaPreview: attachedMedia[0],
             featureData: {
               type: 'landmark',
               id: `landmark-${p.osm_id || p.name || 'landmark'}`,
@@ -2578,7 +2751,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
               lgaName: p.adm2_name,
               stateName: p.adm1_name,
               parentName: `${p.adm2_name || ''} LGA, ${p.adm1_name || ''} State`,
-              media: [],
+              media: attachedMedia,
             },
           });
           return;
@@ -2594,6 +2767,9 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           const isCapital = p.category === 'capital';
           const coords = (canonical.geometry?.type === 'Point' ? (canonical.geometry as any).coordinates : [e.lngLat.lng, e.lngLat.lat]) as [number, number];
           const pt = mapInstance.project(coords);
+          const attachedMedia = getMediaForLocation(p.name, p.id);
+          const hasMedia = attachedMedia.length > 0;
+
           setHover({
             x: Math.round(pt.x),
             y: Math.round(pt.y),
@@ -2607,6 +2783,9 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
             colorBg: isCapital ? 'bg-amber-500/15' : 'bg-emerald-500/15',
             colorBorder: isCapital ? 'border-amber-500/40' : 'border-emerald-500/40',
             colorText: isCapital ? 'text-amber-300' : 'text-emerald-300',
+            hasMedia,
+            mediaCount: attachedMedia.length,
+            mediaPreview: attachedMedia[0],
             featureData: {
               type: 'community',
               id: `canonical-${p.name}`,
@@ -2615,7 +2794,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
               lgaName: p.lgaName,
               stateName: p.stateName,
               parentName: `${p.lgaName || ''} LGA, ${p.stateName || ''} State`,
-              media: [],
+              media: attachedMedia,
             },
           });
           return;
@@ -2783,6 +2962,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
             whyMarked: 'Documented participatory community record submitted to substantiate cultural geography.',
             nearestRiver,
             dialectCluster,
+            media: getMediaForLocation(p.name, p.id),
           });
           return;
         }
@@ -2804,6 +2984,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
             colorExplanation: p.description || 'Community-mapped ancestral village square, kindred hall, or sacred grove.',
             whyMarked: `Documented by native contributors. Category: ${p.category}. Custodian lineage: ${p.umunnaName || 'Communal'}.`,
             nearestRiver,
+            media: getMediaForLocation(p.name, p.id),
           });
           return;
         }
@@ -2832,6 +3013,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
             whyMarked: `Settlement footprint catalogued by GRID3 Nigeria / HOTOSM in ${p.lga || 'local'} jurisdiction.`,
             nearestRiver,
             dialectCluster,
+            media: getMediaForLocation(p.name, p.osm_id || p.wardCode),
           });
           return;
         }
@@ -2863,6 +3045,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
             whyMarked: p.historicalSignificance || `Canonical community from the historical Map of Igbo Land (${p.stateName || 'Igboland'}).`,
             nearestRiver,
             dialectCluster,
+            media: getMediaForLocation(p.name, p.id),
           });
           return;
         }
@@ -2908,6 +3091,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
             whyMarked: 'Documented cultural and civic landmark from OpenStreetMap / HOTOSM.',
             nearestRiver,
             dialectCluster,
+            media: getMediaForLocation(p.name, p.osm_id),
           });
           return;
         }
@@ -2943,6 +3127,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
               : `Geographic reference point outside Igbo-identified areas catalogued by GRID3 Nigeria / HOTOSM to show boundary context. Not an Igbo settlement.`,
             nearestRiver,
             dialectCluster,
+            media: getMediaForLocation(p.name, p.osm_id),
           });
           return;
         }
@@ -3807,6 +3992,50 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
               </span>
             )}
 
+            {/* Visual Media Presence Indicator in Hover Card */}
+            {hover.hasMedia ? (
+              <div className="mt-2.5 p-2 rounded-xl bg-gradient-to-r from-emerald-950/70 via-teal-950/50 to-[#080d1a] border border-emerald-400/40 shadow-lg space-y-1.5 animate-in fade-in duration-150">
+                <div className="flex items-center justify-between gap-1 text-[11px] font-bold text-emerald-300">
+                  <span className="flex items-center gap-1.5">
+                    <Camera className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                    <span>{hover.mediaCount} {hover.mediaCount === 1 ? 'Photo / Video' : 'Photos / Videos'} Attached</span>
+                  </span>
+                  <span className="text-[9px] uppercase tracking-wider font-mono text-cyan-300 bg-cyan-500/15 px-1.5 py-0.5 rounded border border-cyan-500/30">
+                    Live
+                  </span>
+                </div>
+                {hover.mediaPreview && (
+                  <div className="flex items-center gap-2 pt-0.5">
+                    <div className="w-10 h-8 rounded-lg overflow-hidden bg-black/60 border border-white/10 shrink-0">
+                      {hover.mediaPreview.thumbnailUrl || hover.mediaPreview.url ? (
+                        <img
+                          src={hover.mediaPreview.thumbnailUrl || hover.mediaPreview.url}
+                          alt="Thumbnail preview"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src =
+                              'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="32" viewBox="0 0 40 32"><rect fill="%23111827" width="40" height="32"/></svg>';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-slate-800 text-cyan-400">
+                          <Film className="w-3.5 h-3.5" />
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-300 line-clamp-2 italic leading-tight">
+                      {hover.mediaPreview.caption || `Visual record for ${hover.name}`}
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-400">
+                <Camera className="w-3 h-3 text-slate-500" />
+                <span>No media yet &bull; Be the first to upload</span>
+              </div>
+            )}
+
             {/* Stationed, Interactive Upload Photo / Video Button */}
             {hover.featureData && onAddMedia && (
               <button
@@ -3821,7 +4050,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
                 title={`Upload photos or video URLs directly for ${hover.name}`}
               >
                 <Camera className="w-3.5 h-3.5 text-black" />
-                <span>+ Upload Photo / Video</span>
+                <span>{hover.hasMedia ? '+ Add More Photos / Videos' : '+ Upload Photo / Video'}</span>
               </button>
             )}
 

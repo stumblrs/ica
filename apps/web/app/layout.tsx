@@ -4,6 +4,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { InstallPrompt } from '@/components/common/InstallPrompt';
 import { UpdatePrompt } from '@/components/common/UpdatePrompt';
 import { OfflineFieldModeIndicator } from '@/components/common/OfflineFieldModeIndicator';
+import { AppBarProfileButton } from '@/components/layout/AppBarProfileButton';
 import { AppBarFilterButton } from '@/components/layout/AppBarFilterButton';
 import { AppBarMapToolsButton } from '@/components/layout/AppBarMapToolsButton';
 
@@ -41,11 +42,7 @@ export default function RootLayout({
         {/* Navigation Bar (All Viewports) */}
         <header className="flex shrink-0 z-40 w-full border-b border-white/[0.08] bg-[#0a0f1d]/90 backdrop-blur-xl px-3 sm:px-5 py-2 items-center justify-between">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 p-[1px] shadow-lg shadow-emerald-500/20 shrink-0">
-              <div className="h-full w-full rounded-[11px] bg-[#0a0f1d] flex items-center justify-center font-bold text-emerald-400 text-sm sm:text-base font-['Outfit']">
-                ọ
-              </div>
-            </div>
+            <AppBarProfileButton />
             <div className="min-w-0">
               <h1 className="text-xs sm:text-sm font-bold tracking-tight text-white flex items-center gap-1.5 sm:gap-2 truncate">
                 <span className="truncate">Igbo Community Atlas</span>

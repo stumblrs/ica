@@ -1,43 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'node:fs';
-import path from 'node:path';
 import { prisma } from '@/lib/prisma';
 import { revalidateAtlasData } from '@/lib/revalidation';
+import { readCommunityStore, writeCommunityStore } from '@/lib/community-store';
 
 export const dynamic = 'force-dynamic';
-
-function getStorePaths(): string[] {
-  const p1 = path.resolve(process.cwd(), 'public/data/communities_store.json');
-  const p2 = path.resolve(process.cwd(), 'apps/web/public/data/communities_store.json');
-  const p3 = path.resolve(__dirname, '../../../../public/data/communities_store.json');
-  const p4 = path.resolve(__dirname, '../../../public/data/communities_store.json');
-  return Array.from(new Set([p1, p2, p3, p4]));
-}
-
-function readStore(): any[] {
-  for (const p of getStorePaths()) {
-    try {
-      if (fs.existsSync(p)) {
-        const data = JSON.parse(fs.readFileSync(p, 'utf8'));
-        if (Array.isArray(data)) return data;
-      }
-    } catch {}
-  }
-  return [];
-}
-
-function writeStore(records: any[]) {
-  const targets = [
-    path.resolve(process.cwd(), 'public/data/communities_store.json'),
-    path.resolve(process.cwd(), 'apps/web/public/data/communities_store.json'),
-  ];
-  for (const t of targets) {
-    try {
-      fs.mkdirSync(path.dirname(t), { recursive: true });
-      fs.writeFileSync(t, JSON.stringify(records, null, 2), 'utf8');
-    } catch {}
-  }
-}
 
 /**
  * GET /api/communities - List and filter communities from Supabase
@@ -95,7 +61,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(parsed);
   } catch (err: any) {
     console.warn('Database query error in /api/communities, falling back to local store:', err.message);
-    const store = readStore();
+    const store = readCommunityStore();
     return NextResponse.json(store, {
       status: 200,
       headers: {
@@ -261,8 +227,8 @@ export async function POST(req: NextRequest) {
     console.warn('Database offline in POST /api/communities, falling back to local store:', err.message);
     try {
       if (body && body.name && body.latitude != null && body.longitude != null) {
-        const store = readStore();
-        const newRecord = {
+        const store = readCommunityStore();
+        const newRecord: any = {
           id: 'comm-' + Date.now(),
           name: (body.name || '').trim(),
           type: body.type || 'settlement',
@@ -286,7 +252,7 @@ export async function POST(req: NextRequest) {
           updatedAt: new Date().toISOString(),
         };
         store.unshift(newRecord);
-        writeStore(store);
+        writeCommunityStore(store);
         revalidateAtlasData();
         return NextResponse.json(newRecord, { status: 201 });
       }

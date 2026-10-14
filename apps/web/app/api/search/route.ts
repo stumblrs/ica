@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'node:fs';
 import path from 'node:path';
+import { readCommunityStore } from '@/lib/community-store';
 
 function findDataFile(relPath: string): string | null {
   const candidates = [
@@ -50,16 +51,6 @@ function getCanonicalTowns(): any[] {
   return [];
 }
 
-function getStoredCommunities(): any[] {
-  try {
-    const file = findDataFile('public/data/communities_store.json');
-    if (file && fs.existsSync(file)) {
-      return JSON.parse(fs.readFileSync(file, 'utf8')) || [];
-    }
-  } catch {}
-  return [];
-}
-
 const STOPWORDS = new Set(['in', 'at', 'of', 'and', 'the', 'lga', 'state', 'town', 'village', 'community']);
 
 function getPhoneticVariants(word: string): string[] {
@@ -93,8 +84,17 @@ export async function GET(req: NextRequest) {
   const results: any[] = [];
   const seen = new Set<string>();
 
+  // Build media lookup from community store
+  const communities = readCommunityStore();
+  const mediaMap = new Map<string, any[]>();
+  for (const c of communities) {
+    if (c.evidence && c.evidence.length > 0) {
+      const k = (c.name || '').trim().toLowerCase();
+      mediaMap.set(k, c.evidence);
+    }
+  }
+
   // 1. Check participatory communities
-  const communities = getStoredCommunities();
   for (const c of communities) {
     const nameLower = (c.name || '').toLowerCase();
     const lgaLower = (c.lgaName || '').toLowerCase();
@@ -111,6 +111,7 @@ export async function GET(req: NextRequest) {
         seen.add(key);
         const exactName = tokenVariantList[0]?.some((v) => nameLower === v);
         const startsName = tokenVariantList[0]?.some((v) => nameLower.startsWith(v));
+        const attachedMedia = c.evidence || mediaMap.get(nameLower) || [];
         results.push({
           id: c.id,
           source: 'community',
@@ -123,7 +124,10 @@ export async function GET(req: NextRequest) {
           stateCode: c.stateId,
           center: [c.longitude, c.latitude],
           verificationStatus: c.verificationStatus || 'verified',
-          priority: exactName ? 1 : startsName ? 2 : 3,
+          media: attachedMedia,
+          hasMedia: attachedMedia.length > 0,
+          mediaCount: attachedMedia.length,
+          priority: attachedMedia.length > 0 ? 0 : (exactName ? 1 : startsName ? 2 : 3),
         });
       }
     }
@@ -149,6 +153,7 @@ export async function GET(req: NextRequest) {
         seen.add(key);
         const exactName = tokenVariantList[0]?.some((v) => nameLower === v);
         const startsName = tokenVariantList[0]?.some((v) => nameLower.startsWith(v));
+        const attachedMedia = mediaMap.get(nameLower) || [];
         results.push({
           id: f.id || `canonical-${nameLower}`,
           source: 'canonical',
@@ -160,7 +165,10 @@ export async function GET(req: NextRequest) {
           stateName: p.stateName,
           historicalSignificance: p.historicalSignificance,
           center: f.geometry?.coordinates,
-          priority: exactName ? 1 : startsName ? 2 : 3,
+          media: attachedMedia,
+          hasMedia: attachedMedia.length > 0,
+          mediaCount: attachedMedia.length,
+          priority: attachedMedia.length > 0 ? 0 : (exactName ? 1 : startsName ? 2 : 3),
         });
       }
     }
@@ -196,6 +204,7 @@ export async function GET(req: NextRequest) {
         const exactName = tokenVariantList[0]?.some((v) => nameLower === v || altLower === v);
         const startsName = tokenVariantList[0]?.some((v) => nameLower.startsWith(v));
         const containsName = tokenVariantList[0]?.some((v) => nameLower.includes(v) || altLower.includes(v));
+        const attachedMedia = mediaMap.get(nameLower) || (altLower ? mediaMap.get(altLower) : undefined) || [];
 
         results.push({
           id: item.id,
@@ -210,7 +219,10 @@ export async function GET(req: NextRequest) {
           stateName: item.stateName,
           stateCode: item.stateCode,
           center: item.center,
-          priority: exactName ? 1 : startsName ? 2 : containsName ? 3 : 4,
+          media: attachedMedia,
+          hasMedia: attachedMedia.length > 0,
+          mediaCount: attachedMedia.length,
+          priority: attachedMedia.length > 0 ? 0 : (exactName ? 1 : startsName ? 2 : containsName ? 3 : 4),
         });
       }
     }
