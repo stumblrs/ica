@@ -32,6 +32,8 @@ import {
   Archive,
   Scale,
   Navigation,
+  Camera,
+  Film,
 } from 'lucide-react';
 import { SearchBar } from './SearchBar';
 import type { SelectedFeature, FilterDotType } from './MapContainer';
@@ -53,6 +55,8 @@ import { ReinstatementModal } from '@/components/governance/ReinstatementModal';
 import { GovernanceInquiryCard } from '@/components/governance/GovernanceInquiryCard';
 import { CommunityAuditHistory } from '@/components/governance/CommunityAuditHistory';
 import type { GovernanceInquiry } from '@/lib/governancePolicy';
+import { MediaGallery } from '@/components/common/MediaGallery';
+import { parseMediaUrl, type MediaItem } from '@/lib/media';
 
 export interface CommunitySummary {
   id: string;
@@ -70,6 +74,8 @@ export interface CommunitySummary {
   verificationStatus?: string;
   lifecycleStatus?: string;
   confirmationsCount?: number;
+  evidence?: any[];
+  media?: any[];
   comments?: any[];
 }
 
@@ -226,6 +232,67 @@ export function AtlasOverview(props: AtlasOverviewProps) {
       setActiveInquiry(null);
     }
   }, [selectedFeature?.code, selectedFeature?.type]);
+
+  const selectedCommunityMedia: MediaItem[] = React.useMemo(() => {
+    if (!selectedFeature) return [];
+    const items: MediaItem[] = [];
+
+    // 1. Direct media array on selectedFeature (if provided)
+    if (Array.isArray(selectedFeature.media)) {
+      for (const m of selectedFeature.media) {
+        if (m && m.url) {
+          const parsed = parseMediaUrl(m.url, m.caption, m.credit);
+          if (parsed) items.push(parsed);
+          else items.push(m);
+        }
+      }
+    }
+
+    // 2. Find matching community in `communities` prop
+    const match = communities.find(
+      (c) =>
+        (selectedFeature.code && c.id === selectedFeature.code) ||
+        (selectedFeature.name && c.name.toLowerCase() === selectedFeature.name.toLowerCase())
+    );
+
+    if (match) {
+      if (Array.isArray(match.media)) {
+        for (const m of match.media) {
+          if (m?.url && !items.some((existing) => existing.url === m.url)) {
+            const parsed = parseMediaUrl(m.url, m.caption, m.credit);
+            if (parsed) items.push(parsed);
+            else items.push(m);
+          }
+        }
+      }
+
+      if (Array.isArray(match.evidence)) {
+        for (const ev of match.evidence) {
+          if (ev.sourceType === 'media_link' && ev.url) {
+            if (!items.some((existing) => existing.url === ev.url)) {
+              const parsed = parseMediaUrl(ev.url, ev.caption, ev.credit);
+              if (parsed) items.push(parsed);
+            }
+          } else if (ev.citationOrUrl) {
+            const parsed = parseMediaUrl(ev.citationOrUrl, ev.description);
+            if (parsed && !items.some((existing) => existing.url === parsed.url)) {
+              items.push(parsed);
+            }
+          }
+          if (Array.isArray(ev.media)) {
+            for (const sub of ev.media) {
+              if (sub?.url && !items.some((existing) => existing.url === sub.url)) {
+                const parsed = parseMediaUrl(sub.url, sub.caption, sub.credit);
+                if (parsed) items.push(parsed);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return items;
+  }, [selectedFeature, communities]);
 
   function handleSelectState(state: SoutheastStateInfo) {
     if (onSelectState) {
@@ -664,6 +731,20 @@ export function AtlasOverview(props: AtlasOverviewProps) {
                     </div>
                   )}
 
+                  {/* Community Visual Photographs & Video Records */}
+                  {selectedCommunityMedia.length > 0 && (
+                    <div className="pt-2.5 border-t border-white/[0.06] space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-mono font-bold tracking-wider text-emerald-400 flex items-center gap-1.5">
+                          <Camera className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Community Media Records ({selectedCommunityMedia.length})</span>
+                        </span>
+                        <span className="text-[9px] text-slate-400 font-mono">Zero-storage URL embeds</span>
+                      </div>
+                      <MediaGallery media={selectedCommunityMedia} />
+                    </div>
+                  )}
+
                   {/* Public Living Audit Trail */}
                   {selectedFeature.code && (
                     <div className="pt-2 border-t border-white/[0.06]">
@@ -1009,9 +1090,14 @@ export function AtlasOverview(props: AtlasOverviewProps) {
                             <span className="text-xs sm:text-[13px] font-semibold text-white truncate">{c.name}</span>
                             <StatusPill status={c.verificationStatus} />
                           </span>
-                          <span className="block text-[10px] sm:text-[11px] text-slate-400 truncate mt-0.5">
-                            {c.lgaName} · {c.stateName}
-                            {c.languageStatus ? ` · ${c.languageStatus}` : ''}
+                          <span className="flex items-center gap-2 text-[10px] sm:text-[11px] text-slate-400 truncate mt-0.5">
+                            <span className="truncate">{c.lgaName} · {c.stateName}{c.languageStatus ? ` · ${c.languageStatus}` : ''}</span>
+                            {((c.media && c.media.length > 0) || (c.evidence && c.evidence.some((e: any) => e.sourceType === 'media_link' || e.media?.length))) && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-teal-500/15 border border-teal-500/30 text-teal-300 font-mono text-[9px] shrink-0">
+                                <Camera className="w-2.5 h-2.5" />
+                                <span>Media</span>
+                              </span>
+                            )}
                           </span>
                           {c.description && <span className="block text-[10px] sm:text-[11px] text-slate-500 mt-0.5 line-clamp-1 sm:line-clamp-2">{c.description}</span>}
                         </span>

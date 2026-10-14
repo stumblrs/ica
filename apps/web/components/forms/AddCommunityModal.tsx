@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { X, MapPin, ShieldAlert, CheckCircle, AlertTriangle } from 'lucide-react';
 import { CommunityType, IdentityStatus, EvidenceSourceType } from '@/lib/types';
 import { getOrCreateDeviceId } from '@/lib/device';
+import { MediaUrlInput } from '@/components/common/MediaUrlInput';
+import type { MediaItem } from '@/lib/media';
 
 interface AddCommunityModalProps {
   coordinates: { lon: number; lat: number } | null;
@@ -37,6 +39,7 @@ export function AddCommunityModal({
   const [evidenceType, setEvidenceType] = useState<EvidenceSourceType>('community_submission');
   const [evidenceDesc, setEvidenceDesc] = useState('');
   const [citationUrl, setCitationUrl] = useState('');
+  const [mediaList, setMediaList] = useState<MediaItem[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -104,13 +107,15 @@ export function AddCommunityModal({
           historicalStatus: historicalStatus.trim() || undefined,
           latitude: coordinates?.lat,
           longitude: coordinates?.lon,
-          evidence: evidenceDesc.trim()
+          evidence: (evidenceDesc.trim() || citationUrl.trim() || mediaList.length > 0)
             ? {
                 sourceType: evidenceType,
-                description: evidenceDesc.trim(),
-                citationOrUrl: citationUrl.trim() || undefined,
+                description: evidenceDesc.trim() || (mediaList.length > 0 ? `${mediaList.length} photographs/videos attached by contributor` : 'Community reference evidence'),
+                citationOrUrl: citationUrl.trim() || (mediaList[0]?.url) || undefined,
+                media: mediaList,
               }
             : undefined,
+          media: mediaList,
         }),
       });
 
@@ -304,6 +309,14 @@ export function AddCommunityModal({
               className="w-full px-2.5 py-2 bg-black/40 border border-white/[0.08] rounded-xl text-slate-200 placeholder-slate-500"
             />
           </div>
+
+          {/* Visual Photographs & Video Evidence (Copy/Paste URL without backend storage) */}
+          <MediaUrlInput
+            media={mediaList}
+            onChange={setMediaList}
+            label="Photographs & Videos (Paste URLs)"
+            helperText="Paste direct image URLs (.jpg, .png, .webp) or video links (YouTube, Vimeo, MP4) for this settlement."
+          />
 
           <p className="text-[10px] text-slate-400 leading-normal">
             Server PostGIS spatial queries automatically derive the administrative State and LGA. Status begins as <strong className="text-amber-400 font-medium">Pending</strong> for community review.

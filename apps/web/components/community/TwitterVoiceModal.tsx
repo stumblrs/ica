@@ -270,7 +270,7 @@ export function TwitterVoiceModal({
               <textarea
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
-                placeholder="What oral testimony, historical event, clan lore, or dialect phrase belongs to this place?"
+                placeholder="What oral testimony, historical event, clan lore, dialect phrase, or image/video URLs belong to this place?"
                 rows={4}
                 maxLength={maxChars}
                 className="w-full bg-transparent text-[#e7e9ea] placeholder-[#71767b] text-sm resize-none focus:outline-none leading-relaxed"

@@ -304,23 +304,7 @@ export default function HomePage() {
             )}
 
             {/* Desktop Twitter Pill Trigger */}
-            <div className="hidden lg:flex absolute top-3.5 left-4 z-20 items-center gap-2 pointer-events-auto animate-in fade-in zoom-in-95 duration-150">
-              <button
-                type="button"
-                onClick={() => setIsFiltersCollapsed(false)}
-                className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#000000]/85 hover:bg-[#16181c] border border-[#2f3336] hover:border-emerald-500/40 text-xs font-semibold text-[#e7e9ea] shadow-xl backdrop-blur-xl transition-all active:scale-95 group"
-                title="Filter Settlements & Dialects (Shortcut: F)"
-                aria-label="Filter Settlements"
-              >
-                <Filter className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
-                <span>Filters & Continua</span>
-                {(activeFilter !== 'all' || selectedDialect || selectedMarketFilter) && (
-                  <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-mono font-semibold capitalize">
-                    {activeFilter !== 'all' ? activeFilter : selectedDialect || selectedMarketFilter}
-                  </span>
-                )}
-              </button>
-            </div>
+            
           </>
         ) : (
           <div className="absolute top-2 left-0 right-0 z-20 px-3 py-1 flex flex-col gap-1.5 pointer-events-none animate-in fade-in slide-in-from-top-2 duration-200 lg:top-3.5 lg:left-4 lg:right-20 lg:p-3 lg:rounded-2xl lg:bg-[#000000]/90 lg:backdrop-blur-xl lg:border lg:border-[#2f3336] lg:shadow-2xl">

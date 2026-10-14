@@ -37,6 +37,11 @@ export interface KindredLandmarkItem {
   longitude: number;
   createdAt: string;
   isLocalContribution?: boolean;
+  mediaUrls?: Array<{
+    type: 'image' | 'video';
+    url: string;
+    caption?: string;
+  }>;
 }
 
 function openDB(): Promise<IDBDatabase> {

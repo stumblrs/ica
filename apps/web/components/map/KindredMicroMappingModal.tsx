@@ -17,6 +17,8 @@ import {
   Loader2,
 } from 'lucide-react';
 import { saveKindredLandmarkOffline, type KindredLandmarkItem } from '@/lib/offlineStorage';
+import { MediaUrlInput } from '@/components/common/MediaUrlInput';
+import type { MediaItem } from '@/lib/media';
 
 interface KindredMicroMappingModalProps {
   isOpen: boolean;
@@ -97,6 +99,7 @@ export function KindredMicroMappingModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
+  const [mediaList, setMediaList] = useState<MediaItem[]>([]);
 
   // Update coords if initialCoords changes
   React.useEffect(() => {
@@ -169,6 +172,11 @@ export function KindredMicroMappingModal({
       longitude: lonNum,
       createdAt: new Date().toISOString(),
       isLocalContribution: true,
+      mediaUrls: mediaList.map((m) => ({
+        type: m.type,
+        url: m.url,
+        caption: m.caption,
+      })),
     };
 
     // 1. Always save into local IndexedDB for instant offline availability
@@ -415,6 +423,14 @@ export function KindredMicroMappingModal({
                 className="w-full bg-[#131b2e] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 placeholder-slate-500"
               />
             </div>
+
+            {/* Visual Media URL Attachment */}
+            <MediaUrlInput
+              media={mediaList}
+              onChange={setMediaList}
+              label="Landmark Photos & Video Links (Paste URLs)"
+              helperText="Paste direct image URLs or YouTube video links of this Obi, Ilo square, or kindred monument."
+            />
 
             {/* Submit Action */}
             <div className="pt-2 flex items-center justify-between gap-3 border-t border-white/10">

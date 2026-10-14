@@ -24,6 +24,8 @@ import {
 import type { EnrichedComment } from '@/app/api/comments/route';
 import type { CommunitySummary } from '@/components/map/AtlasOverview';
 import type { SelectedFeature } from '@/components/map/MapContainer';
+import { MediaGallery } from '@/components/common/MediaGallery';
+import { extractMediaFromText } from '@/lib/media';
 
 interface CommunityVoicesTabProps {
   communities: CommunitySummary[];
@@ -416,7 +418,7 @@ export function CommunityVoicesTab({
               ref={composerTextareaRef}
               rows={isComposerExpanded ? 3 : 2}
               maxLength={500}
-              placeholder="What's happening in your community? Share an oral tradition, lineage note, dialect phrase, or borderland history…"
+              placeholder="What's happening in your community? Share an oral tradition, lineage note, dialect phrase, or paste photo/video URLs…"
               value={commentText}
               onFocus={() => setIsComposerExpanded(true)}
               onChange={(e) => setCommentText(e.target.value)}
@@ -687,10 +689,22 @@ export function CommunityVoicesTab({
                   </button>
                 </div>
 
-                {/* TWEET BODY TEXT */}
-                <p className="text-xs sm:text-[13px] text-slate-200 leading-relaxed whitespace-pre-wrap pl-2 border-l-2 border-emerald-500/40">
-                  {cmt.comment}
-                </p>
+                {/* TWEET BODY TEXT & EXTRACTED MEDIA GALLERY */}
+                {(() => {
+                  const { cleanText, media } = extractMediaFromText(cmt.comment);
+                  return (
+                    <div className="space-y-2">
+                      <p className="text-xs sm:text-[13px] text-slate-200 leading-relaxed whitespace-pre-wrap pl-2 border-l-2 border-emerald-500/40">
+                        {cleanText}
+                      </p>
+                      {media.length > 0 && (
+                        <div className="pl-2">
+                          <MediaGallery media={media} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* TWEET INTERACTION BAR (Like, Fly, Reply, Share) */}
                 <div className="pt-2 border-t border-white/[0.05] flex items-center justify-between text-slate-400 text-xs">

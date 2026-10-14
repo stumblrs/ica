@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { X, MapPin, Sparkles, ChevronRight, Waves, MessageSquarePlus, Navigation } from 'lucide-react';
+import { X, MapPin, Sparkles, ChevronRight, Waves, MessageSquarePlus, Navigation, Play, Film } from 'lucide-react';
 import type { SelectedFeature } from './MapContainer';
 import { AudioPronunciationPlayer } from '@/components/cultural/AudioPronunciationPlayer';
 
@@ -112,6 +112,50 @@ export function MapFeatureFloatingCard({
       {(feature.dialectGreeting || feature.dialectCluster?.sampleGreeting) && (
         <div className="mt-2 px-2.5 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-[11px] text-emerald-300 italic">
           &ldquo;{feature.dialectGreeting || feature.dialectCluster?.sampleGreeting}&rdquo;
+        </div>
+      )}
+
+      {/* Attached Media Photos & Videos Preview */}
+      {feature.media && feature.media.length > 0 && (
+        <div className="mt-2.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+          {feature.media.slice(0, 4).map((m: any, idx: number) => (
+            <div
+              key={m.id || idx}
+              onClick={onViewLore}
+              className="relative w-12 h-10 rounded-lg overflow-hidden bg-black/60 border border-white/10 shrink-0 cursor-pointer hover:border-emerald-400 transition-colors"
+              title={m.caption || 'Attached visual record'}
+            >
+              {m.thumbnailUrl || m.url ? (
+                <img
+                  src={m.thumbnailUrl || m.url}
+                  alt="Thumb"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src =
+                      'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="48" height="40" viewBox="0 0 48 40"><rect fill="%23111827" width="48" height="40"/></svg>';
+                  }}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-slate-900 text-cyan-400">
+                  <Film className="w-3.5 h-3.5" />
+                </div>
+              )}
+              {m.type === 'video' && (
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                  <Play className="w-3 h-3 text-cyan-300 fill-cyan-300" />
+                </div>
+              )}
+            </div>
+          ))}
+          {feature.media.length > 4 && (
+            <button
+              type="button"
+              onClick={onViewLore}
+              className="h-10 px-2 rounded-lg bg-white/5 border border-white/10 text-[10px] text-slate-300 shrink-0 font-mono hover:bg-white/10"
+            >
+              +{feature.media.length - 4} more
+            </button>
+          )}
         </div>
       )}
 

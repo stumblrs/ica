@@ -38,6 +38,7 @@ export interface SelectedFeature {
   dialectGreeting?: string;
   whySignificant?: string;
   traditionalMarketsAndLandmarks?: string[];
+  media?: any[];
 }
 
 export type BasemapMode = 'dark' | 'satellite' | 'topo' | 'light';

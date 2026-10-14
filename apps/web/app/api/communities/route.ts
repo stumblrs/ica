@@ -164,15 +164,34 @@ export async function POST(req: NextRequest) {
           verificationStatus: 'pending', // Defaults to pending
           lifecycleStatus: 'ACTIVE',
           confidence: 0.5,
-          evidenceJson: evidence
+          evidenceJson: (evidence || (Array.isArray(body.media) && body.media.length > 0))
             ? JSON.stringify([
-                {
-                  id: 'ev-' + Date.now(),
-                  sourceType: evidence.sourceType,
-                  citationOrUrl: evidence.citationOrUrl || null,
-                  description: evidence.description,
-                  isVerified: false,
-                },
+                ...(evidence
+                  ? [
+                      {
+                        id: 'ev-' + Date.now(),
+                        sourceType: evidence.sourceType || 'community_submission',
+                        citationOrUrl: evidence.citationOrUrl || null,
+                        description: evidence.description || 'Community evidence',
+                        isVerified: false,
+                        media: evidence.media || body.media || [],
+                      },
+                    ]
+                  : []),
+                ...(Array.isArray(body.media)
+                  ? body.media.map((m: any, idx: number) => ({
+                      id: m.id || `media-${Date.now()}-${idx}`,
+                      sourceType: 'media_link',
+                      type: m.type,
+                      provider: m.provider,
+                      url: m.url,
+                      embedUrl: m.embedUrl,
+                      thumbnailUrl: m.thumbnailUrl,
+                      caption: m.caption,
+                      credit: m.credit,
+                      isVerified: false,
+                    }))
+                  : []),
               ])
             : null,
           confirmationsCount: 0,

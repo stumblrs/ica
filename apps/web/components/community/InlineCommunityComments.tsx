@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, Send, User, Sparkles, ChevronDown, ChevronUp, CheckCircle2 } from 'lucide-react';
+import { MediaGallery } from '@/components/common/MediaGallery';
+import { extractMediaFromText } from '@/lib/media';
 
 interface InlineComment {
   id: string;
@@ -142,7 +144,7 @@ export function InlineCommunityComments({
             <textarea
               required
               rows={2}
-              placeholder={`Share dialect peculiarities, clan lineage, market days, or oral traditions of ${communityName}...`}
+              placeholder={`Share dialect peculiarities, clan lineage, traditions, or paste photo/video URLs for ${communityName}...`}
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
               className="w-full px-2.5 py-1.5 bg-white/[0.04] border border-white/[0.1] rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
@@ -176,29 +178,37 @@ export function InlineCommunityComments({
                 No oral histories or notes recorded yet. Be the first to share one above!
               </p>
             ) : (
-              comments.map((cmt) => (
-                <div key={cmt.id} className="p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] space-y-1">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <div className="flex items-center gap-1.5 truncate">
-                      <span className="font-semibold text-white truncate">{cmt.authorName}</span>
-                      {cmt.affiliation && (
-                        <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/20 shrink-0">
-                          {cmt.affiliation}
-                        </span>
-                      )}
+              comments.map((cmt) => {
+                const { cleanText, media } = extractMediaFromText(cmt.comment);
+                return (
+                  <div key={cmt.id} className="p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span className="font-semibold text-white truncate">{cmt.authorName}</span>
+                        {cmt.affiliation && (
+                          <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/20 shrink-0">
+                            {cmt.affiliation}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[9px] font-mono text-slate-500 shrink-0">
+                        {new Date(cmt.createdAt).toLocaleDateString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </span>
                     </div>
-                    <span className="text-[9px] font-mono text-slate-500 shrink-0">
-                      {new Date(cmt.createdAt).toLocaleDateString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </span>
+                    <p className="text-[11px] text-slate-300 leading-relaxed whitespace-pre-wrap">
+                      {cleanText}
+                    </p>
+                    {media.length > 0 && (
+                      <div className="pt-1">
+                        <MediaGallery media={media} />
+                      </div>
+                    )}
                   </div>
-                  <p className="text-[11px] text-slate-300 leading-relaxed whitespace-pre-wrap">
-                    {cmt.comment}
-                  </p>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

@@ -18,10 +18,13 @@ import {
   Sparkles,
   Archive,
   ExternalLink,
+  Camera,
 } from 'lucide-react';
 import { AudioPronunciationPlayer } from '@/components/cultural/AudioPronunciationPlayer';
 import { calculateNearestWaterway, getDialectForLocation } from '@/lib/cultural';
 import { getArchivalDocumentsForFeature } from '@/lib/archival';
+import { MediaGallery } from '@/components/common/MediaGallery';
+import { parseMediaUrl, extractMediaFromText, type MediaItem } from '@/lib/media';
 
 export default function CommunityDetailPage({ params }: { params: { id: string } }) {
   const [community, setCommunity] = useState<any>(null);
@@ -40,6 +43,31 @@ export default function CommunityDetailPage({ params }: { params: { id: string }
   const [commentAffiliation, setCommentAffiliation] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
+
+  const communityMedia: MediaItem[] = React.useMemo(() => {
+    if (!community) return [];
+    const items: MediaItem[] = [];
+    if (Array.isArray(community.evidence)) {
+      for (const ev of community.evidence) {
+        if (ev.sourceType === 'media_link' && ev.url) {
+          const parsed = parseMediaUrl(ev.url, ev.caption, ev.credit);
+          if (parsed && !items.some((i) => i.url === parsed.url)) items.push(parsed);
+        } else if (ev.citationOrUrl) {
+          const parsed = parseMediaUrl(ev.citationOrUrl, ev.description);
+          if (parsed && !items.some((i) => i.url === parsed.url)) items.push(parsed);
+        }
+        if (Array.isArray(ev.media)) {
+          for (const m of ev.media) {
+            if (m?.url) {
+              const parsed = parseMediaUrl(m.url, m.caption, m.credit);
+              if (parsed && !items.some((i) => i.url === parsed.url)) items.push(parsed);
+            }
+          }
+        }
+      }
+    }
+    return items;
+  }, [community]);
 
   useEffect(() => {
     fetchCommunity();
@@ -300,6 +328,17 @@ export default function CommunityDetailPage({ params }: { params: { id: string }
               <p className="text-xs text-slate-500 italic">No user-uploaded evidence attached yet.</p>
             )}
 
+            {/* Visual Photographs & Video Media Records */}
+            {communityMedia.length > 0 && (
+              <div className="pt-3 border-t border-slate-800 space-y-2">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                  <Camera className="w-3.5 h-3.5 text-emerald-400" />
+                  Visual Photographs & Video Records ({communityMedia.length})
+                </span>
+                <MediaGallery media={communityMedia} />
+              </div>
+            )}
+
             {/* Matched Regional Archival Records */}
             {(() => {
               const matchedArchives = getArchivalDocumentsForFeature({
@@ -397,7 +436,7 @@ export default function CommunityDetailPage({ params }: { params: { id: string }
             <textarea
               required
               rows={3}
-              placeholder="Share cultural context, local dialect details, historical notes, or commentary about this settlement..."
+              placeholder="Share cultural context, local dialect details, historical notes, or paste photo/video URLs..."
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
               className="w-full px-3 py-2 bg-slate-900 border border-slate-700/80 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
@@ -423,32 +462,40 @@ export default function CommunityDetailPage({ params }: { params: { id: string }
         {/* Comments Feed */}
         <div className="space-y-3">
           {community.comments && community.comments.length > 0 ? (
-            community.comments.map((cmt: any) => (
-              <div key={cmt.id} className="p-3.5 rounded-xl bg-slate-950/40 border border-slate-800/80 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-white font-['Outfit']">
-                      {cmt.authorName}
-                    </span>
-                    {cmt.affiliation && (
-                      <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                        {cmt.affiliation}
+            community.comments.map((cmt: any) => {
+              const { cleanText, media } = extractMediaFromText(cmt.comment);
+              return (
+                <div key={cmt.id} className="p-3.5 rounded-xl bg-slate-950/40 border border-slate-800/80 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-white font-['Outfit']">
+                        {cmt.authorName}
                       </span>
-                    )}
+                      {cmt.affiliation && (
+                        <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                          {cmt.affiliation}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] font-mono text-slate-500">
+                      {new Date(cmt.createdAt).toLocaleDateString(undefined, {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </span>
                   </div>
-                  <span className="text-[10px] font-mono text-slate-500">
-                    {new Date(cmt.createdAt).toLocaleDateString(undefined, {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                    })}
-                  </span>
+                  <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">
+                    {cleanText}
+                  </p>
+                  {media.length > 0 && (
+                    <div className="pt-1">
+                      <MediaGallery media={media} />
+                    </div>
+                  )}
                 </div>
-                <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">
-                  {cmt.comment}
-                </p>
-              </div>
-            ))
+              );
+            })
           ) : (
             <div className="p-6 text-center text-xs text-slate-500 italic bg-slate-950/20 border border-dashed border-slate-800 rounded-xl">
               No comments yet. Be the first to share knowledge or feedback about {community.name}.
