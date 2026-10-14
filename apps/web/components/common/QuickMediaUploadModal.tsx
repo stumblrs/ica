@@ -100,10 +100,6 @@ export function QuickMediaUploadModal({
               <Camera className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-bold">
-                <Sparkles className="w-3 h-3 text-emerald-400" />
-                <span>Zero-Cost Media Attachment</span>
-              </div>
               <h2 className="text-base sm:text-lg font-bold font-display text-white truncate leading-tight mt-0.5">
                 {feature.name}
               </h2>
