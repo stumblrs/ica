@@ -864,7 +864,7 @@ export function AtlasOverview(props: AtlasOverviewProps) {
             <section className="space-y-1">
               <div className="flex items-center justify-between text-[11px] font-mono">
                 <span className="text-emerald-400 uppercase tracking-wider font-bold text-[10px]">Participatory Geographic Atlas</span>
-                <span className="text-slate-400">{communities.length} Communities</span>
+                <span className="text-slate-400" suppressHydrationWarning>{communities.length} Communities</span>
               </div>
               <h2 className="font-display text-lg sm:text-[22px] leading-snug font-bold text-white">
                 Where Igbo communities live — <span className="bg-gradient-to-r from-emerald-300 to-teal-300 bg-clip-text text-transparent">mapped by the people who know.</span>
@@ -884,7 +884,7 @@ export function AtlasOverview(props: AtlasOverviewProps) {
               ].map((s) => (
                 <div key={s.label} className="card stat-card p-2 sm:p-3 text-center sm:text-left" style={{ ['--glow' as any]: s.glow }}>
                   <s.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 mx-auto sm:mx-0 mb-1 sm:mb-2" />
-                  <p className="font-display text-base sm:text-2xl font-bold text-white leading-none">{s.value}</p>
+                  <p className="font-display text-base sm:text-2xl font-bold text-white leading-none" suppressHydrationWarning>{s.value}</p>
                   <p className="text-[9px] sm:text-[11px] text-slate-400 mt-0.5 sm:mt-1 truncate">
                     <span className="sm:hidden">{s.label}</span>
                     <span className="hidden sm:inline">{s.fullLabel}</span>
@@ -932,7 +932,7 @@ export function AtlasOverview(props: AtlasOverviewProps) {
 
               <div className="flex items-center justify-between mt-4 sm:mt-5 mb-2">
                 <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Beyond the Southeast</p>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20" suppressHydrationWarning>
                   {BEYOND_SOUTHEAST_REGIONS.length} Regions · {BEYOND_SOUTHEAST_REGIONS.reduce((acc, r) => acc + r.lgas.length, 0)} LGAs
                 </span>
               </div>

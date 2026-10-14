@@ -638,7 +638,7 @@ export default function HomePage() {
             </button>
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#090e1c]/80 border border-white/[0.08] text-[11px] font-mono text-slate-300 backdrop-blur-xl">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>{communities.length} Communities Documented</span>
+              <span suppressHydrationWarning>{communities.length} Communities Documented</span>
             </div>
           </div>
         )}
@@ -727,7 +727,7 @@ export default function HomePage() {
               title={`${communities.length} documented Igbo communities across ${statesCovered} states`}
             >
               <Globe2 className="w-3.5 h-3.5 text-emerald-400 mb-0.5" />
-              <span className="text-[11px] font-mono font-bold text-white leading-none">
+              <span className="text-[11px] font-mono font-bold text-white leading-none" suppressHydrationWarning>
                 {communities.length}
               </span>
               <span className="text-[8px] font-mono uppercase tracking-wider text-slate-500 mt-0.5">
@@ -744,7 +744,7 @@ export default function HomePage() {
               title={`${verifiedCount} Verified Communities (Click to filter)`}
             >
               <ShieldCheck className="w-3.5 h-3.5 text-amber-400 mb-0.5" />
-              <span className="text-[11px] font-mono font-bold text-amber-300 leading-none">
+              <span className="text-[11px] font-mono font-bold text-amber-300 leading-none" suppressHydrationWarning>
                 {verifiedCount}
               </span>
               <span className="text-[8px] font-mono uppercase tracking-wider text-amber-400/60 mt-0.5">
@@ -761,7 +761,7 @@ export default function HomePage() {
               title={`${contestedCount} Settlements under community review & quorum`}
             >
               <Scale className="w-3.5 h-3.5 text-purple-400 mb-0.5" />
-              <span className="text-[11px] font-mono font-bold text-purple-300 leading-none">
+              <span className="text-[11px] font-mono font-bold text-purple-300 leading-none" suppressHydrationWarning>
                 {contestedCount}
               </span>
               <span className="text-[8px] font-mono uppercase tracking-wider text-purple-400/70 mt-0.5">
