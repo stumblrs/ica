@@ -1,6 +1,9 @@
 'use client';
 
+import { getOrCreateDeviceId } from '@/lib/device';
+
 export interface UserProfile {
+  deviceId?: string;
   username: string; // e.g. "chidi_m" (stored without '@')
   displayName: string; // e.g. "Chidi Okafor"
   homeTown?: string; // e.g. "Awka"
@@ -20,6 +23,7 @@ export const DEFAULT_AVATARS = ['ọ', 'Ọ', 'ị', 'Ụ', 'ᛘ', '☀', '⚡',
 export function getUserProfile(): UserProfile {
   if (typeof window === 'undefined') {
     return {
+      deviceId: 'srv-anonymous',
       username: '',
       displayName: '',
       avatarSymbol: 'ọ',
@@ -28,10 +32,13 @@ export function getUserProfile(): UserProfile {
     };
   }
 
+  const deviceId = getOrCreateDeviceId();
+
   try {
     const raw = localStorage.getItem(PROFILE_KEY);
     if (!raw) {
       return {
+        deviceId,
         username: '',
         displayName: '',
         avatarSymbol: 'ọ',
@@ -41,6 +48,7 @@ export function getUserProfile(): UserProfile {
     }
     const parsed = JSON.parse(raw);
     return {
+      deviceId,
       username: cleanUsername(parsed.username || ''),
       displayName: parsed.displayName || '',
       homeTown: parsed.homeTown || '',
@@ -54,6 +62,7 @@ export function getUserProfile(): UserProfile {
     };
   } catch {
     return {
+      deviceId,
       username: '',
       displayName: '',
       avatarSymbol: 'ọ',
@@ -83,29 +92,64 @@ export function saveUserProfile(updates: Partial<UserProfile>): UserProfile {
     };
   }
 
+  const deviceId = getOrCreateDeviceId();
+
   try {
     const current = getUserProfile();
     const updated: UserProfile = {
       ...current,
       ...updates,
+      deviceId,
       username: updates.username !== undefined ? cleanUsername(updates.username) : current.username,
       joinedAt: current.joinedAt || new Date().toISOString(),
     };
 
+    // 1. Fast local persistence
     localStorage.setItem(PROFILE_KEY, JSON.stringify(updated));
 
-    // Notify all components across the app
+    // 2. Notify all UI components across the client
     window.dispatchEvent(
       new CustomEvent('ica:profile-updated', {
         detail: updated,
       })
     );
 
+    // 3. Asynchronously sync and bind profile with backend tied to this deviceId
+    fetch('/api/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    }).catch((err) => {
+      console.warn('[UserProfile] Backend profile sync deferred (offline):', err.message);
+    });
+
     return updated;
   } catch (err) {
     console.error('Failed saving user profile:', err);
     return getUserProfile();
   }
+}
+
+/**
+ * Syncs profile from backend by deviceId if local storage is blank
+ */
+export async function syncProfileFromBackend(): Promise<UserProfile | null> {
+  if (typeof window === 'undefined') return null;
+  const deviceId = getOrCreateDeviceId();
+  try {
+    const res = await fetch(`/api/profile?deviceId=${encodeURIComponent(deviceId)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.username) {
+        localStorage.setItem(PROFILE_KEY, JSON.stringify(data));
+        window.dispatchEvent(new CustomEvent('ica:profile-updated', { detail: data }));
+        return data;
+      }
+    }
+  } catch {
+    // offline
+  }
+  return null;
 }
 
 /**

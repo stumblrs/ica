@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import {
   Sparkles,
   Filter,
@@ -178,18 +179,15 @@ export function MobileTwitterHeader({
                 {profile?.username ? `@${profile.username}` : '@anonymous_contributor'}
               </p>
 
-              {/* Edit Profile Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  setIsProfileDrawerOpen(false);
-                  window.dispatchEvent(new CustomEvent('ica:open-profile'));
-                }}
+              {/* Edit Profile Link */}
+              <Link
+                href="/profile"
+                onClick={() => setIsProfileDrawerOpen(false)}
                 className="mt-3 w-full py-1.5 px-3 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-xs font-semibold text-emerald-300 flex items-center justify-center gap-1.5 transition-colors"
               >
                 <User className="w-3.5 h-3.5" />
-                <span>{profile?.username ? 'Edit Profile & Settings' : 'Set Your @username'}</span>
-              </button>
+                <span>{profile?.username ? 'View Profile & Settings' : 'Set Your @username'}</span>
+              </Link>
 
               {/* Stats row like Twitter followers/following */}
               <div className="flex items-center gap-4 mt-3 pt-2 text-xs border-t border-[#2f3336]/60">

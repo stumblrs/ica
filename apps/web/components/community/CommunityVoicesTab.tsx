@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import Link from 'next/link';
 import {
   MessageSquare,
   Sparkles,
@@ -455,14 +456,13 @@ export function CommunityVoicesTab({
                   onChange={(e) => setAuthorHandle(e.target.value)}
                   className="w-full h-7 px-2 rounded-lg bg-white/[0.04] border border-white/10 text-white placeholder-slate-500 text-[11px] font-mono focus:outline-none focus:border-emerald-500"
                 />
-                <button
-                  type="button"
-                  onClick={() => window.dispatchEvent(new CustomEvent('ica:open-profile'))}
-                  className="shrink-0 px-1.5 h-7 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[10px] font-mono border border-emerald-500/30"
-                  title="Configure Contributor Profile"
+                <Link
+                  href="/profile"
+                  className="shrink-0 px-2 h-7 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[10px] font-mono border border-emerald-500/30 flex items-center justify-center"
+                  title="Open Contributor Profile Page"
                 >
                   Profile
-                </button>
+                </Link>
               </div>
               <div>
                 <select

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { X, Camera, Film, Link as LinkIcon, CheckCircle2, AlertCircle, Loader2, Sparkles, MapPin } from 'lucide-react';
 import { parseMediaUrl, type MediaItem } from '@/lib/media';
 import { getUserProfile, getContributorSignature, type UserProfile } from '@/lib/user-profile';
@@ -240,14 +241,13 @@ export function QuickMediaUploadModal({
                 <label className="block text-xs font-semibold text-slate-300">
                   Your Name / Alias (Optional)
                 </label>
-                <button
-                  type="button"
-                  onClick={() => window.dispatchEvent(new CustomEvent('ica:open-profile'))}
+                <Link
+                  href="/profile"
                   className="text-[10px] text-emerald-400 hover:text-emerald-300 hover:underline font-mono"
-                  title="Edit profile & handle"
+                  title="Open Profile Page"
                 >
                   {profile?.username ? `@${profile.username}` : '+ Set @username'}
-                </button>
+                </Link>
               </div>
               <input
                 type="text"

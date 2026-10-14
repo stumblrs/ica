@@ -395,10 +395,29 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
                   )}
                 </div>
 
+                <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.08] space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-300 font-medium flex items-center gap-1.5">
+                      <Shield className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Device Identity & Backend Binding</span>
+                    </span>
+                    <span className="font-mono text-cyan-400 text-[10px]">Bound</span>
+                  </div>
+                  <div className="p-2 rounded-lg bg-black/40 border border-white/[0.06] flex items-center justify-between text-[11px] font-mono">
+                    <span className="text-slate-400">Device ID</span>
+                    <span className="text-emerald-400 truncate max-w-[200px]" title={profile?.deviceId}>
+                      {profile?.deviceId || 'Generating...'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    This browser device is bound to your handle <strong className="text-white">@{sanitizedHandle || 'handle'}</strong>. Contributions and governance votes are registered on the backend via <code className="text-emerald-400">/api/profile</code>.
+                  </p>
+                </div>
+
                 <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-300/90 leading-relaxed flex items-start gap-2">
                   <Info className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                   <span>
-                    Your profile data is stored on-device and embedded into verified community audit logs when you contribute.
+                    Your profile data is stored on-device and mirrored on the backend. When you upload media or mark kindred boundaries, your handle is automatically attached.
                   </span>
                 </div>
               </div>

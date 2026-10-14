@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import {
   X,
   MapPin,
@@ -427,13 +428,13 @@ export function KindredMicroMappingModal({
                 <label className="block text-xs font-medium text-slate-300">
                   Contributor / Kindred Elder Name (Optional)
                 </label>
-                <button
-                  type="button"
-                  onClick={() => window.dispatchEvent(new CustomEvent('ica:open-profile'))}
+                <Link
+                  href="/profile"
                   className="text-[10px] text-emerald-400 hover:text-emerald-300 hover:underline font-mono"
+                  title="Open Profile Page"
                 >
                   {profile?.username ? `@${profile.username}` : '+ Set @username'}
-                </button>
+                </Link>
               </div>
               <input
                 type="text"
