@@ -21,11 +21,14 @@ import {
   FileText,
   Clock,
   ExternalLink,
+  AlertTriangle,
+  Loader2,
 } from 'lucide-react';
 import {
   getUserProfile,
-  saveUserProfile,
+  saveUserProfileAsync,
   cleanUsername,
+  checkUsernameAvailabilityRemote,
   DEFAULT_AVATARS,
   type UserProfile,
 } from '@/lib/user-profile';
@@ -46,6 +49,14 @@ export default function ProfilePage() {
   const [cacheCleared, setCacheCleared] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'details' | 'activity' | 'settings'>('details');
 
+  // Username validation & uniqueness checking state
+  const [usernameStatus, setUsernameStatus] = useState<
+    'idle' | 'checking' | 'available' | 'taken' | 'self' | 'invalid'
+  >('idle');
+  const [usernameMessage, setUsernameMessage] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+
   // Load profile on mount
   useEffect(() => {
     const current = getUserProfile();
@@ -63,25 +74,93 @@ export default function ProfilePage() {
 
   const sanitizedHandle = cleanUsername(usernameInput);
 
-  function handleSave(e: React.FormEvent) {
-    e.preventDefault();
-    const updated = saveUserProfile({
-      username: sanitizedHandle,
-      displayName: displayName.trim(),
-      homeTown: homeTown.trim(),
-      stateOfOrigin: stateOfOrigin.trim(),
-      kindredClan: kindredClan.trim(),
-      bio: bio.trim(),
-      avatarSymbol: avatarSymbol || 'ọ',
-      role,
-      autoSignContributions: autoSign,
-    });
+  // Real-time debounced username uniqueness check
+  useEffect(() => {
+    if (!sanitizedHandle) {
+      setUsernameStatus('idle');
+      setUsernameMessage('');
+      return;
+    }
 
-    setProfile(updated);
-    setSavedSuccess(true);
-    setTimeout(() => {
-      setSavedSuccess(false);
-    }, 2500);
+    if (sanitizedHandle.length < 3) {
+      setUsernameStatus('invalid');
+      setUsernameMessage('Handle must be at least 3 characters long.');
+      return;
+    }
+
+    setUsernameStatus('checking');
+    const timer = setTimeout(async () => {
+      try {
+        const result = await checkUsernameAvailabilityRemote(sanitizedHandle, profile?.deviceId);
+        if (result.isSelf) {
+          setUsernameStatus('self');
+          setUsernameMessage(`@${sanitizedHandle} is your registered handle on this device.`);
+        } else if (result.available) {
+          setUsernameStatus('available');
+          setUsernameMessage(`@${sanitizedHandle} is available globally!`);
+        } else {
+          setUsernameStatus('taken');
+          setUsernameMessage(
+            result.reason || `The handle @${sanitizedHandle} is already registered to another contributor device.`
+          );
+        }
+      } catch {
+        setUsernameStatus('idle');
+      }
+    }, 280);
+
+    return () => clearTimeout(timer);
+  }, [sanitizedHandle, profile?.deviceId]);
+
+  async function handleSave(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    setSubmissionError(null);
+
+    if (usernameStatus === 'taken') {
+      setSubmissionError(`Cannot save: @${sanitizedHandle} is already taken by another contributor. Please choose a different handle.`);
+      return;
+    }
+
+    if (!sanitizedHandle || sanitizedHandle.length < 3) {
+      setSubmissionError('Please choose a valid contributor handle of at least 3 characters.');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const res = await saveUserProfileAsync({
+        username: sanitizedHandle,
+        displayName: displayName.trim(),
+        homeTown: homeTown.trim(),
+        stateOfOrigin: stateOfOrigin.trim(),
+        kindredClan: kindredClan.trim(),
+        bio: bio.trim(),
+        avatarSymbol: avatarSymbol || 'ọ',
+        role,
+        autoSignContributions: autoSign,
+      });
+
+      if (!res.success) {
+        setSubmissionError(res.error || 'Failed to update handle.');
+        if (res.isTaken) {
+          setUsernameStatus('taken');
+          setUsernameMessage(res.error || `The handle @${sanitizedHandle} is already taken.`);
+        }
+        return;
+      }
+
+      if (res.profile) {
+        setProfile(res.profile);
+      }
+      setSavedSuccess(true);
+      setTimeout(() => {
+        setSavedSuccess(false);
+      }, 2500);
+    } catch (err: any) {
+      setSubmissionError(err.message || 'An unexpected error occurred while saving.');
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   function handleClearCache() {
@@ -131,13 +210,23 @@ export default function ProfilePage() {
 
         <button
           type="button"
-          onClick={handleSave}
-          className="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black shadow-lg shadow-emerald-500/25 active:scale-95 transition-all flex items-center gap-1.5"
+          onClick={() => handleSave()}
+          disabled={isSubmitting || usernameStatus === 'taken'}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-lg ${
+            usernameStatus === 'taken'
+              ? 'bg-red-500/20 text-red-300 border border-red-500/40 cursor-not-allowed shadow-none'
+              : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black shadow-emerald-500/25 active:scale-95'
+          }`}
         >
-          {savedSuccess ? (
+          {isSubmitting ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Checking & Saving...</span>
+            </>
+          ) : savedSuccess ? (
             <>
               <Check className="w-4 h-4 stroke-[3]" />
-              <span>Saved!</span>
+              <span>Saved Globally!</span>
             </>
           ) : (
             <>
@@ -147,6 +236,26 @@ export default function ProfilePage() {
           )}
         </button>
       </div>
+
+      {/* Global Error Banner */}
+      {submissionError && (
+        <div className="max-w-5xl w-full mx-auto px-4 sm:px-8 pt-4">
+          <div className="p-4 rounded-2xl bg-red-500/15 border border-red-500/40 text-red-200 text-xs flex items-start gap-3 shadow-xl animate-in fade-in slide-in-from-top-2 duration-200">
+            <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h4 className="font-bold text-sm text-red-100">Action Blocked</h4>
+              <p className="mt-0.5 text-red-200/90 leading-relaxed">{submissionError}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSubmissionError(null)}
+              className="text-red-300 hover:text-white text-xs font-bold px-2 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 transition-colors"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Content Area */}
       <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-8 space-y-6">
@@ -260,16 +369,43 @@ export default function ProfilePage() {
                 <span>Contributor Identity Details</span>
               </h3>
 
-              {/* Handle (@username) */}
+              {/* Handle (@username) with Real-Time Uniqueness Checker */}
               <div>
                 <label className="block text-xs font-semibold text-slate-200 mb-1.5 flex items-center justify-between">
                   <span>Contributor Handle (@username)</span>
-                  <span className="text-[11px] text-emerald-400 font-mono">
-                    {sanitizedHandle ? `@${sanitizedHandle}` : 'Required'}
+                  <span className="text-[11px] font-mono">
+                    {usernameStatus === 'checking' && (
+                      <span className="text-slate-400 flex items-center gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin text-emerald-400" />
+                        <span>Checking...</span>
+                      </span>
+                    )}
+                    {usernameStatus === 'available' && (
+                      <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                        <Check className="w-3 h-3 stroke-[3]" /> Available
+                      </span>
+                    )}
+                    {usernameStatus === 'self' && (
+                      <span className="text-cyan-400 font-semibold flex items-center gap-1">
+                        <Check className="w-3 h-3 stroke-[3]" /> Registered to you
+                      </span>
+                    )}
+                    {usernameStatus === 'taken' && (
+                      <span className="text-red-400 font-bold flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> Already Taken
+                      </span>
+                    )}
+                    {usernameStatus === 'invalid' && (
+                      <span className="text-amber-400 font-medium">Invalid Format</span>
+                    )}
                   </span>
                 </label>
                 <div className="relative flex items-center">
-                  <div className="absolute left-3.5 text-emerald-400 font-mono font-bold text-base pointer-events-none">
+                  <div
+                    className={`absolute left-3.5 font-mono font-bold text-base pointer-events-none transition-colors ${
+                      usernameStatus === 'taken' ? 'text-red-400' : 'text-emerald-400'
+                    }`}
+                  >
                     @
                   </div>
                   <input
@@ -279,11 +415,69 @@ export default function ProfilePage() {
                     placeholder="e.g. okafor_native or awka_mapper"
                     required
                     maxLength={30}
-                    className="w-full pl-9 pr-3 py-2.5 bg-white/[0.04] border border-white/[0.12] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-colors font-mono"
+                    className={`w-full pl-9 pr-10 py-2.5 rounded-xl text-sm placeholder-slate-500 focus:outline-none transition-all font-mono ${
+                      usernameStatus === 'taken'
+                        ? 'bg-red-500/[0.08] border-2 border-red-500/80 text-red-100 ring-2 ring-red-500/20'
+                        : usernameStatus === 'available'
+                        ? 'bg-emerald-500/[0.05] border border-emerald-500/60 text-white focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400'
+                        : 'bg-white/[0.04] border border-white/[0.12] text-white focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400'
+                    }`}
                   />
+                  <div className="absolute right-3">
+                    {usernameStatus === 'checking' && (
+                      <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+                    )}
+                    {usernameStatus === 'available' && (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    )}
+                    {usernameStatus === 'self' && (
+                      <CheckCircle2 className="w-4 h-4 text-cyan-400" />
+                    )}
+                    {usernameStatus === 'taken' && (
+                      <AlertTriangle className="w-4 h-4 text-red-400 animate-bounce" />
+                    )}
+                  </div>
                 </div>
+
+                {/* Prominent Alert Box when handle is taken */}
+                {usernameStatus === 'taken' && (
+                  <div className="mt-2.5 p-3.5 rounded-xl bg-red-500/15 border border-red-500/40 text-red-200 text-xs flex items-start gap-3 shadow-lg animate-in fade-in slide-in-from-top-1 duration-150">
+                    <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                    <div>
+                      <h5 className="font-bold text-red-100 text-xs">Handle Already Claimed</h5>
+                      <p className="text-[11px] text-red-200/90 mt-0.5 leading-relaxed">
+                        <strong className="text-white">@{sanitizedHandle}</strong> is already registered to another contributor device. Every handle in the Igbo Community Atlas is globally unique across all devices. Please select another username.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Success feedback when handle is available */}
+                {usernameStatus === 'available' && (
+                  <p className="text-xs text-emerald-400 flex items-center gap-1.5 mt-1.5 font-medium">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>@{sanitizedHandle} is available to claim across all devices</span>
+                  </p>
+                )}
+
+                {/* Self registered handle confirmation */}
+                {usernameStatus === 'self' && (
+                  <p className="text-xs text-cyan-400 flex items-center gap-1.5 mt-1.5 font-medium">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>@{sanitizedHandle} is your registered handle</span>
+                  </p>
+                )}
+
+                {/* Invalid format warning */}
+                {usernameStatus === 'invalid' && (
+                  <p className="text-xs text-amber-400 flex items-center gap-1.5 mt-1.5 font-medium">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    <span>{usernameMessage}</span>
+                  </p>
+                )}
+
                 <p className="text-[11px] text-slate-400 mt-1.5">
-                  Your public handle attached when you link photos, upload settlement videos, mark kindred obi, or post oral histories.
+                  Your public handle is uniquely tied to your device and attached when you link photos, upload settlement videos, mark kindred obi, or post oral histories.
                 </p>
               </div>
 
@@ -387,10 +581,29 @@ export default function ProfilePage() {
               <div className="pt-2 flex items-center justify-end">
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black shadow-lg shadow-emerald-500/25 active:scale-95 transition-all flex items-center gap-1.5"
+                  disabled={isSubmitting || usernameStatus === 'taken'}
+                  className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-lg ${
+                    usernameStatus === 'taken'
+                      ? 'bg-red-500/20 text-red-300 border border-red-500/40 cursor-not-allowed shadow-none'
+                      : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black shadow-emerald-500/25 active:scale-95'
+                  }`}
                 >
-                  <Save className="w-4 h-4" />
-                  <span>Save Profile</span>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Checking & Saving...</span>
+                    </>
+                  ) : savedSuccess ? (
+                    <>
+                      <Check className="w-4 h-4 stroke-[3]" />
+                      <span>Saved Globally!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>Save Profile</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>

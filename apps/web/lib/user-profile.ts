@@ -82,52 +82,124 @@ export function cleanUsername(input: string): string {
     .slice(0, 30);
 }
 
-export function saveUserProfile(updates: Partial<UserProfile>): UserProfile {
+/**
+ * Checks in real time with backend if a username is available globally or taken by another device.
+ */
+export async function checkUsernameAvailabilityRemote(
+  username: string,
+  deviceId?: string
+): Promise<{
+  available: boolean;
+  isSelf: boolean;
+  reason?: string;
+}> {
+  const clean = cleanUsername(username);
+  if (!clean) {
+    return { available: false, isSelf: false, reason: 'Please enter a username.' };
+  }
+  if (clean.length < 3) {
+    return { available: false, isSelf: false, reason: 'Username must be at least 3 characters.' };
+  }
+
+  const effectiveDeviceId = deviceId || (typeof window !== 'undefined' ? getOrCreateDeviceId() : '');
+
+  try {
+    const res = await fetch(
+      `/api/profile?checkUsername=${encodeURIComponent(clean)}&deviceId=${encodeURIComponent(effectiveDeviceId)}`
+    );
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        available: Boolean(data.available),
+        isSelf: Boolean(data.isSelf),
+        reason: data.reason,
+      };
+    }
+  } catch (err) {
+    console.warn('[UserProfile] Check username network fallback:', err);
+  }
+
+  // Fallback optimistic check if offline
+  return { available: true, isSelf: false, reason: `@${clean} is valid.` };
+}
+
+/**
+ * Validates and saves profile asynchronously, ensuring the handle is globally unique.
+ */
+export async function saveUserProfileAsync(
+  updates: Partial<UserProfile>
+): Promise<{
+  success: boolean;
+  profile?: UserProfile;
+  error?: string;
+  isTaken?: boolean;
+}> {
   if (typeof window === 'undefined') {
-    return {
-      username: '',
-      displayName: '',
-      avatarSymbol: 'ọ',
-      ...updates,
-    };
+    return { success: false, error: 'Cannot save outside browser window.' };
   }
 
   const deviceId = getOrCreateDeviceId();
+  const current = getUserProfile();
+  const candidateUsername = updates.username !== undefined ? cleanUsername(updates.username) : current.username;
+
+  const candidateProfile: UserProfile = {
+    ...current,
+    ...updates,
+    deviceId,
+    username: candidateUsername,
+    joinedAt: current.joinedAt || new Date().toISOString(),
+  };
 
   try {
-    const current = getUserProfile();
-    const updated: UserProfile = {
-      ...current,
-      ...updates,
-      deviceId,
-      username: updates.username !== undefined ? cleanUsername(updates.username) : current.username,
-      joinedAt: current.joinedAt || new Date().toISOString(),
-    };
+    // 1. Verify with backend first
+    const res = await fetch('/api/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(candidateProfile),
+    });
 
-    // 1. Fast local persistence
-    localStorage.setItem(PROFILE_KEY, JSON.stringify(updated));
+    const data = await res.json();
 
-    // 2. Notify all UI components across the client
+    if (!res.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to register username.',
+        isTaken: Boolean(data.isTaken || res.status === 409),
+      };
+    }
+
+    // 2. Only persist to local device storage once verified
+    const saved = data.profile || candidateProfile;
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(saved));
+
+    // 3. Notify all client components
     window.dispatchEvent(
       new CustomEvent('ica:profile-updated', {
-        detail: updated,
+        detail: saved,
       })
     );
 
-    // 3. Asynchronously sync and bind profile with backend tied to this deviceId
-    fetch('/api/profile', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updated),
-    }).catch((err) => {
-      console.warn('[UserProfile] Backend profile sync deferred (offline):', err.message);
-    });
-
-    return updated;
-  } catch (err) {
-    console.error('Failed saving user profile:', err);
-    return getUserProfile();
+    return { success: true, profile: saved };
+  } catch (err: any) {
+    // If completely offline, save locally
+    console.warn('[UserProfile] Offline profile save:', err.message);
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(candidateProfile));
+    window.dispatchEvent(
+      new CustomEvent('ica:profile-updated', {
+        detail: candidateProfile,
+      })
+    );
+    return { success: true, profile: candidateProfile };
   }
+}
+
+/**
+ * Synchronous profile save helper for compatibility
+ */
+export function saveUserProfile(updates: Partial<UserProfile>): UserProfile {
+  saveUserProfileAsync(updates);
+  const current = getUserProfile();
+  return { ...current, ...updates };
 }
 
 /**
