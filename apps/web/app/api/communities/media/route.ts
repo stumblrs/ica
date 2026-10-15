@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 import { revalidateAtlasData } from '@/lib/revalidation';
 import { parseMediaUrl } from '@/lib/media';
 import { saveMediaToStore } from '@/lib/community-store';
@@ -59,22 +60,47 @@ export async function POST(req: NextRequest) {
       isVerified: false,
     };
 
-    // Try Prisma DB first
+    // Try Supabase directly first, with Prisma as secondary fallback
     try {
       let existingCommunity: any = null;
       if (communityId) {
-        existingCommunity = await prisma.community.findUnique({
-          where: { id: communityId },
-        });
+        const { data } = await supabase
+          .from('Community')
+          .select('*')
+          .eq('id', communityId)
+          .maybeSingle();
+        existingCommunity = data;
       }
 
       if (!existingCommunity) {
-        existingCommunity = await prisma.community.findFirst({
-          where: {
-            name: { equals: name.trim(), mode: 'insensitive' },
-            ...(stateName ? { stateName: { contains: stateName.trim(), mode: 'insensitive' } } : {}),
-          },
-        });
+        const { data } = await supabase
+          .from('Community')
+          .select('*')
+          .ilike('name', name.trim())
+          .limit(1)
+          .maybeSingle();
+        existingCommunity = data;
+      }
+
+      // If Supabase didn't have it or errored, check Prisma
+      if (!existingCommunity) {
+        try {
+          if (communityId) {
+            existingCommunity = await prisma.community.findUnique({
+              where: { id: communityId },
+            });
+          }
+          if (!existingCommunity) {
+            existingCommunity = await prisma.community.findFirst({
+              where: {
+                name: { equals: name.trim(), mode: 'insensitive' },
+                ...(stateName ? { stateName: { contains: stateName.trim(), mode: 'insensitive' } } : {}),
+              },
+            });
+          }
+        } catch {
+          // Prisma offline
+        }
       }
 
       if (existingCommunity) {
@@ -86,20 +112,42 @@ export async function POST(req: NextRequest) {
         }
         currentEvidence.unshift(mediaEvidenceItem);
 
-        const updated = await prisma.community.update({
-          where: { id: existingCommunity.id },
-          data: {
-            evidenceJson: JSON.stringify(currentEvidence),
-          },
-        });
+        // Update via Supabase
+        let updated: any = null;
+        try {
+          const { data } = await supabase
+            .from('Community')
+            .update({
+              evidenceJson: JSON.stringify(currentEvidence),
+            })
+            .eq('id', existingCommunity.id)
+            .select()
+            .single();
+          updated = data;
+        } catch {}
+
+        // Fallback to Prisma update if needed
+        if (!updated) {
+          try {
+            updated = await prisma.community.update({
+              where: { id: existingCommunity.id },
+              data: {
+                evidenceJson: JSON.stringify(currentEvidence),
+              },
+            });
+          } catch {}
+        }
+
+        if (!updated) {
+          updated = { ...existingCommunity, evidenceJson: JSON.stringify(currentEvidence) };
+        }
 
         try {
-          await prisma.communityAuditLog.create({
-            data: {
-              communityId: updated.id,
-              action: 'MEDIA_ADDED',
-              summary: `Added ${parsedMedia.type} URL (${parsedMedia.provider}) for '${updated.name}'.`,
-            },
+          await supabase.from('CommunityAuditLog').insert({
+            id: 'audit-' + Date.now(),
+            communityId: updated.id,
+            action: 'MEDIA_ADDED',
+            summary: `Added ${parsedMedia.type} URL (${parsedMedia.provider}) for '${updated.name}'.`,
           });
         } catch {}
 
@@ -120,31 +168,64 @@ export async function POST(req: NextRequest) {
         const lat = typeof latitude === 'number' ? latitude : 6.22;
         const lon = typeof longitude === 'number' ? longitude : 7.05;
 
-        const newCommunity = await prisma.community.create({
-          data: {
-            id: 'comm-' + Date.now(),
-            name: name.trim(),
-            type: 'settlement',
-            description: `Documented settlement ${name.trim()} with community visual media.`,
-            latitude: lat,
-            longitude: lon,
-            stateId: 'SE',
-            stateName: stateName?.trim() || 'Anambra',
-            lgaId: 'LGA',
-            lgaName: lgaName?.trim() || 'Awka South',
-            identityStatus: 'confirmed_igbo',
-            languageStatus: 'Central Igbo dialect',
-            verificationStatus: 'verified',
-            lifecycleStatus: 'ACTIVE',
-            confidence: 0.85,
-            evidenceJson: JSON.stringify([mediaEvidenceItem]),
-            confirmationsCount: 1,
-            challengesCount: 0,
-          },
-        });
+        let newCommunity: any = null;
+        try {
+          const { data } = await supabase
+            .from('Community')
+            .insert({
+              id: 'comm-' + Date.now(),
+              name: name.trim(),
+              type: 'settlement',
+              description: `Documented settlement ${name.trim()} with community visual media.`,
+              latitude: lat,
+              longitude: lon,
+              stateId: 'SE',
+              stateName: stateName?.trim() || 'Anambra',
+              lgaId: 'LGA',
+              lgaName: lgaName?.trim() || 'Awka South',
+              identityStatus: 'confirmed_igbo',
+              languageStatus: 'Central Igbo dialect',
+              verificationStatus: 'verified',
+              lifecycleStatus: 'ACTIVE',
+              confidence: 0.85,
+              evidenceJson: JSON.stringify([mediaEvidenceItem]),
+              confirmationsCount: 1,
+              challengesCount: 0,
+            })
+            .select()
+            .single();
+          newCommunity = data;
+        } catch {}
+
+        if (!newCommunity) {
+          try {
+            newCommunity = await prisma.community.create({
+              data: {
+                id: 'comm-' + Date.now(),
+                name: name.trim(),
+                type: 'settlement',
+                description: `Documented settlement ${name.trim()} with community visual media.`,
+                latitude: lat,
+                longitude: lon,
+                stateId: 'SE',
+                stateName: stateName?.trim() || 'Anambra',
+                lgaId: 'LGA',
+                lgaName: lgaName?.trim() || 'Awka South',
+                identityStatus: 'confirmed_igbo',
+                languageStatus: 'Central Igbo dialect',
+                verificationStatus: 'verified',
+                lifecycleStatus: 'ACTIVE',
+                confidence: 0.85,
+                evidenceJson: JSON.stringify([mediaEvidenceItem]),
+                confirmationsCount: 1,
+                challengesCount: 0,
+              },
+            });
+          } catch {}
+        }
 
         // Keep local store in sync
-        saveMediaToStore({ communityId: newCommunity.id, name, latitude, longitude, lgaName, stateName, mediaEvidenceItem });
+        saveMediaToStore({ communityId: newCommunity?.id || 'comm-' + Date.now(), name, latitude, longitude, lgaName, stateName, mediaEvidenceItem });
         revalidateAtlasData();
 
         return NextResponse.json({
@@ -158,7 +239,7 @@ export async function POST(req: NextRequest) {
         }, { status: 201 });
       }
     } catch (dbErr: any) {
-      console.warn('Database server offline (Prisma unreachable). Seamlessly saving to local store:', dbErr.message);
+      console.warn('Database error in media upload. Seamlessly saving to local store:', dbErr.message);
     }
 
     // Resilient fallback: Save directly to communities_store.json

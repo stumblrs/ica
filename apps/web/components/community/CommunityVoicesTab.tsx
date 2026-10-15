@@ -28,6 +28,7 @@ import type { SelectedFeature } from '@/components/map/MapContainer';
 import { MediaGallery } from '@/components/common/MediaGallery';
 import { extractMediaFromText } from '@/lib/media';
 import { getUserProfile, type UserProfile } from '@/lib/user-profile';
+import { supabase } from '@/lib/supabase';
 
 interface CommunityVoicesTabProps {
   communities: CommunitySummary[];
@@ -130,6 +131,71 @@ export function CommunityVoicesTab({
     }
   }, [selectedFeature, communities]);
 
+  // Realtime live subscription with 1200ms batching buffer (conserve free tier egress)
+  useEffect(() => {
+    let buffer: any[] = [];
+    let flushTimer: NodeJS.Timeout | null = null;
+
+    const channel = supabase
+      .channel('living-atlas-comments-live')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'Comment' },
+        (payload) => {
+          const newRecord = payload.new;
+          if (!newRecord) return;
+
+          buffer.push(newRecord);
+
+          // Batch rapid incoming comments into a single state update
+          if (!flushTimer) {
+            flushTimer = setTimeout(() => {
+              if (buffer.length > 0) {
+                const toAdd = [...buffer];
+                buffer = [];
+                flushTimer = null;
+
+                setComments((prev) => {
+                  const existingIds = new Set(prev.map((c) => c.id));
+                  const newEnriched: EnrichedComment[] = [];
+
+                  for (const item of toAdd) {
+                    if (!existingIds.has(item.id)) {
+                      const comm = communities.find((c) => c.id === item.communityId);
+                      newEnriched.push({
+                        id: item.id,
+                        communityId: item.communityId || '',
+                        communityName: comm?.name || 'Community',
+                        lgaName: comm?.lgaName,
+                        stateName: comm?.stateName,
+                        coordinates: [comm?.longitude || 7.0, comm?.latitude || 6.2],
+                        authorName: item.author || 'Contributor',
+                        handle: item.handle || `@${item.author?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'resident'}`,
+                        affiliation: 'Community Member',
+                        category: item.category || 'general',
+                        comment: item.content || '',
+                        likes: item.likes || 0,
+                        createdAt: item.createdAt || new Date().toISOString(),
+                      });
+                    }
+                  }
+
+                  if (newEnriched.length === 0) return prev;
+                  return [...newEnriched, ...prev];
+                });
+              }
+            }, 1200);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (flushTimer) clearTimeout(flushTimer);
+      supabase.removeChannel(channel);
+    };
+  }, [communities]);
+
   useEffect(() => {
     loadInitialComments(selectedState);
   }, [selectedState]);
@@ -137,7 +203,7 @@ export function CommunityVoicesTab({
   async function loadInitialComments(state = selectedState) {
     try {
       setLoading(true);
-      const url = `/api/comments?limit=5${state !== 'all' ? `&state=${encodeURIComponent(state)}` : ''}`;
+      const url = `/api/comments?limit=15${state !== 'all' ? `&state=${encodeURIComponent(state)}` : ''}`;
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
@@ -165,7 +231,7 @@ export function CommunityVoicesTab({
     if (loadingMore || !hasMore || !nextCursor) return;
     try {
       setLoadingMore(true);
-      const url = `/api/comments?limit=5&cursor=${encodeURIComponent(nextCursor)}${selectedState !== 'all' ? `&state=${encodeURIComponent(selectedState)}` : ''}`;
+      const url = `/api/comments?limit=15&cursor=${encodeURIComponent(nextCursor)}${selectedState !== 'all' ? `&state=${encodeURIComponent(selectedState)}` : ''}`;
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();

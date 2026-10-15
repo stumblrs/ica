@@ -1,5 +1,24 @@
 [
   {
+    "id": "cmt_1792107580056_5guhd",
+    "communityId": "c2-enugu",
+    "communityName": "Enugu",
+    "lgaName": "Enugu North",
+    "stateName": "Enugu",
+    "coordinates": [
+      7.4988,
+      6.4413
+    ],
+    "deviceId": null,
+    "authorName": "Adaeze Okoye",
+    "handle": "@adaezeokoye",
+    "affiliation": "Community Member",
+    "category": "oral-history",
+    "comment": "@okafor_native citing your research on Awka blacksmithing guilds!",
+    "likes": 0,
+    "createdAt": "2026-10-15T23:39:40.056Z"
+  },
+  {
     "id": "cmt_1792069603133_krqio",
     "communityId": "c2-enugu",
     "communityName": "Enugu",

@@ -1,15 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 import {
   getProfileByDeviceId,
   saveProfileForDevice,
   readProfilesStore,
   checkUsernameAvailability,
   cleanUsername,
+  RESERVED_USERNAMES,
   type StoredUserProfile,
 } from '@/lib/profile-store';
 
 export const dynamic = 'force-dynamic';
+
+// Micro-cache for username availability checks to prevent Supabase egress exhaustion
+interface CacheEntry {
+  available: boolean;
+  isSelf: boolean;
+  reason?: string;
+  timestamp: number;
+}
+const usernameCheckCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 15000; // 15 seconds
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -18,35 +30,97 @@ export async function GET(request: NextRequest) {
   const username = searchParams.get('username')?.toLowerCase().replace(/^@+/, '').trim();
 
   try {
-    // 1. Real-time Username Availability Check
+    // 1. Real-time Username Availability Check (with batch/egress caching)
     if (checkUsername !== null) {
       const targetHandle = cleanUsername(checkUsername);
-      const result = checkUsernameAvailability(targetHandle, deviceId || undefined);
+      const cacheKey = `${targetHandle}:${deviceId || ''}`;
+      const now = Date.now();
+
+      const cached = usernameCheckCache.get(cacheKey);
+      if (cached && now - cached.timestamp < CACHE_TTL_MS) {
+        return NextResponse.json({
+          username: targetHandle,
+          available: cached.available,
+          isSelf: cached.isSelf,
+          reason: cached.reason,
+        });
+      }
+
+      if (RESERVED_USERNAMES.has(targetHandle)) {
+        return NextResponse.json({
+          username: targetHandle,
+          available: false,
+          isSelf: false,
+          reason: `@${targetHandle} is a reserved system handle.`,
+        });
+      }
+
+      let isAvailable = true;
+      let isSelf = false;
+      let reason = `@${targetHandle} is available!`;
+
+      // Check Supabase first
+      try {
+        const { data: existing, error } = await supabase
+          .from('Profile')
+          .select('deviceId, username')
+          .eq('username', targetHandle)
+          .maybeSingle();
+
+        if (!error && existing) {
+          if (deviceId && existing.deviceId === deviceId) {
+            isSelf = true;
+            isAvailable = true;
+            reason = `@${targetHandle} is already registered to your device.`;
+          } else {
+            isAvailable = false;
+            reason = `@${targetHandle} is already registered by another contributor.`;
+          }
+        }
+      } catch (sbErr) {
+        // Fallback to local store
+        const fileCheck = checkUsernameAvailability(targetHandle, deviceId || undefined);
+        isAvailable = fileCheck.available;
+        isSelf = Boolean(fileCheck.isSelf);
+        reason = fileCheck.reason || (isAvailable ? `@${targetHandle} is available!` : `@${targetHandle} is taken.`);
+      }
+
+      // Store in micro-cache
+      usernameCheckCache.set(cacheKey, {
+        available: isAvailable,
+        isSelf,
+        reason,
+        timestamp: now,
+      });
+
       return NextResponse.json({
         username: targetHandle,
-        available: result.available,
-        isSelf: result.isSelf,
-        reason: result.reason,
+        available: isAvailable,
+        isSelf,
+        reason,
       });
     }
 
     // 2. By Device ID lookup
     if (deviceId) {
-      const fileProfile = getProfileByDeviceId(deviceId);
-
-      // Attempt Prisma lookup if online
+      // Try Supabase Profile first
       try {
-        const device = await prisma.device.findUnique({
-          where: { id: deviceId },
-        });
+        const { data: sbProfile, error } = await supabase
+          .from('Profile')
+          .select('deviceId, username, displayName, homeTown, stateOfOrigin, kindredClan, bio, avatarSymbol, role, createdAt, updatedAt')
+          .eq('deviceId', deviceId)
+          .maybeSingle();
 
-        if (device && fileProfile) {
-          return NextResponse.json({ ...fileProfile, trustScore: device.trustScore });
+        if (!error && sbProfile) {
+          return NextResponse.json({
+            ...sbProfile,
+            autoSignContributions: true,
+          });
         }
-      } catch {
-        // Postgres offline - proceed with fileProfile
-      }
+      } catch {}
 
+      // Fallback to local file store
+      const fileProfile = getProfileByDeviceId(deviceId);
       if (fileProfile) {
         return NextResponse.json(fileProfile);
       }
@@ -54,6 +128,18 @@ export async function GET(request: NextRequest) {
 
     // 3. By Username lookup
     if (username) {
+      try {
+        const { data: sbProfile, error } = await supabase
+          .from('Profile')
+          .select('deviceId, username, displayName, homeTown, stateOfOrigin, kindredClan, bio, avatarSymbol, role, createdAt, updatedAt')
+          .eq('username', cleanUsername(username))
+          .maybeSingle();
+
+        if (!error && sbProfile) {
+          return NextResponse.json(sbProfile);
+        }
+      } catch {}
+
       const allProfiles = readProfilesStore();
       const match = Object.values(allProfiles).find(
         (p) => cleanUsername(p.username) === cleanUsername(username)
@@ -95,63 +181,117 @@ export async function POST(request: NextRequest) {
 
     const cleanHandle = username ? cleanUsername(username) : '';
 
-    // 1. Validate global unique handle if username is provided
+    // 1. Validate unique handle in Supabase
     if (cleanHandle) {
-      const check = checkUsernameAvailability(cleanHandle, deviceId);
-      if (!check.available && !check.isSelf) {
+      if (RESERVED_USERNAMES.has(cleanHandle)) {
         return NextResponse.json(
-          {
-            error: `The handle @${cleanHandle} is already taken by another contributor. Please choose a different username.`,
-            isTaken: true,
-            username: cleanHandle,
-          },
-          { status: 409 }
+          { error: `@${cleanHandle} is a reserved system handle.` },
+          { status: 400 }
         );
+      }
+
+      try {
+        const { data: existing, error } = await supabase
+          .from('Profile')
+          .select('deviceId, username')
+          .eq('username', cleanHandle)
+          .maybeSingle();
+
+        if (!error && existing && existing.deviceId !== deviceId) {
+          return NextResponse.json(
+            {
+              error: `The handle @${cleanHandle} is already taken by another contributor. Please choose a different username.`,
+              isTaken: true,
+              username: cleanHandle,
+            },
+            { status: 409 }
+          );
+        }
+      } catch {
+        const check = checkUsernameAvailability(cleanHandle, deviceId);
+        if (!check.available && !check.isSelf) {
+          return NextResponse.json(
+            {
+              error: `The handle @${cleanHandle} is already taken by another contributor.`,
+              isTaken: true,
+              username: cleanHandle,
+            },
+            { status: 409 }
+          );
+        }
       }
     }
 
-    // 2. Save to persistent offline-first profile store
-    let savedProfile: StoredUserProfile;
+    const targetDisplayName = displayName ? String(displayName).trim() : cleanHandle ? `@${cleanHandle}` : 'Contributor';
+    const targetAvatar = avatarSymbol || 'ọ';
+    const targetRole = role || 'Native Contributor';
+    const targetTown = homeTown ? String(homeTown).trim() : null;
+    const targetState = stateOfOrigin ? String(stateOfOrigin).trim() : null;
+    const targetClan = kindredClan ? String(kindredClan).trim() : null;
+    const targetBio = bio ? String(bio).trim() : null;
+
+    // 2. Persist to Supabase Profile table
+    let savedProfile: any = null;
     try {
-      savedProfile = saveProfileForDevice(deviceId, {
-        deviceId,
-        username: cleanHandle,
-        displayName: displayName ? String(displayName).trim() : '',
-        homeTown: homeTown ? String(homeTown).trim() : '',
-        stateOfOrigin: stateOfOrigin ? String(stateOfOrigin).trim() : '',
-        kindredClan: kindredClan ? String(kindredClan).trim() : '',
-        bio: bio ? String(bio).trim() : '',
-        avatarSymbol: avatarSymbol || 'ọ',
-        role: role || 'Native Contributor',
-        autoSignContributions: autoSignContributions ?? true,
-      });
-    } catch (saveErr: any) {
-      return NextResponse.json(
-        { error: saveErr.message || 'Failed saving profile.' },
-        { status: 409 }
-      );
+      const { data: sbSaved, error: sbErr } = await supabase
+        .from('Profile')
+        .upsert({
+          deviceId,
+          username: cleanHandle,
+          displayName: targetDisplayName,
+          homeTown: targetTown,
+          stateOfOrigin: targetState,
+          kindredClan: targetClan,
+          bio: targetBio,
+          avatarSymbol: targetAvatar,
+          role: targetRole,
+          updatedAt: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (!sbErr && sbSaved) {
+        savedProfile = sbSaved;
+      }
+    } catch (err: any) {
+      console.warn('[ProfileAPI] Supabase Profile upsert failed, falling back to local file store:', err.message);
     }
 
-    // 3. Upsert in PostgreSQL Prisma Device model if reachable
+    // 3. Also update Device table in Supabase / Prisma
     try {
-      await prisma.device.upsert({
-        where: { id: deviceId },
-        update: {
-          lastActiveAt: new Date(),
-        },
-        create: {
-          id: deviceId,
-          trustScore: 100,
-        },
+      await supabase.from('Device').upsert({ id: deviceId, trustScore: 100 }).select();
+    } catch {}
+
+    // 4. Mirror to local file store as offline backup
+    try {
+      const fileSaved = saveProfileForDevice(deviceId, {
+        deviceId,
+        username: cleanHandle,
+        displayName: targetDisplayName,
+        homeTown: targetTown || '',
+        stateOfOrigin: targetState || '',
+        kindredClan: targetClan || '',
+        bio: targetBio || '',
+        avatarSymbol: targetAvatar,
+        role: targetRole,
+        autoSignContributions: autoSignContributions ?? true,
       });
-    } catch (err: any) {
-      console.warn(`[ProfileAPI] PostgreSQL offline (${err.message}). Profile safely persisted in profiles_store.json.`);
+      if (!savedProfile) savedProfile = fileSaved;
+    } catch {}
+
+    // Clear username check micro-cache for this handle
+    if (cleanHandle) {
+      usernameCheckCache.delete(`${cleanHandle}:${deviceId}`);
+      usernameCheckCache.delete(`${cleanHandle}:`);
     }
 
     return NextResponse.json({
       success: true,
-      profile: savedProfile,
-      message: 'Profile successfully linked to device and synced to backend.',
+      profile: {
+        ...savedProfile,
+        autoSignContributions: autoSignContributions ?? true,
+      },
+      message: 'Profile successfully linked to device and synchronized globally.',
     });
   } catch (error: any) {
     console.error('Error saving profile in POST:', error);

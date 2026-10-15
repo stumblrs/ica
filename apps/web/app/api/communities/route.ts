@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 import { revalidateAtlasData } from '@/lib/revalidation';
 import { readCommunityStore, writeCommunityStore } from '@/lib/community-store';
 
@@ -48,17 +49,69 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const communities = await prisma.community.findMany({
-      where,
-      orderBy: [{ confidence: 'desc' }, { name: 'asc' }],
-    });
+    let communities: any[] | null = null;
 
-    const parsed = communities.map((c) => ({
-      ...c,
-      evidence: c.evidenceJson ? JSON.parse(c.evidenceJson) : [],
-    }));
+    // 1. Query Supabase directly first (stateless HTTPS PostgREST)
+    try {
+      let query = supabase.from('Community').select('*');
 
-    return NextResponse.json(parsed);
+      if (q) {
+        query = query.or(`name.ilike.%${q}%,lgaName.ilike.%${q}%,stateName.ilike.%${q}%`);
+      }
+
+      if (state) {
+        query = query.or(`stateName.ilike.%${state}%,stateId.ilike.%${state}%`);
+      }
+
+      if (status) {
+        query = query.eq('verificationStatus', status);
+      }
+
+      if (lifecycle && lifecycle !== 'all') {
+        if (lifecycle === 'active') {
+          query = query.eq('lifecycleStatus', 'ACTIVE');
+        } else if (lifecycle === 'delisted' || lifecycle === 'dormant') {
+          query = query.eq('lifecycleStatus', 'DELISTED');
+        } else if (lifecycle === 'contested') {
+          query = query.in('lifecycleStatus', ['CONTESTED_DELIST', 'CONTESTED_REINSTATE']);
+        }
+      }
+
+      const { data, error } = await query
+        .order('confidence', { ascending: false })
+        .order('name', { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        communities = data;
+      }
+    } catch (sbErr) {
+      // Supabase query fallback
+    }
+
+    // 2. Secondary fallback to Prisma if Supabase was unavailable
+    if (!communities) {
+      try {
+        communities = await prisma.community.findMany({
+          where,
+          orderBy: [{ confidence: 'desc' }, { name: 'asc' }],
+        });
+      } catch (prismaErr) {
+        // Prisma unreachable
+      }
+    }
+
+    if (communities && communities.length > 0) {
+      const parsed = communities.map((c) => ({
+        ...c,
+        evidence: c.evidenceJson ? (typeof c.evidenceJson === 'string' ? JSON.parse(c.evidenceJson) : c.evidenceJson) : [],
+      }));
+
+      return NextResponse.json(parsed);
+    }
+
+    // 3. Fallback to local store if both database methods returned no records
+    const store = readCommunityStore();
+    return NextResponse.json(store);
   } catch (err: any) {
     console.warn('Database query error in /api/communities, falling back to local store:', err.message);
     const store = readCommunityStore();

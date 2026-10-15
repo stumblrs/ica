@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 import {
   saveCommentToStore,
   getCommentsFromStore,
@@ -11,6 +12,18 @@ import { createNotification } from '@/lib/notification-store';
 import { findProfileByUsername } from '@/lib/profile-store';
 
 export const dynamic = 'force-dynamic';
+
+// In-memory microcache to avoid Supabase egress exhaustion on repeated feed loads
+interface CommentsCacheEntry {
+  data: { comments: EnrichedComment[]; nextCursor: string | null; hasMore: boolean };
+  timestamp: number;
+}
+const commentsCache = new Map<string, CommentsCacheEntry>();
+const CACHE_TTL_MS = 10000; // 10 seconds
+
+function invalidateCommentsCache() {
+  commentsCache.clear();
+}
 
 export interface EnrichedComment {
   id: string;
@@ -41,7 +54,16 @@ export async function GET(req: NextRequest) {
   const stateFilter = searchParams.get('state')?.toLowerCase();
   const communityId = searchParams.get('communityId') || undefined;
   const cursor = searchParams.get('cursor') || undefined;
-  const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '10', 10), 1), 50);
+  const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '15', 10), 1), 50);
+
+  // Egress optimization: check microcache
+  const cacheKey = `${stateFilter || 'all'}:${communityId || 'all'}:${cursor || 'start'}:${limit}`;
+  const cached = commentsCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return NextResponse.json(cached.data, {
+      headers: { 'x-cache': 'HIT', 'Cache-Control': 'public, max-age=10, stale-while-revalidate=30' },
+    });
+  }
 
   // 1. Load comments from local offline-first persistent store
   const storeComments = readCommentsStore();
@@ -66,42 +88,89 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // 2. Also query PostgreSQL if available, and merge
+  // 2. Query Supabase directly first, with Prisma as fallback
   try {
-    const dbComments = await prisma.comment.findMany({
-      include: {
-        community: {
-          select: {
-            id: true,
-            name: true,
-            lgaName: true,
-            stateName: true,
-            longitude: true,
-            latitude: true,
+    const { data: sbComments, error: sbErr } = await supabase
+      .from('Comment')
+      .select(`
+        id,
+        communityId,
+        author,
+        handle,
+        content,
+        category,
+        likes,
+        createdAt,
+        community:Community (
+          id,
+          name,
+          lgaName,
+          stateName,
+          longitude,
+          latitude
+        )
+      `)
+      .order('createdAt', { ascending: false })
+      .limit(100);
+
+    if (!sbErr && sbComments) {
+      for (const cmt of sbComments as any[]) {
+        if (!commentsMap.has(cmt.id)) {
+          const comm = Array.isArray(cmt.community) ? cmt.community[0] : cmt.community;
+          commentsMap.set(cmt.id, {
+            id: cmt.id,
+            communityId: cmt.communityId || '',
+            communityName: comm?.name || 'Community',
+            lgaName: comm?.lgaName,
+            stateName: comm?.stateName,
+            coordinates: [comm?.longitude || 7.0, comm?.latitude || 6.2],
+            authorName: cmt.author,
+            handle: cmt.handle || `@${cmt.author?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'resident'}`,
+            affiliation: 'Community Member',
+            category: cmt.category,
+            comment: cmt.content,
+            likes: cmt.likes || 0,
+            createdAt: typeof cmt.createdAt === 'string' ? cmt.createdAt : new Date(cmt.createdAt).toISOString(),
+          });
+        }
+      }
+    } else {
+      // Supabase PostgREST had an issue, fallback to Prisma
+      const dbComments = await prisma.comment.findMany({
+        include: {
+          community: {
+            select: {
+              id: true,
+              name: true,
+              lgaName: true,
+              stateName: true,
+              longitude: true,
+              latitude: true,
+            },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    });
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      });
 
-    for (const cmt of dbComments) {
-      if (!commentsMap.has(cmt.id)) {
-        commentsMap.set(cmt.id, {
-          id: cmt.id,
-          communityId: cmt.communityId || '',
-          communityName: cmt.community?.name || 'Community',
-          lgaName: cmt.community?.lgaName,
-          stateName: cmt.community?.stateName,
-          coordinates: [cmt.community?.longitude || 7.0, cmt.community?.latitude || 6.2],
-          authorName: cmt.author,
-          handle: cmt.handle || `@${cmt.author.toLowerCase().replace(/[^a-z0-9]/g, '') || 'resident'}`,
-          affiliation: 'Community Member',
-          category: cmt.category,
-          comment: cmt.content,
-          likes: cmt.likes,
-          createdAt: cmt.createdAt.toISOString(),
-        });
+      for (const cmt of dbComments) {
+        if (!commentsMap.has(cmt.id)) {
+          commentsMap.set(cmt.id, {
+            id: cmt.id,
+            communityId: cmt.communityId || '',
+            communityName: cmt.community?.name || 'Community',
+            lgaName: cmt.community?.lgaName,
+            stateName: cmt.community?.stateName,
+            coordinates: [cmt.community?.longitude || 7.0, cmt.community?.latitude || 6.2],
+            authorName: cmt.author,
+            handle: cmt.handle || `@${cmt.author.toLowerCase().replace(/[^a-z0-9]/g, '') || 'resident'}`,
+            affiliation: 'Community Member',
+            category: cmt.category,
+            comment: cmt.content,
+            likes: cmt.likes,
+            createdAt: cmt.createdAt.toISOString(),
+          });
+        }
       }
     }
   } catch (err: any) {
@@ -139,10 +208,20 @@ export async function GET(req: NextRequest) {
   const hasMore = startIndex + limit < allUnified.length;
   const nextCursor = hasMore && sliced.length > 0 ? sliced[sliced.length - 1].id : null;
 
-  return NextResponse.json({
+  const resultPayload = {
     comments: sliced,
     nextCursor,
     hasMore,
+  };
+
+  // Cache response to protect free tier egress
+  commentsCache.set(cacheKey, {
+    data: resultPayload,
+    timestamp: Date.now(),
+  });
+
+  return NextResponse.json(resultPayload, {
+    headers: { 'x-cache': 'MISS', 'Cache-Control': 'public, max-age=10, stale-while-revalidate=30' },
   });
 }
 
@@ -238,7 +317,8 @@ export async function POST(req: NextRequest) {
       // Dispatch in-app notification for each mentioned contributor
       for (const citedUser of Array.from(citedHandles)) {
         const ownerProfile = findProfileByUsername(citedUser);
-        createNotification({
+        const notifItem = {
+          id: `ntf_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
           recipientDeviceId: ownerProfile?.deviceId || null,
           recipientHandle: `@${citedUser}`,
           actorHandle: targetHandle,
@@ -246,41 +326,82 @@ export async function POST(req: NextRequest) {
           commentId: stored.id,
           communityId: stored.communityId,
           communityName: stored.communityName,
-          coordinates: stored.coordinates,
+          coordinates: JSON.stringify(stored.coordinates),
           snippet: targetComment.trim(),
-          type: replyToHandle ? 'citation' : 'mention',
+          type: (replyToHandle ? 'citation' : 'mention') as 'citation' | 'mention',
+          isRead: false,
+        };
+
+        // 1. Persist to Supabase Notification table
+        try {
+          await supabase.from('Notification').insert(notifItem);
+        } catch (sbNotifErr: any) {
+          console.warn('[CommentsAPI] Supabase Notification insert error:', sbNotifErr.message);
+        }
+
+        // 2. Mirror to local file store
+        createNotification({
+          ...notifItem,
+          coordinates: stored.coordinates,
         });
       }
     } catch (notifErr: any) {
       console.warn('[CommentsAPI] Notification trigger error:', notifErr.message);
     }
 
-    // 5. Also persist to PostgreSQL if online
+    // 5. Persist to Supabase directly first, with Prisma as secondary fallback
     try {
       if (deviceId) {
-        await prisma.device.upsert({
-          where: { id: deviceId },
-          update: {},
-          create: { id: deviceId, trustScore: 100 },
-        });
+        await supabase
+          .from('Device')
+          .upsert({ id: deviceId, trustScore: 100 })
+          .select();
       }
 
-      await prisma.comment.create({
-        data: {
-          id: stored.id,
-          communityId,
-          deviceId: deviceId || null,
-          author: targetAuthor,
-          handle: targetHandle,
-          content: targetComment.trim(),
-          category,
-          location: location || null,
-          likes: 0,
-        },
+      const { error: insertError } = await supabase.from('Comment').insert({
+        id: stored.id,
+        communityId,
+        deviceId: deviceId || null,
+        author: targetAuthor,
+        handle: targetHandle,
+        content: targetComment.trim(),
+        category,
+        location: location || null,
+        likes: 0,
       });
+
+      if (insertError) {
+        // Fallback to Prisma if Supabase reported an error
+        try {
+          if (deviceId) {
+            await prisma.device.upsert({
+              where: { id: deviceId },
+              update: {},
+              create: { id: deviceId, trustScore: 100 },
+            });
+          }
+
+          await prisma.comment.create({
+            data: {
+              id: stored.id,
+              communityId,
+              deviceId: deviceId || null,
+              author: targetAuthor,
+              handle: targetHandle,
+              content: targetComment.trim(),
+              category,
+              location: location || null,
+              likes: 0,
+            },
+          });
+        } catch {}
+      }
     } catch (dbErr: any) {
-      // Prisma offline - safely ignored
+      // Database offline - safely saved in persistent store
     }
+
+    // Invalidate comments microcache so newly posted comment is instantly visible
+    invalidateCommentsCache();
 
     return NextResponse.json(stored, { status: 201 });
   } catch (err: any) {

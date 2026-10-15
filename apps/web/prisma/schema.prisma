@@ -122,3 +122,41 @@ model Comment {
   likes       Int       @default(0)
   createdAt   DateTime  @default(now())
 }
+
+// 7. Contributor Profile (Global Identity Bound to Device)
+model Profile {
+  deviceId      String   @id
+  username      String   @unique
+  displayName   String
+  homeTown      String?
+  stateOfOrigin String?
+  kindredClan   String?
+  bio           String?
+  avatarSymbol  String   @default("ọ")
+  role          String   @default("Native Contributor")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([username])
+}
+
+// 8. In-App Citation & Mention Notifications (Zero-Cost Global Notifications)
+model Notification {
+  id                String   @id @default(cuid())
+  recipientDeviceId String?
+  recipientHandle   String
+  actorHandle       String
+  actorName         String
+  commentId         String?
+  communityId       String?
+  communityName     String?
+  coordinates       String?  // JSON stringified coordinates [lng, lat]
+  snippet           String
+  type              String   @default("citation") // citation, mention
+  isRead            Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  @@index([recipientHandle, isRead])
+  @@index([recipientDeviceId, isRead])
+}
+

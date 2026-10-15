@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Bell, Quote, CheckCheck, X, ExternalLink, MessageSquare, MapPin } from 'lucide-react';
 import { getUserProfile, type UserProfile } from '@/lib/user-profile';
 import type { StoredNotification } from '@/lib/notification-store';
+import { supabase } from '@/lib/supabase';
 
 export function AppBarNotificationBell() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -19,6 +20,11 @@ export function AppBarNotificationBell() {
     setProfile(p);
 
     function fetchNotifications() {
+      // Egress optimization: skip polling if tab is hidden / backgrounded
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return;
+      }
+
       const active = getUserProfile();
       if (!active.deviceId && !active.username) return;
 
@@ -39,8 +45,55 @@ export function AppBarNotificationBell() {
 
     fetchNotifications();
 
-    // Check periodically for new notifications (zero cost polling)
-    const interval = setInterval(fetchNotifications, 25000);
+    // 1. Supabase Realtime for instant notification push without polling egress
+    const notifChannel = supabase
+      .channel(`user-notifs-${p.username || p.deviceId || 'global'}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'Notification' },
+        (payload) => {
+          const newNotif = payload.new as any;
+          if (!newNotif) return;
+
+          const currentProfile = getUserProfile();
+          const targetHandle = currentProfile.username ? `@${currentProfile.username.toLowerCase()}` : '';
+
+          const isTargeted =
+            (newNotif.recipientDeviceId && newNotif.recipientDeviceId === currentProfile.deviceId) ||
+            (newNotif.recipientHandle && targetHandle && newNotif.recipientHandle.toLowerCase() === targetHandle);
+
+          if (isTargeted) {
+            const parsed: StoredNotification = {
+              id: String(newNotif.id),
+              recipientDeviceId: newNotif.recipientDeviceId || null,
+              recipientHandle: String(newNotif.recipientHandle),
+              actorHandle: String(newNotif.actorHandle),
+              actorName: String(newNotif.actorName),
+              commentId: newNotif.commentId || null,
+              communityId: newNotif.communityId || null,
+              communityName: newNotif.communityName || null,
+              coordinates: typeof newNotif.coordinates === 'string' ? JSON.parse(newNotif.coordinates) : newNotif.coordinates,
+              snippet: String(newNotif.snippet),
+              type: (newNotif.type || 'citation') as 'citation' | 'mention',
+              isRead: Boolean(newNotif.isRead),
+              createdAt: String(newNotif.createdAt || new Date().toISOString()),
+            };
+            setNotifications((prev) => [parsed, ...prev.filter((n) => n.id !== parsed.id)]);
+            setUnreadCount((c) => c + 1);
+          }
+        }
+      )
+      .subscribe();
+
+    // 2. Low-frequency fallback polling (90 seconds, only active when window is visible)
+    const interval = setInterval(fetchNotifications, 90000);
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        fetchNotifications();
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     // Close on outside click
     function handleClickOutside(e: MouseEvent) {
@@ -52,7 +105,9 @@ export function AppBarNotificationBell() {
 
     return () => {
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       document.removeEventListener('mousedown', handleClickOutside);
+      supabase.removeChannel(notifChannel);
     };
   }, []);
 

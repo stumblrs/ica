@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 import {
   saveCommentToStore,
   getCommentsFromStore,
@@ -17,7 +18,33 @@ export async function GET(
 ) {
   const { id } = params;
 
-  // 1. Try Prisma first
+  // 1. Try Supabase directly first
+  try {
+    const { data: comments, error } = await supabase
+      .from('Comment')
+      .select('id, communityId, author, handle, content, category, likes, createdAt')
+      .eq('communityId', id)
+      .order('createdAt', { ascending: false });
+
+    if (!error && comments && comments.length > 0) {
+      const formatted = comments.map((c) => ({
+        id: c.id,
+        communityId: c.communityId,
+        authorName: c.author,
+        handle: c.handle || `@${c.author?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'resident'}`,
+        affiliation: 'Community Member',
+        comment: c.content,
+        likes: c.likes || 0,
+        category: c.category,
+        createdAt: typeof c.createdAt === 'string' ? c.createdAt : new Date(c.createdAt).toISOString(),
+      }));
+      return NextResponse.json(formatted);
+    }
+  } catch (err: any) {
+    // Supabase error fallback
+  }
+
+  // 2. Try Prisma fallback
   try {
     const comments = await prisma.comment.findMany({
       where: { communityId: id },
@@ -42,7 +69,7 @@ export async function GET(
     console.warn(`[CommunityCommentsAPI] PostgreSQL offline: ${err.message}. Reading from store.`);
   }
 
-  // 2. Offline store fallback
+  // 3. Offline store fallback
   const storeResult = getCommentsFromStore({ communityId: id, limit: 50 });
   return NextResponse.json(storeResult.comments);
 }
@@ -82,17 +109,49 @@ export async function POST(
       deviceId,
     });
 
-    // 2. Also try PostgreSQL if available
+    // 2. Persist to Supabase directly first, with Prisma as secondary fallback
     try {
       if (deviceId) {
-        await prisma.device.upsert({
-          where: { id: deviceId },
-          update: {},
-          create: { id: deviceId, trustScore: 100 },
-        });
+        await supabase
+          .from('Device')
+          .upsert({ id: deviceId, trustScore: 100 })
+          .select();
       }
 
-      const created = await prisma.comment.create({
+      const { data: created, error } = await supabase
+        .from('Comment')
+        .insert({
+          id: stored.id,
+          communityId: id,
+          deviceId: deviceId || null,
+          author: cleanAuthor,
+          handle: cleanHandle,
+          content: commentText.trim(),
+          category,
+          likes: 0,
+        })
+        .select()
+        .single();
+
+      if (!error && created) {
+        return NextResponse.json(
+          {
+            id: created.id,
+            communityId: created.communityId,
+            authorName: created.author,
+            handle: created.handle,
+            affiliation: affiliation || 'Community Member',
+            comment: created.content,
+            likes: created.likes || 0,
+            category: created.category,
+            createdAt: typeof created.createdAt === 'string' ? created.createdAt : new Date(created.createdAt).toISOString(),
+          },
+          { status: 201 }
+        );
+      }
+
+      // Fallback to Prisma if Supabase had an error
+      const prismaCreated = await prisma.comment.create({
         data: {
           id: stored.id,
           communityId: id,
@@ -107,20 +166,20 @@ export async function POST(
 
       return NextResponse.json(
         {
-          id: created.id,
-          communityId: created.communityId,
-          authorName: created.author,
-          handle: created.handle,
+          id: prismaCreated.id,
+          communityId: prismaCreated.communityId,
+          authorName: prismaCreated.author,
+          handle: prismaCreated.handle,
           affiliation: affiliation || 'Community Member',
-          comment: created.content,
-          likes: created.likes,
-          category: created.category,
-          createdAt: created.createdAt.toISOString(),
+          comment: prismaCreated.content,
+          likes: prismaCreated.likes,
+          category: prismaCreated.category,
+          createdAt: prismaCreated.createdAt.toISOString(),
         },
         { status: 201 }
       );
     } catch (dbErr: any) {
-      console.warn(`[CommunityCommentsAPI] PostgreSQL offline (${dbErr.message}). Persisted to comments_store.json.`);
+      console.warn(`[CommunityCommentsAPI] Database error (${dbErr.message}). Persisted to comments_store.json.`);
     }
 
     // Return stored comment

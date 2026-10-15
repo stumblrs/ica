@@ -14,10 +14,13 @@ import {
   HardDrive,
   Info,
   CheckCircle2,
+  AlertCircle,
+  Loader2,
 } from 'lucide-react';
 import {
   getUserProfile,
-  saveUserProfile,
+  saveUserProfileAsync,
+  checkUsernameAvailabilityRemote,
   cleanUsername,
   DEFAULT_AVATARS,
   type UserProfile,
@@ -43,6 +46,16 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
   const [activeTab, setActiveTab] = useState<'profile' | 'settings'>('profile');
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [cacheCleared, setCacheCleared] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Debounced handle check state
+  const [checkingHandle, setCheckingHandle] = useState(false);
+  const [handleStatus, setHandleStatus] = useState<{
+    available: boolean;
+    isSelf: boolean;
+    reason?: string;
+  } | null>(null);
 
   // Sync state on open
   useEffect(() => {
@@ -60,33 +73,90 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
       setAutoSign(current.autoSignContributions ?? true);
       setSavedSuccess(false);
       setCacheCleared(false);
+      setSaveError(null);
+      setHandleStatus(null);
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
   const sanitizedHandle = cleanUsername(usernameInput);
 
-  function handleSave(e: React.FormEvent) {
-    e.preventDefault();
-    const updated = saveUserProfile({
-      username: sanitizedHandle,
-      displayName: displayName.trim(),
-      homeTown: homeTown.trim(),
-      stateOfOrigin: stateOfOrigin.trim(),
-      kindredClan: kindredClan.trim(),
-      bio: bio.trim(),
-      avatarSymbol: avatarSymbol || 'ọ',
-      role,
-      autoSignContributions: autoSign,
-    });
+  // Live debounced availability check
+  useEffect(() => {
+    if (!sanitizedHandle || sanitizedHandle.length < 3) {
+      setHandleStatus(null);
+      setCheckingHandle(false);
+      return;
+    }
 
-    setProfile(updated);
-    setSavedSuccess(true);
-    setTimeout(() => {
-      setSavedSuccess(false);
-      onClose();
-    }, 700);
+    if (profile.username && sanitizedHandle === profile.username) {
+      setHandleStatus({
+        available: true,
+        isSelf: true,
+        reason: 'Your registered handle.',
+      });
+      setCheckingHandle(false);
+      return;
+    }
+
+    setCheckingHandle(true);
+    const timer = setTimeout(async () => {
+      try {
+        const result = await checkUsernameAvailabilityRemote(sanitizedHandle, profile.deviceId);
+        setHandleStatus(result);
+      } catch {
+        setHandleStatus({ available: true, isSelf: false });
+      } finally {
+        setCheckingHandle(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [sanitizedHandle, profile.username, profile.deviceId]);
+
+  if (!isOpen) return null;
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setSaveError(null);
+
+    if (handleStatus && !handleStatus.available && !handleStatus.isSelf) {
+      setSaveError(handleStatus.reason || `The handle @${sanitizedHandle} is already registered.`);
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const res = await saveUserProfileAsync({
+        username: sanitizedHandle,
+        displayName: displayName.trim(),
+        homeTown: homeTown.trim(),
+        stateOfOrigin: stateOfOrigin.trim(),
+        kindredClan: kindredClan.trim(),
+        bio: bio.trim(),
+        avatarSymbol: avatarSymbol || 'ọ',
+        role,
+        autoSignContributions: autoSign,
+      });
+
+      if (!res.success) {
+        setSaveError(res.error || 'Failed to save profile.');
+        setIsSaving(false);
+        return;
+      }
+
+      if (res.profile) {
+        setProfile(res.profile);
+      }
+      setSavedSuccess(true);
+      setTimeout(() => {
+        setSavedSuccess(false);
+        onClose();
+      }, 600);
+    } catch (err: any) {
+      setSaveError(err.message || 'Error saving profile.');
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   function handleClearCache() {
@@ -200,9 +270,26 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
               <div>
                 <label className="block text-xs font-semibold text-slate-200 mb-1.5 flex items-center justify-between">
                   <span>Contributor Handle (@username)</span>
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    {sanitizedHandle ? `@${sanitizedHandle}` : 'Required for attributions'}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {checkingHandle && (
+                      <span className="text-[11px] text-slate-400 flex items-center gap-1 font-mono">
+                        <Loader2 className="w-3 h-3 animate-spin text-emerald-400" /> Checking...
+                      </span>
+                    )}
+                    {!checkingHandle && handleStatus && handleStatus.available && (
+                      <span className="text-[11px] text-emerald-400 flex items-center gap-1 font-mono">
+                        <CheckCircle2 className="w-3 h-3" /> Available
+                      </span>
+                    )}
+                    {!checkingHandle && handleStatus && !handleStatus.available && (
+                      <span className="text-[11px] text-rose-400 flex items-center gap-1 font-mono">
+                        <AlertCircle className="w-3 h-3" /> Taken
+                      </span>
+                    )}
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {sanitizedHandle ? `@${sanitizedHandle}` : 'Required'}
+                    </span>
+                  </div>
                 </label>
                 <div className="relative flex items-center">
                   <div className="absolute left-3 text-emerald-400 font-mono font-bold text-sm pointer-events-none">
@@ -211,17 +298,39 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
                   <input
                     type="text"
                     value={usernameInput}
-                    onChange={(e) => setUsernameInput(e.target.value)}
+                    onChange={(e) => {
+                      setUsernameInput(e.target.value);
+                      if (saveError) setSaveError(null);
+                    }}
                     placeholder="e.g. okafor_native or awka_mapper"
                     required
                     maxLength={30}
-                    className="w-full pl-8 pr-3 py-2 bg-white/[0.04] border border-white/[0.12] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-colors font-mono"
+                    className={`w-full pl-8 pr-3 py-2 bg-white/[0.04] border rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none transition-colors font-mono ${
+                      handleStatus && !handleStatus.available && !handleStatus.isSelf
+                        ? 'border-rose-500/50 focus:border-rose-400 focus:ring-1 focus:ring-rose-400'
+                        : 'border-white/[0.12] focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400'
+                    }`}
                   />
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Unique handle displayed when you attach images, videos, landmarks, or oral records.
-                </p>
+                {handleStatus && !handleStatus.available && !handleStatus.isSelf && (
+                  <p className="text-[11px] text-rose-400 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 inline shrink-0" />
+                    <span>{handleStatus.reason || 'This handle is registered by another contributor.'}</span>
+                  </p>
+                )}
+                {(!handleStatus || handleStatus.available) && (
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Unique global handle displayed when you attach images, videos, landmarks, or oral records.
+                  </p>
+                )}
               </div>
+
+              {saveError && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2 animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
+                  <span>{saveError}</span>
+                </div>
+              )}
 
               {/* Display Name */}
               <div>
@@ -448,10 +557,24 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black shadow-lg shadow-emerald-500/25 active:scale-95 transition-all flex items-center gap-1.5"
+                disabled={isSaving || Boolean(handleStatus && !handleStatus.available && !handleStatus.isSelf)}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  isSaving || (handleStatus && !handleStatus.available && !handleStatus.isSelf)
+                    ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black shadow-lg shadow-emerald-500/25 active:scale-95'
+                }`}
               >
-                <Save className="w-3.5 h-3.5" />
-                <span>Save Profile</span>
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-3.5 h-3.5" />
+                    <span>Save Profile</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
