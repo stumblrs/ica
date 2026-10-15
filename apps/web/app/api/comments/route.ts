@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import {
+  saveCommentToStore,
+  getCommentsFromStore,
+  likeCommentInStore,
+  readCommentsStore,
+  type StoredComment,
+} from '@/lib/comment-store';
+
+export const dynamic = 'force-dynamic';
 
 export interface EnrichedComment {
   id: string;
@@ -19,17 +28,18 @@ export interface EnrichedComment {
 
 /**
  * GET /api/comments
- * Returns all community comments and oral histories from Supabase, sorted newest first.
+ * Returns all community comments and oral histories, sorted newest first.
+ * Gracefully falls back to offline comment store if PostgreSQL is unreachable.
  */
 export async function GET(req: NextRequest) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const stateFilter = searchParams.get('state')?.toLowerCase();
-    const communityId = searchParams.get('communityId');
-    const cursor = searchParams.get('cursor');
-    // Default to 5 items to minimize initial egress and bandwidth
-    const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '5', 10), 1), 50);
+  const { searchParams } = new URL(req.url);
+  const stateFilter = searchParams.get('state')?.toLowerCase();
+  const communityId = searchParams.get('communityId') || undefined;
+  const cursor = searchParams.get('cursor') || undefined;
+  const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '5', 10), 1), 50);
 
+  // 1. Try Prisma first if available
+  try {
     const where: any = {};
     if (communityId) {
       where.communityId = communityId;
@@ -40,7 +50,6 @@ export async function GET(req: NextRequest) {
       };
     }
 
-    // Query limit + 1 to check if another page exists without a separate count query
     const comments = await prisma.comment.findMany({
       where,
       include: {
@@ -80,19 +89,37 @@ export async function GET(req: NextRequest) {
       createdAt: cmt.createdAt.toISOString(),
     }));
 
-    return NextResponse.json({
-      comments: enriched,
-      nextCursor,
-      hasMore,
-    });
+    // If database returned results, return them
+    if (enriched.length > 0) {
+      return NextResponse.json({
+        comments: enriched,
+        nextCursor,
+        hasMore,
+      });
+    }
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Failed to fetch comments' }, { status: 500 });
+    console.warn('[CommentsAPI] PostgreSQL offline or unreachable. Reading from offline store:', err.message);
   }
+
+  // 2. Seamless fallback to offline file store
+  const storeResult = getCommentsFromStore({
+    communityId,
+    state: stateFilter,
+    limit,
+    cursor,
+  });
+
+  return NextResponse.json({
+    comments: storeResult.comments,
+    nextCursor: storeResult.nextCursor,
+    hasMore: storeResult.hasMore,
+  });
 }
 
 /**
  * POST /api/comments
  * Creates a comment / oral tweet on a community, or increments likes.
+ * Works offline with persistent fallback so no comment is lost when DB is offline.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -100,11 +127,17 @@ export async function POST(req: NextRequest) {
 
     // 1. Like action
     if (body.action === 'like' && body.commentId) {
-      const updated = await prisma.comment.update({
-        where: { id: body.commentId },
-        data: { likes: { increment: 1 } },
-      });
-      return NextResponse.json({ success: true, likes: updated.likes });
+      let likes = likeCommentInStore(body.commentId);
+      try {
+        const updated = await prisma.comment.update({
+          where: { id: body.commentId },
+          data: { likes: { increment: 1 } },
+        });
+        likes = updated.likes;
+      } catch {
+        // Prisma offline - store updated
+      }
+      return NextResponse.json({ success: true, likes });
     }
 
     // 2. Create Comment
@@ -116,6 +149,7 @@ export async function POST(req: NextRequest) {
       comment,
       content,
       category = 'general',
+      affiliation,
       location,
     } = body;
 
@@ -128,64 +162,89 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Comment text is required.' }, { status: 400 });
     }
 
-    const deviceId = req.headers.get('x-device-id') || body.deviceId;
-    if (deviceId) {
-      await prisma.device.upsert({
-        where: { id: deviceId },
-        update: {},
-        create: { id: deviceId, trustScore: 100 },
-      });
-    }
-
+    const deviceId = req.headers.get('x-device-id') || body.deviceId || null;
     const targetAuthor = (authorName || author || '').trim() || 'Anonymous Resident';
     const targetHandle =
-      (handle && typeof handle === 'string' && handle.trim())
-        ? (handle.trim().startsWith('@') ? handle.trim() : `@${handle.trim()}`)
+      handle && typeof handle === 'string' && handle.trim()
+        ? handle.trim().startsWith('@')
+          ? handle.trim()
+          : `@${handle.trim()}`
         : `@${targetAuthor.toLowerCase().replace(/[^a-z0-9]/g, '') || 'resident'}`;
 
-    const created = await prisma.comment.create({
-      data: {
-        communityId,
-        deviceId: deviceId || null,
-        author: targetAuthor,
-        handle: targetHandle,
-        content: targetComment.trim(),
-        category,
-        location: location || null,
-        likes: 0,
-      },
-      include: {
-        community: {
-          select: {
-            id: true,
-            name: true,
-            lgaName: true,
-            stateName: true,
-            longitude: true,
-            latitude: true,
-          },
-        },
-      },
+    // 3. Always save to offline file store first (guaranteed persistence)
+    const stored = saveCommentToStore({
+      communityId,
+      authorName: targetAuthor,
+      handle: targetHandle,
+      comment: targetComment.trim(),
+      category,
+      affiliation,
+      deviceId,
+      location,
     });
 
-    const enriched: EnrichedComment = {
-      id: created.id,
-      communityId: created.communityId || '',
-      communityName: created.community?.name || 'Community',
-      lgaName: created.community?.lgaName,
-      stateName: created.community?.stateName,
-      coordinates: [created.community?.longitude || 0, created.community?.latitude || 0],
-      authorName: created.author,
-      handle: created.handle || `@${created.author.toLowerCase().replace(/[^a-z0-9]/g, '') || 'resident'}`,
-      affiliation: 'Community Member',
-      category: created.category,
-      comment: created.content,
-      likes: created.likes,
-      createdAt: created.createdAt.toISOString(),
-    };
+    // 4. Also persist to PostgreSQL if reachable
+    try {
+      if (deviceId) {
+        await prisma.device.upsert({
+          where: { id: deviceId },
+          update: {},
+          create: { id: deviceId, trustScore: 100 },
+        });
+      }
 
-    return NextResponse.json(enriched, { status: 201 });
+      const created = await prisma.comment.create({
+        data: {
+          id: stored.id,
+          communityId,
+          deviceId: deviceId || null,
+          author: targetAuthor,
+          handle: targetHandle,
+          content: targetComment.trim(),
+          category,
+          location: location || null,
+          likes: 0,
+        },
+        include: {
+          community: {
+            select: {
+              id: true,
+              name: true,
+              lgaName: true,
+              stateName: true,
+              longitude: true,
+              latitude: true,
+            },
+          },
+        },
+      });
+
+      return NextResponse.json(
+        {
+          id: created.id,
+          communityId: created.communityId,
+          communityName: created.community?.name || stored.communityName,
+          lgaName: created.community?.lgaName || stored.lgaName,
+          stateName: created.community?.stateName || stored.stateName,
+          coordinates: [created.community?.longitude || stored.coordinates[0], created.community?.latitude || stored.coordinates[1]],
+          authorName: created.author,
+          handle: created.handle,
+          affiliation: affiliation || 'Community Member',
+          category: created.category,
+          comment: created.content,
+          likes: created.likes,
+          createdAt: created.createdAt.toISOString(),
+        },
+        { status: 201 }
+      );
+    } catch (dbErr: any) {
+      console.warn(`[CommentsAPI] PostgreSQL offline (${dbErr.message}). Successfully saved to comments_store.json.`);
+    }
+
+    // Return the stored comment seamlessly
+    return NextResponse.json(stored, { status: 201 });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
+    console.error('Error creating comment:', err);
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
 }

@@ -1,0 +1,19 @@
+[
+  {
+    "id": "cmt_1792066227195_muouv",
+    "communityId": "awka",
+    "communityName": "Igbo Settlement",
+    "coordinates": [
+      7,
+      6.2
+    ],
+    "deviceId": null,
+    "authorName": "Chidi Okafor",
+    "handle": "@okafor_native",
+    "affiliation": "Community Member",
+    "category": "oral-history",
+    "comment": "Testing oral testimony persistence",
+    "likes": 0,
+    "createdAt": "2026-10-15T12:10:27.195Z"
+  }
+]
