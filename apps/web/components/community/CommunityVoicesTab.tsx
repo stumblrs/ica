@@ -90,12 +90,24 @@ export function CommunityVoicesTab({
   const [communitySearch, setCommunitySearch] = useState('');
   const [isPickingCommunity, setIsPickingCommunity] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [replyTarget, setReplyTarget] = useState<EnrichedComment | null>(null);
 
   useEffect(() => {
     const p = getUserProfile();
     setProfile(p);
-    if (p.displayName && !authorName) setAuthorName(p.displayName);
-    if (p.username && !authorHandle) setAuthorHandle(`@${p.username}`);
+    if (p.displayName) setAuthorName(p.displayName);
+    if (p.username) setAuthorHandle(`@${p.username}`);
+
+    function handleProfileUpdate(e: Event) {
+      const customEvent = e as CustomEvent<UserProfile>;
+      const updated = customEvent.detail || getUserProfile();
+      setProfile(updated);
+      if (updated.displayName) setAuthorName(updated.displayName);
+      if (updated.username) setAuthorHandle(`@${updated.username}`);
+    }
+
+    window.addEventListener('ica:profile-updated', handleProfileUpdate);
+    return () => window.removeEventListener('ica:profile-updated', handleProfileUpdate);
   }, []);
 
   // Social interactions
@@ -212,9 +224,10 @@ export function CommunityVoicesTab({
     setTimeout(() => setCopiedId(null), 2500);
   }
 
-  // Reply to author
+  // Reply / Cite an existing author's comment
   function handleReply(comment: EnrichedComment) {
     setIsComposerExpanded(true);
+    setReplyTarget(comment);
     const handle = comment.handle || `@${comment.authorName.replace(/\s+/g, '')}`;
     setCommentText((prev) => (prev ? `${prev} ${handle} ` : `${handle} `));
     setSelectedCommId(comment.communityId);
@@ -235,6 +248,11 @@ export function CommunityVoicesTab({
       return;
     }
 
+    // Automatically resolve identity from user's device profile
+    const activeProfile = profile || getUserProfile();
+    const finalAuthor = activeProfile?.displayName || activeProfile?.username || authorName.trim() || 'Contributor';
+    const finalHandle = activeProfile?.username ? `@${activeProfile.username}` : (authorHandle.trim() || undefined);
+
     try {
       setSubmitting(true);
       setFormError(null);
@@ -244,26 +262,30 @@ export function CommunityVoicesTab({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           communityId: selectedCommId,
-          authorName: authorName.trim() || undefined,
-          handle: authorHandle.trim() || undefined,
+          authorName: finalAuthor,
+          handle: finalHandle,
           affiliation: affiliation.trim() || undefined,
           category,
           comment: commentText.trim(),
+          deviceId: activeProfile?.deviceId || undefined,
+          replyToHandle: replyTarget?.handle || undefined,
+          replyToCommentId: replyTarget?.id || undefined,
         }),
       });
 
       if (res.ok) {
         const newEnriched: EnrichedComment = await res.json();
 
-        // Push new comment to the top of feed immediately: pushes older comments down!
-        setComments((prev) => [newEnriched, ...prev]);
+        // Push new comment to the top of feed immediately, deduplicating
+        setComments((prev) => [newEnriched, ...prev.filter((c) => c.id !== newEnriched.id)]);
         setLikesCountMap((prev) => ({ ...prev, [newEnriched.id]: 0 }));
 
         setSubmitSuccess(true);
         setCommentText('');
+        setReplyTarget(null);
         setIsComposerExpanded(false);
 
-        // Smooth scroll to top of feed so user sees their new tweet!
+        // Smooth scroll to top of feed
         topFeedRef.current?.scrollIntoView({ behavior: 'smooth' });
 
         setTimeout(() => setSubmitSuccess(false), 3000);
@@ -277,6 +299,7 @@ export function CommunityVoicesTab({
       setSubmitting(false);
     }
   }
+
 
   // Filtered comments timeline
   const filteredComments = useMemo(() => {
@@ -422,6 +445,26 @@ export function CommunityVoicesTab({
             </div>
           )}
 
+          {/* Citation Banner if replying */}
+          {replyTarget && (
+            <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-sky-500/10 border border-sky-500/25 text-xs text-sky-300 animate-in fade-in duration-150">
+              <div className="flex items-center gap-1.5 truncate">
+                <Quote className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                <span className="truncate">
+                  Citing <strong className="text-white">{replyTarget.handle}</strong> in {replyTarget.communityName}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReplyTarget(null)}
+                className="p-0.5 text-sky-400 hover:text-white hover:bg-sky-500/20 rounded-md text-xs"
+                title="Remove citation"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           {/* Textarea Composer */}
           <div className="relative">
             <textarea
@@ -436,48 +479,64 @@ export function CommunityVoicesTab({
             />
           </div>
 
-          {/* Author Details (Expandable) */}
+          {/* Automatically Bound Device Identity */}
           {isComposerExpanded && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-white/[0.06] text-xs animate-in fade-in duration-200">
-              <div>
-                <input
-                  type="text"
-                  placeholder="Your Name (or Clan Title)"
-                  value={authorName}
-                  onChange={(e) => setAuthorName(e.target.value)}
-                  className="w-full h-7 px-2 rounded-lg bg-white/[0.04] border border-white/10 text-white placeholder-slate-500 text-[11px] focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-              <div className="flex items-center gap-1">
-                <input
-                  type="text"
-                  placeholder="Handle (@username)"
-                  value={authorHandle}
-                  onChange={(e) => setAuthorHandle(e.target.value)}
-                  className="w-full h-7 px-2 rounded-lg bg-white/[0.04] border border-white/10 text-white placeholder-slate-500 text-[11px] font-mono focus:outline-none focus:border-emerald-500"
-                />
-                <Link
-                  href="/profile"
-                  className="shrink-0 px-2 h-7 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[10px] font-mono border border-emerald-500/30 flex items-center justify-center"
-                  title="Open Contributor Profile Page"
-                >
-                  Profile
-                </Link>
-              </div>
-              <div>
-                <select
-                  value={affiliation}
-                  onChange={(e) => setAffiliation(e.target.value)}
-                  className="w-full h-7 px-2 rounded-lg bg-[#090e1c] border border-white/10 text-slate-300 text-[11px] focus:outline-none focus:border-emerald-500"
-                >
-                  <option value="Indigene">Indigene</option>
-                  <option value="Clan Elder">Clan Elder</option>
-                  <option value="Youth Leader">Youth Leader</option>
-                  <option value="Linguist / Oral Historian">Linguist / Historian</option>
-                  <option value="Resident">Resident</option>
-                  <option value="Diaspora Member">Diaspora Member</option>
-                </select>
-              </div>
+            <div className="space-y-2 pt-2 border-t border-white/[0.06] text-xs animate-in fade-in duration-200">
+              {profile?.username ? (
+                <div className="flex items-center justify-between p-2 rounded-xl bg-white/[0.04] border border-white/[0.08]">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="h-6 w-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs shrink-0">
+                      {profile.avatarSymbol || 'ọ'}
+                    </div>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="font-bold text-white text-xs truncate">
+                        {profile.displayName || profile.username}
+                      </span>
+                      <span className="font-mono text-emerald-400 text-[11px] truncate">
+                        @{profile.username}
+                      </span>
+                      <span className="hidden sm:inline-flex text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 font-mono">
+                        Device Linked
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <select
+                      value={affiliation}
+                      onChange={(e) => setAffiliation(e.target.value)}
+                      className="h-7 px-2 rounded-lg bg-[#090e1c] border border-white/10 text-slate-300 text-[11px] focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="Indigene">Indigene</option>
+                      <option value="Clan Elder">Clan Elder</option>
+                      <option value="Youth Leader">Youth Leader</option>
+                      <option value="Linguist / Oral Historian">Linguist / Historian</option>
+                      <option value="Resident">Resident</option>
+                      <option value="Diaspora Member">Diaspora Member</option>
+                    </select>
+                    <Link
+                      href="/profile"
+                      className="text-[10px] text-slate-400 hover:text-emerald-400 underline font-mono shrink-0"
+                      title="Edit Profile"
+                    >
+                      Profile
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-amber-200 text-xs truncate">
+                      No global @username claimed on this device yet.
+                    </span>
+                  </div>
+                  <Link
+                    href="/profile"
+                    className="px-2.5 py-1 rounded-lg bg-emerald-500 text-black font-bold text-[11px] shrink-0 hover:bg-emerald-400 transition-colors"
+                  >
+                    Claim @username →
+                  </Link>
+                </div>
+              )}
             </div>
           )}
 

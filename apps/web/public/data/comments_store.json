@@ -1,5 +1,24 @@
 [
   {
+    "id": "cmt_1792069603133_krqio",
+    "communityId": "c2-enugu",
+    "communityName": "Enugu",
+    "lgaName": "Enugu North",
+    "stateName": "Enugu",
+    "coordinates": [
+      7.4988,
+      6.4413
+    ],
+    "deviceId": "adaeze-device-123",
+    "authorName": "Adaeze Okoye",
+    "handle": "@adaezeokoye",
+    "affiliation": "Community Member",
+    "category": "oral-history",
+    "comment": "@okafor_native Great observation on the craft guilds!",
+    "likes": 0,
+    "createdAt": "2026-10-15T13:06:43.133Z"
+  },
+  {
     "id": "cmt_1792066227195_muouv",
     "communityId": "awka",
     "communityName": "Igbo Settlement",

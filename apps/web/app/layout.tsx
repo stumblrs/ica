@@ -5,6 +5,7 @@ import { InstallPrompt } from '@/components/common/InstallPrompt';
 import { UpdatePrompt } from '@/components/common/UpdatePrompt';
 import { OfflineFieldModeIndicator } from '@/components/common/OfflineFieldModeIndicator';
 import { AppBarProfileButton } from '@/components/layout/AppBarProfileButton';
+import { AppBarNotificationBell } from '@/components/layout/AppBarNotificationBell';
 import { AppBarFilterButton } from '@/components/layout/AppBarFilterButton';
 import { AppBarMapToolsButton } from '@/components/layout/AppBarMapToolsButton';
 
@@ -54,6 +55,7 @@ export default function RootLayout({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <AppBarNotificationBell />
             <AppBarMapToolsButton />
             <AppBarFilterButton />
             <OfflineFieldModeIndicator />
