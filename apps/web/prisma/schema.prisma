@@ -12,11 +12,14 @@ model Device {
   fingerprintHash  String?
   trustScore       Int               @default(100)
   createdAt        DateTime          @default(now())
-  lastActiveAt     DateTime          @updatedAt
+  lastActiveAt     DateTime          @default(now()) @updatedAt
   votes            GovernanceVote[]
   inquiriesCreated GovernanceInquiry[]
   auditLogs        CommunityAuditLog[]
   comments         Comment[]
+  profile          Profile?
+
+  @@index([fingerprintHash])
 }
 
 // 2. Community with Lifecycle State
@@ -125,19 +128,22 @@ model Comment {
 
 // 7. Contributor Profile (Global Identity Bound to Device)
 model Profile {
-  deviceId      String   @id
-  username      String   @unique
-  displayName   String
-  homeTown      String?
-  stateOfOrigin String?
-  kindredClan   String?
-  bio           String?
-  avatarSymbol  String   @default("ọ")
-  role          String   @default("Native Contributor")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  deviceId        String   @id
+  device          Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  fingerprintHash String?
+  username        String   @unique
+  displayName     String
+  homeTown        String?
+  stateOfOrigin   String?
+  kindredClan     String?
+  bio             String?
+  avatarSymbol    String   @default("ọ")
+  role            String   @default("Native Contributor")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@index([username])
+  @@index([fingerprintHash])
 }
 
 // 8. In-App Citation & Mention Notifications (Zero-Cost Global Notifications)

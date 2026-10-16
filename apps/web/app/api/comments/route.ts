@@ -274,6 +274,8 @@ export async function POST(req: NextRequest) {
     }
 
     const deviceId = req.headers.get('x-device-id') || body.deviceId || null;
+    const rawFingerprint = req.headers.get('x-device-fingerprint') || body.fingerprintHash || null;
+    const cleanFingerprint = rawFingerprint && String(rawFingerprint).startsWith('fp_') ? String(rawFingerprint) : null;
     const targetAuthor = (authorName || author || '').trim() || 'Anonymous Resident';
     const targetHandle =
       handle && typeof handle === 'string' && handle.trim()
@@ -354,8 +356,12 @@ export async function POST(req: NextRequest) {
       if (deviceId) {
         await supabase
           .from('Device')
-          .upsert({ id: deviceId, trustScore: 100 })
-          .select();
+          .upsert({
+            id: deviceId,
+            trustScore: 100,
+            lastActiveAt: new Date().toISOString(),
+            ...(cleanFingerprint ? { fingerprintHash: cleanFingerprint } : {}),
+          });
       }
 
       const { error: insertError } = await supabase.from('Comment').insert({

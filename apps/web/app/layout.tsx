@@ -8,6 +8,7 @@ import { AppBarProfileButton } from '@/components/layout/AppBarProfileButton';
 import { AppBarNotificationBell } from '@/components/layout/AppBarNotificationBell';
 import { AppBarFilterButton } from '@/components/layout/AppBarFilterButton';
 import { AppBarMapToolsButton } from '@/components/layout/AppBarMapToolsButton';
+import { DeviceSyncHandler } from '@/components/layout/DeviceSyncHandler';
 
 export const metadata: Metadata = {
   title: 'Igbo Community Atlas | Participatory Geographic Database',
@@ -76,6 +77,9 @@ export default function RootLayout({
 
         {/* Mobile Install App Alert */}
         <InstallPrompt />
+
+        {/* Automatic Device & Fingerprint Synchronization */}
+        <DeviceSyncHandler />
       </body>
     </html>
   );

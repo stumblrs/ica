@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   MapPin,
@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import type { CommunitySummary } from '@/components/map/AtlasOverview';
 import type { SelectedFeature } from '@/components/map/MapContainer';
+import { getUserProfile, type UserProfile } from '@/lib/user-profile';
+import { getOrCreateDeviceId, getDeviceFingerprintSync } from '@/lib/device';
 
 interface TwitterVoiceModalProps {
   communities: CommunitySummary[];
@@ -65,6 +67,26 @@ export function TwitterVoiceModal({
     [communities, selectedCommId]
   );
 
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+
+  useEffect(() => {
+    const p = getUserProfile();
+    setProfile(p);
+    if (p.displayName) setAuthorName(p.displayName);
+    if (p.username) setAuthorHandle(`@${p.username}`);
+
+    function handleProfileUpdate(e: Event) {
+      const customEvent = e as CustomEvent<UserProfile>;
+      const updated = customEvent.detail || getUserProfile();
+      setProfile(updated);
+      if (updated.displayName) setAuthorName(updated.displayName);
+      if (updated.username) setAuthorHandle(`@${updated.username}`);
+    }
+
+    window.addEventListener('ica:profile-updated', handleProfileUpdate);
+    return () => window.removeEventListener('ica:profile-updated', handleProfileUpdate);
+  }, []);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!commentText.trim()) {
@@ -77,20 +99,31 @@ export function TwitterVoiceModal({
       return;
     }
 
+    const effectiveDeviceId = profile?.deviceId || getOrCreateDeviceId();
+    const effectiveFingerprint = profile?.fingerprintHash || getDeviceFingerprintSync();
+    const finalAuthor = profile?.displayName || authorName.trim() || 'Contributor';
+    const finalHandle = profile?.username ? `@${profile.username}` : (authorHandle.trim() || undefined);
+
     try {
       setSubmitting(true);
       setError(null);
 
       const res = await fetch('/api/comments', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-device-id': effectiveDeviceId,
+          ...(effectiveFingerprint ? { 'x-device-fingerprint': effectiveFingerprint } : {}),
+        },
         body: JSON.stringify({
           communityId: selectedCommId,
-          authorName: authorName.trim() || undefined,
-          handle: authorHandle.trim() || undefined,
+          authorName: finalAuthor,
+          handle: finalHandle,
           affiliation: affiliation.trim() || undefined,
           category,
           comment: commentText.trim(),
+          deviceId: effectiveDeviceId,
+          fingerprintHash: effectiveFingerprint || undefined,
         }),
       });
 
@@ -278,22 +311,43 @@ export function TwitterVoiceModal({
               />
 
               {/* Contributor Details row */}
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#2f3336]/60">
-                <input
-                  type="text"
-                  placeholder="Your Name (Optional)"
-                  value={authorName}
-                  onChange={(e) => setAuthorName(e.target.value)}
-                  className="bg-[#16181c] border border-[#2f3336] rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-[#71767b] focus:outline-none focus:border-emerald-500"
-                />
-                <input
-                  type="text"
-                  placeholder="@handle or title"
-                  value={authorHandle}
-                  onChange={(e) => setAuthorHandle(e.target.value)}
-                  className="bg-[#16181c] border border-[#2f3336] rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-[#71767b] focus:outline-none focus:border-emerald-500 font-mono"
-                />
-              </div>
+              {profile?.username ? (
+                <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-white/[0.04] border border-emerald-500/30 text-xs mt-1">
+                  <div className="flex items-center gap-2">
+                    <span className="h-6 w-6 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-xs">
+                      {profile.avatarSymbol || 'ọ'}
+                    </span>
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-white leading-tight">
+                        {profile.displayName || `@${profile.username}`}
+                      </span>
+                      <span className="text-[10px] text-emerald-400 font-mono">
+                        @{profile.username} • Linked to Device
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-slate-400 bg-white/[0.06] px-2 py-0.5 rounded-full font-mono">
+                    Auto-Signed
+                  </span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#2f3336]/60">
+                  <input
+                    type="text"
+                    placeholder="Your Name (Optional)"
+                    value={authorName}
+                    onChange={(e) => setAuthorName(e.target.value)}
+                    className="bg-[#16181c] border border-[#2f3336] rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-[#71767b] focus:outline-none focus:border-emerald-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="@handle (Optional)"
+                    value={authorHandle}
+                    onChange={(e) => setAuthorHandle(e.target.value)}
+                    className="bg-[#16181c] border border-[#2f3336] rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-[#71767b] focus:outline-none focus:border-emerald-500 font-mono"
+                  />
+                </div>
+              )}
             </div>
           </div>
 

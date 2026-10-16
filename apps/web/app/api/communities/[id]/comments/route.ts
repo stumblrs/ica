@@ -92,6 +92,8 @@ export async function POST(
     }
 
     const deviceId = req.headers.get('x-device-id') || body.deviceId || null;
+    const rawFingerprint = req.headers.get('x-device-fingerprint') || body.fingerprintHash || null;
+    const cleanFingerprint = rawFingerprint && String(rawFingerprint).startsWith('fp_') ? String(rawFingerprint) : null;
     const cleanAuthor =
       authorName && typeof authorName === 'string' && authorName.trim()
         ? authorName.trim()
@@ -114,8 +116,12 @@ export async function POST(
       if (deviceId) {
         await supabase
           .from('Device')
-          .upsert({ id: deviceId, trustScore: 100 })
-          .select();
+          .upsert({
+            id: deviceId,
+            trustScore: 100,
+            lastActiveAt: new Date().toISOString(),
+            ...(cleanFingerprint ? { fingerprintHash: cleanFingerprint } : {}),
+          });
       }
 
       const { data: created, error } = await supabase

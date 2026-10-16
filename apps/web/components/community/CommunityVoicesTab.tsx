@@ -28,6 +28,7 @@ import type { SelectedFeature } from '@/components/map/MapContainer';
 import { MediaGallery } from '@/components/common/MediaGallery';
 import { extractMediaFromText } from '@/lib/media';
 import { getUserProfile, type UserProfile } from '@/lib/user-profile';
+import { getOrCreateDeviceId, getDeviceFingerprintSync } from '@/lib/device';
 import { supabase } from '@/lib/supabase';
 
 interface CommunityVoicesTabProps {
@@ -316,6 +317,8 @@ export function CommunityVoicesTab({
 
     // Automatically resolve identity from user's device profile
     const activeProfile = profile || getUserProfile();
+    const effectiveDeviceId = activeProfile?.deviceId || getOrCreateDeviceId();
+    const effectiveFingerprint = activeProfile?.fingerprintHash || getDeviceFingerprintSync();
     const finalAuthor = activeProfile?.displayName || activeProfile?.username || authorName.trim() || 'Contributor';
     const finalHandle = activeProfile?.username ? `@${activeProfile.username}` : (authorHandle.trim() || undefined);
 
@@ -325,7 +328,11 @@ export function CommunityVoicesTab({
 
       const res = await fetch('/api/comments', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-device-id': effectiveDeviceId,
+          ...(effectiveFingerprint ? { 'x-device-fingerprint': effectiveFingerprint } : {}),
+        },
         body: JSON.stringify({
           communityId: selectedCommId,
           authorName: finalAuthor,
@@ -333,7 +340,8 @@ export function CommunityVoicesTab({
           affiliation: affiliation.trim() || undefined,
           category,
           comment: commentText.trim(),
-          deviceId: activeProfile?.deviceId || undefined,
+          deviceId: effectiveDeviceId,
+          fingerprintHash: effectiveFingerprint || undefined,
           replyToHandle: replyTarget?.handle || undefined,
           replyToCommentId: replyTarget?.id || undefined,
         }),

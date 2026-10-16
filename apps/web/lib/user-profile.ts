@@ -1,9 +1,10 @@
 'use client';
 
-import { getOrCreateDeviceId } from '@/lib/device';
+import { getOrCreateDeviceId, getOrCreateDeviceFingerprint } from '@/lib/device';
 
 export interface UserProfile {
   deviceId?: string;
+  fingerprintHash?: string;
   username: string; // e.g. "chidi_m" (stored without '@')
   displayName: string; // e.g. "Chidi Okafor"
   homeTown?: string; // e.g. "Awka"
@@ -49,6 +50,7 @@ export function getUserProfile(): UserProfile {
     const parsed = JSON.parse(raw);
     return {
       deviceId,
+      fingerprintHash: parsed.fingerprintHash || undefined,
       username: cleanUsername(parsed.username || ''),
       displayName: parsed.displayName || '',
       homeTown: parsed.homeTown || '',
@@ -139,6 +141,7 @@ export async function saveUserProfileAsync(
   }
 
   const deviceId = getOrCreateDeviceId();
+  const fingerprintHash = await getOrCreateDeviceFingerprint();
   const current = getUserProfile();
   const candidateUsername = updates.username !== undefined ? cleanUsername(updates.username) : current.username;
 
@@ -146,6 +149,7 @@ export async function saveUserProfileAsync(
     ...current,
     ...updates,
     deviceId,
+    fingerprintHash,
     username: candidateUsername,
     joinedAt: current.joinedAt || new Date().toISOString(),
   };

@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
       try {
         const { data: sbProfile, error } = await supabase
           .from('Profile')
-          .select('deviceId, username, displayName, homeTown, stateOfOrigin, kindredClan, bio, avatarSymbol, role, createdAt, updatedAt')
+          .select('deviceId, fingerprintHash, username, displayName, homeTown, stateOfOrigin, kindredClan, bio, avatarSymbol, role, createdAt, updatedAt')
           .eq('deviceId', deviceId)
           .maybeSingle();
 
@@ -131,7 +131,7 @@ export async function GET(request: NextRequest) {
       try {
         const { data: sbProfile, error } = await supabase
           .from('Profile')
-          .select('deviceId, username, displayName, homeTown, stateOfOrigin, kindredClan, bio, avatarSymbol, role, createdAt, updatedAt')
+          .select('deviceId, fingerprintHash, username, displayName, homeTown, stateOfOrigin, kindredClan, bio, avatarSymbol, role, createdAt, updatedAt')
           .eq('username', cleanUsername(username))
           .maybeSingle();
 
@@ -161,6 +161,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       deviceId,
+      fingerprintHash: bodyFp,
       username,
       displayName,
       homeTown,
@@ -178,6 +179,11 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const headerFp = request.headers.get('x-device-fingerprint');
+    const cleanFingerprint = (bodyFp || headerFp) && String(bodyFp || headerFp).startsWith('fp_')
+      ? String(bodyFp || headerFp)
+      : null;
 
     const cleanHandle = username ? cleanUsername(username) : '';
 
@@ -230,13 +236,41 @@ export async function POST(request: NextRequest) {
     const targetClan = kindredClan ? String(kindredClan).trim() : null;
     const targetBio = bio ? String(bio).trim() : null;
 
-    // 2. Persist to Supabase Profile table
+    // 2. Ensure Device exists FIRST in Supabase / Prisma (satisfying foreign key constraint)
+    try {
+      await supabase.from('Device').upsert({
+        id: deviceId,
+        fingerprintHash: cleanFingerprint,
+        trustScore: 100,
+        lastActiveAt: new Date().toISOString(),
+      });
+    } catch (devErr: any) {
+      console.warn('[ProfileAPI] Device upsert in Supabase error, falling back to Prisma:', devErr.message);
+      try {
+        await prisma.device.upsert({
+          where: { id: deviceId },
+          update: {
+            fingerprintHash: cleanFingerprint,
+            lastActiveAt: new Date(),
+          },
+          create: {
+            id: deviceId,
+            fingerprintHash: cleanFingerprint,
+            trustScore: 100,
+            lastActiveAt: new Date(),
+          },
+        });
+      } catch {}
+    }
+
+    // 3. Persist to Supabase Profile table linked with fingerprintHash
     let savedProfile: any = null;
     try {
       const { data: sbSaved, error: sbErr } = await supabase
         .from('Profile')
         .upsert({
           deviceId,
+          fingerprintHash: cleanFingerprint,
           username: cleanHandle,
           displayName: targetDisplayName,
           homeTown: targetTown,
@@ -256,11 +290,6 @@ export async function POST(request: NextRequest) {
     } catch (err: any) {
       console.warn('[ProfileAPI] Supabase Profile upsert failed, falling back to local file store:', err.message);
     }
-
-    // 3. Also update Device table in Supabase / Prisma
-    try {
-      await supabase.from('Device').upsert({ id: deviceId, trustScore: 100 }).select();
-    } catch {}
 
     // 4. Mirror to local file store as offline backup
     try {
