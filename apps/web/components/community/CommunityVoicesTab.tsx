@@ -119,6 +119,11 @@ export function CommunityVoicesTab({
 
   const composerTextareaRef = useRef<HTMLTextAreaElement>(null);
   const topFeedRef = useRef<HTMLDivElement>(null);
+  const communitiesRef = useRef(communities);
+
+  useEffect(() => {
+    communitiesRef.current = communities;
+  }, [communities]);
 
   // Automatically pre-fill community if a feature is selected on the map
   useEffect(() => {
@@ -136,66 +141,76 @@ export function CommunityVoicesTab({
   useEffect(() => {
     let buffer: any[] = [];
     let flushTimer: NodeJS.Timeout | null = null;
+    const channelName = `comments-feed-${Math.random().toString(36).slice(2, 9)}`;
 
-    const channel = supabase
-      .channel('living-atlas-comments-live')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'Comment' },
-        (payload) => {
-          const newRecord = payload.new;
-          if (!newRecord) return;
+    let channel: any = null;
+    try {
+      channel = supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'Comment' },
+          (payload) => {
+            const newRecord = payload.new;
+            if (!newRecord) return;
 
-          buffer.push(newRecord);
+            buffer.push(newRecord);
 
-          // Batch rapid incoming comments into a single state update
-          if (!flushTimer) {
-            flushTimer = setTimeout(() => {
-              if (buffer.length > 0) {
-                const toAdd = [...buffer];
-                buffer = [];
-                flushTimer = null;
+            // Batch rapid incoming comments into a single state update
+            if (!flushTimer) {
+              flushTimer = setTimeout(() => {
+                if (buffer.length > 0) {
+                  const toAdd = [...buffer];
+                  buffer = [];
+                  flushTimer = null;
 
-                setComments((prev) => {
-                  const existingIds = new Set(prev.map((c) => c.id));
-                  const newEnriched: EnrichedComment[] = [];
+                  setComments((prev) => {
+                    const existingIds = new Set(prev.map((c) => c.id));
+                    const newEnriched: EnrichedComment[] = [];
 
-                  for (const item of toAdd) {
-                    if (!existingIds.has(item.id)) {
-                      const comm = communities.find((c) => c.id === item.communityId);
-                      newEnriched.push({
-                        id: item.id,
-                        communityId: item.communityId || '',
-                        communityName: comm?.name || 'Community',
-                        lgaName: comm?.lgaName,
-                        stateName: comm?.stateName,
-                        coordinates: [comm?.longitude || 7.0, comm?.latitude || 6.2],
-                        authorName: item.author || 'Contributor',
-                        handle: item.handle || `@${item.author?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'resident'}`,
-                        affiliation: 'Community Member',
-                        category: item.category || 'general',
-                        comment: item.content || '',
-                        likes: item.likes || 0,
-                        createdAt: item.createdAt || new Date().toISOString(),
-                      });
+                    for (const item of toAdd) {
+                      if (!existingIds.has(item.id)) {
+                        const comm = communitiesRef.current.find((c) => c.id === item.communityId);
+                        newEnriched.push({
+                          id: item.id,
+                          communityId: item.communityId || '',
+                          communityName: comm?.name || 'Community',
+                          lgaName: comm?.lgaName,
+                          stateName: comm?.stateName,
+                          coordinates: [comm?.longitude || 7.0, comm?.latitude || 6.2],
+                          authorName: item.author || 'Contributor',
+                          handle: item.handle || `@${item.author?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'resident'}`,
+                          affiliation: 'Community Member',
+                          category: item.category || 'general',
+                          comment: item.content || '',
+                          likes: item.likes || 0,
+                          createdAt: item.createdAt || new Date().toISOString(),
+                        });
+                      }
                     }
-                  }
 
-                  if (newEnriched.length === 0) return prev;
-                  return [...newEnriched, ...prev];
-                });
-              }
-            }, 1200);
+                    if (newEnriched.length === 0) return prev;
+                    return [...newEnriched, ...prev];
+                  });
+                }
+              }, 1200);
+            }
           }
-        }
-      )
-      .subscribe();
+        )
+        .subscribe();
+    } catch (subErr) {
+      console.warn('[Realtime] Failed to subscribe to comments feed:', subErr);
+    }
 
     return () => {
       if (flushTimer) clearTimeout(flushTimer);
-      supabase.removeChannel(channel);
+      if (channel) {
+        try {
+          supabase.removeChannel(channel);
+        } catch {}
+      }
     };
-  }, [communities]);
+  }, []); // Mounts once to prevent subscription teardown collisions
 
   useEffect(() => {
     loadInitialComments(selectedState);
