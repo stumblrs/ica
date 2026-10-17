@@ -30,6 +30,7 @@ import { extractMediaFromText } from '@/lib/media';
 import { getUserProfile, type UserProfile } from '@/lib/user-profile';
 import { getOrCreateDeviceId, getDeviceFingerprintSync } from '@/lib/device';
 import { supabase } from '@/lib/supabase';
+import { SocialShareModal } from './SocialShareModal';
 
 interface CommunityVoicesTabProps {
   /** @deprecated Comments are global; these props are no longer used. */
@@ -151,6 +152,7 @@ export function CommunityVoicesTab(_props: CommunityVoicesTabProps) {
   const [likesCountMap, setLikesCountMap] = useState<Record<string, number>>({});
   const [citesCountMap, setCitesCountMap] = useState<Record<string, number>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [shareTarget, setShareTarget] = useState<EnrichedComment | null>(null);
 
   const composerTextareaRef = useRef<HTMLTextAreaElement>(null);
   const topFeedRef = useRef<HTMLDivElement>(null);
@@ -385,13 +387,9 @@ export function CommunityVoicesTab(_props: CommunityVoicesTabProps) {
     }
   }
 
-  // Share comment link
+  // Direct Social Share
   function handleShareComment(comment: EnrichedComment) {
-    const url = new URL(window.location.href);
-    url.searchParams.set('comment', comment.id);
-    navigator.clipboard.writeText(url.toString());
-    setCopiedId(comment.id);
-    setTimeout(() => setCopiedId(null), 2500);
+    setShareTarget(comment);
   }
 
   // Reply / Cite an existing author's comment
@@ -888,14 +886,11 @@ export function CommunityVoicesTab(_props: CommunityVoicesTabProps) {
                   <button
                     type="button"
                     onClick={() => handleShareComment(cmt)}
-                    className={`flex items-center gap-1 transition-colors ${
-                      copiedId === cmt.id ? 'text-emerald-400 font-bold' : 'hover:text-white'
-                    }`}
+                    className="flex items-center gap-1 transition-colors hover:text-white"
+                    title="Share to social media"
                   >
                     <Share2 className="w-3.5 h-3.5" />
-                    <span className="text-[11px]">
-                      {copiedId === cmt.id ? 'Copied!' : 'Share'}
-                    </span>
+                    <span className="text-[11px]">Share</span>
                   </button>
                 </div>
               </article>
@@ -933,6 +928,14 @@ export function CommunityVoicesTab(_props: CommunityVoicesTabProps) {
           </div>
         )}
       </div>
+
+      {/* Direct Social Media Share Modal */}
+      {shareTarget && (
+        <SocialShareModal
+          comment={shareTarget}
+          onClose={() => setShareTarget(null)}
+        />
+      )}
     </div>
   );
 }
