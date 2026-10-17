@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect } from 'react';
 import { X, Send, AlertCircle, Loader2 } from 'lucide-react';
@@ -20,7 +20,6 @@ export function TwitterVoiceModal({ onClose, onSuccess }: TwitterVoiceModalProps
   const [authorName, setAuthorName] = useState('');
   const [authorHandle, setAuthorHandle] = useState('');
   const [affiliation, setAffiliation] = useState('Indigene / Elder');
-  const [category, setCategory] = useState<'oral-history' | 'dialect' | 'lineage' | 'tradition' | 'general'>('oral-history');
   const [commentText, setCommentText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +47,7 @@ export function TwitterVoiceModal({ onClose, onSuccess }: TwitterVoiceModalProps
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!commentText.trim()) {
-      setError('Please write an oral history, proverb, or testimony.');
+      setError('Please write your note before posting.');
       return;
     }
 
@@ -72,32 +71,23 @@ export function TwitterVoiceModal({ onClose, onSuccess }: TwitterVoiceModalProps
           authorName: finalAuthor,
           handle: finalHandle,
           affiliation: affiliation.trim() || undefined,
-          category,
           comment: commentText.trim(),
-          deviceId: effectiveDeviceId,
-          fingerprintHash: effectiveFingerprint || undefined,
         }),
       });
 
       if (res.ok) {
         const newCmt = await res.json().catch(() => null);
         if (newCmt) {
-          try {
-            const raw = localStorage.getItem('ica_local_posted_comments_v2');
-            const list = raw ? JSON.parse(raw) : [];
-            const updated = [newCmt, ...(Array.isArray(list) ? list.filter((c: any) => c.id !== newCmt.id) : [])].slice(0, 100);
-            localStorage.setItem('ica_local_posted_comments_v2', JSON.stringify(updated));
-          } catch {}
           window.dispatchEvent(new CustomEvent('ica:comment-posted', { detail: newCmt }));
         }
         onSuccess();
         onClose();
       } else {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || 'Failed to post comment');
+        setError(data.error || 'Failed to post note to database.');
       }
     } catch (err: any) {
-      setError(err.message || 'Network error occurred');
+      setError(err.message || 'Network error occurred. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -107,18 +97,18 @@ export function TwitterVoiceModal({ onClose, onSuccess }: TwitterVoiceModalProps
   const maxChars = 600;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-center p-3 sm:p-4 pt-4 sm:pt-10 overflow-y-auto">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Modal Dialog */}
-      <div className="relative w-full max-w-lg bg-[#000000] border border-[#2f3336] rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden animate-in slide-in-from-bottom-6 duration-200">
-        {/* Top Twitter Navigation Bar */}
-        <div className="h-[52px] px-4 border-b border-[#2f3336] flex items-center justify-between shrink-0 bg-[#000000]/95 backdrop-blur-md">
+      <div className="relative w-full max-w-lg bg-[#000000] border border-[#2f3336] rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden animate-in slide-in-from-top-4 duration-200 z-10">
+        {/* Top Navigation Bar */}
+        <div className="h-[48px] px-4 border-b border-[#2f3336] flex items-center justify-between shrink-0 bg-[#000000]/95 backdrop-blur-md">
           <button
             type="button"
             onClick={onClose}
@@ -128,8 +118,8 @@ export function TwitterVoiceModal({ onClose, onSuccess }: TwitterVoiceModalProps
             <X className="w-5 h-5" />
           </button>
 
-          <span className="text-xs font-mono font-semibold text-[#71767b] uppercase tracking-wider">
-            Oral Testimony
+          <span className="text-xs font-mono font-semibold text-emerald-400 uppercase tracking-wider">
+            Share Note
           </span>
 
           <button
@@ -143,7 +133,7 @@ export function TwitterVoiceModal({ onClose, onSuccess }: TwitterVoiceModalProps
             ) : (
               <Send className="w-3.5 h-3.5 fill-black stroke-black" />
             )}
-            <span>Post Voice</span>
+            <span>Post</span>
           </button>
         </div>
 
@@ -156,35 +146,11 @@ export function TwitterVoiceModal({ onClose, onSuccess }: TwitterVoiceModalProps
             </div>
           )}
 
-          {/* Category Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
-            {[
-              { id: 'oral-history', label: 'Oral History', icon: 'ðŸ“œ' },
-              { id: 'dialect', label: 'Dialect / Phrase', icon: 'ðŸ—£ï¸' },
-              { id: 'tradition', label: 'Tradition / Omenala', icon: 'âœ¨' },
-              { id: 'lineage', label: 'Lineage / Clan', icon: 'ðŸŒ³' },
-              { id: 'general', label: 'General Note', icon: 'ðŸ’¬' },
-            ].map((cat) => (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => setCategory(cat.id as any)}
-                className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold transition-all active:scale-95 ${
-                  category === cat.id
-                    ? 'bg-emerald-500 text-black font-bold'
-                    : 'bg-[#16181c] text-[#71767b] hover:text-[#e7e9ea] border border-[#2f3336]'
-                }`}
-              >
-                <span>{cat.icon} {cat.label}</span>
-              </button>
-            ))}
-          </div>
-
           {/* Main Content Area */}
           <div className="flex gap-3">
             <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-400 p-[1.5px] shrink-0 mt-1">
               <div className="w-full h-full rounded-full bg-[#000000] flex items-center justify-center font-mono text-xs font-bold text-emerald-300">
-                {authorName ? authorName[0].toUpperCase() : 'á»¤'}
+                {authorName ? authorName[0].toUpperCase() : 'Ụ'}
               </div>
             </div>
 
@@ -192,7 +158,7 @@ export function TwitterVoiceModal({ onClose, onSuccess }: TwitterVoiceModalProps
               <textarea
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
-                placeholder="What oral testimony, historical event, clan lore, dialect phrase, or image/video URLs would you like to share?"
+                placeholder="Share your note, history, testimony, clan lore, or proverb..."
                 rows={4}
                 maxLength={maxChars}
                 className="w-full bg-transparent text-[#e7e9ea] placeholder-[#71767b] text-sm resize-none focus:outline-none leading-relaxed"
@@ -204,14 +170,14 @@ export function TwitterVoiceModal({ onClose, onSuccess }: TwitterVoiceModalProps
                 <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-white/[0.04] border border-emerald-500/30 text-xs mt-1">
                   <div className="flex items-center gap-2">
                     <span className="h-6 w-6 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-xs">
-                      {profile.avatarSymbol || 'á»'}
+                      {profile.avatarSymbol || 'ọ'}
                     </span>
                     <div className="flex flex-col">
                       <span className="font-semibold text-white leading-tight">
                         {profile.displayName || `@${profile.username}`}
                       </span>
                       <span className="text-[10px] text-emerald-400 font-mono">
-                        @{profile.username} â€¢ Linked to Device
+                        @{profile.username} • Linked to Device
                       </span>
                     </div>
                   </div>

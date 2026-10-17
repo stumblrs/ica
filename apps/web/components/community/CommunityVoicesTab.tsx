@@ -63,29 +63,7 @@ function timeAgo(dateString: string): string {
   }
 }
 
-const LOCAL_POSTED_COMMENTS_KEY = 'ica_local_posted_comments_v2';
 const LOCAL_CITES_MAP_KEY = 'ica_local_cites_map_v2';
-
-function getLocalPostedComments(): EnrichedComment[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(LOCAL_POSTED_COMMENTS_KEY);
-    if (!raw) return [];
-    const list = JSON.parse(raw);
-    return Array.isArray(list) ? list : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveLocalPostedComment(cmt: EnrichedComment) {
-  if (typeof window === 'undefined') return;
-  try {
-    const current = getLocalPostedComments();
-    const updated = [cmt, ...current.filter((c) => c.id !== cmt.id)].slice(0, 100);
-    localStorage.setItem(LOCAL_POSTED_COMMENTS_KEY, JSON.stringify(updated));
-  } catch {}
-}
 
 function getLocalCitesMap(): Record<string, number> {
   if (typeof window === 'undefined') return {};
@@ -107,19 +85,17 @@ function saveLocalCiteCount(id: string, count: number) {
 }
 
 export function CommunityVoicesTab(_props: CommunityVoicesTabProps) {
-  const [comments, setComments] = useState<EnrichedComment[]>(() => getLocalPostedComments());
+  const [comments, setComments] = useState<EnrichedComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   // Composer state
   const [authorName, setAuthorName] = useState<string>('');
   const [authorHandle, setAuthorHandle] = useState<string>('');
   const [affiliation, setAffiliation] = useState<string>('Indigene');
-  const [category, setCategory] = useState<'oral-history' | 'dialect' | 'lineage' | 'tradition' | 'general'>('oral-history');
   const [commentText, setCommentText] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
@@ -164,8 +140,6 @@ export function CommunityVoicesTab(_props: CommunityVoicesTabProps) {
       const newCmt = customEvent.detail;
       if (!newCmt) return;
 
-      saveLocalPostedComment(newCmt);
-
       setComments((prev) => [newCmt, ...prev.filter((c) => c.id !== newCmt.id)]);
       setLikesCountMap((prev) => ({ ...prev, [newCmt.id]: newCmt.likes || 0 }));
       setCitesCountMap((prev) => ({ ...prev, [newCmt.id]: newCmt.citesCount || 0 }));
@@ -181,10 +155,7 @@ export function CommunityVoicesTab(_props: CommunityVoicesTabProps) {
         });
       }
 
-      // Reset filters so the new comment appears right at the top of the feed
-      setSelectedCategory('all');
       setSearchQuery('');
-
       topFeedRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
 
@@ -230,9 +201,9 @@ export function CommunityVoicesTab(_props: CommunityVoicesTabProps) {
                           authorName: item.author || 'Contributor',
                           handle: item.handle || `@${item.author?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'resident'}`,
                           affiliation: 'Community Member',
-                          category: item.category || 'general',
                           comment: item.content || '',
                           likes: item.likes || 0,
+                          citesCount: item.citesCount || 0,
                           createdAt: item.createdAt || new Date().toISOString(),
                         });
                       }
@@ -276,26 +247,15 @@ export function CommunityVoicesTab(_props: CommunityVoicesTabProps) {
       if (res.ok) {
         const data = await res.json();
         const items: EnrichedComment[] = Array.isArray(data) ? data : (data.comments || []);
-        const sorted = items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-        // Merge with local persistent storage so comments posted on this device NEVER disappear
-        const localSaved = getLocalPostedComments();
-        const serverIds = new Set(sorted.map((s) => s.id));
-        const localOnly = localSaved.filter((p) => !serverIds.has(p.id));
-        const combined = [...localOnly, ...sorted];
-        const finalComments = combined.sort(
-          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-
-        setComments(finalComments);
+        setComments(items);
         setNextCursor(data.nextCursor || null);
         setHasMore(Boolean(data.hasMore));
 
-        // Restore likes & cites maps, merging local increments with server values
+        // Restore likes & cites maps
         const localCites = getLocalCitesMap();
         setCitesCountMap((prev) => {
           const next = { ...localCites, ...prev };
-          sorted.forEach((c) => {
+          items.forEach((c) => {
             const serverVal = c.citesCount ?? 0;
             const currentVal = next[c.id] ?? 0;
             next[c.id] = Math.max(serverVal, currentVal);
@@ -305,7 +265,7 @@ export function CommunityVoicesTab(_props: CommunityVoicesTabProps) {
 
         setLikesCountMap((prev) => {
           const next = { ...prev };
-          sorted.forEach((c) => {
+          items.forEach((c) => {
             if (next[c.id] === undefined) {
               next[c.id] = c.likes ?? 0;
             } else {
@@ -316,11 +276,7 @@ export function CommunityVoicesTab(_props: CommunityVoicesTabProps) {
         });
       }
     } catch (err) {
-      console.error('Failed to load comments:', err);
-      const localSaved = getLocalPostedComments();
-      if (localSaved.length > 0) {
-        setComments(localSaved);
-      }
+      console.error('Failed to load comments from server:', err);
     } finally {
       setLoading(false);
     }
@@ -432,7 +388,6 @@ export function CommunityVoicesTab(_props: CommunityVoicesTabProps) {
           authorName: finalAuthor,
           handle: finalHandle,
           affiliation: affiliation.trim() || undefined,
-          category,
           comment: commentText.trim(),
           deviceId: effectiveDeviceId,
           fingerprintHash: effectiveFingerprint || undefined,
@@ -444,10 +399,7 @@ export function CommunityVoicesTab(_props: CommunityVoicesTabProps) {
       if (res.ok) {
         const newEnriched: EnrichedComment = await res.json();
 
-        // 1. Immediately persist to localStorage so it never disappears on refresh, filter, or tab switch
-        saveLocalPostedComment(newEnriched);
-
-        // 2. Push new comment to the top of feed immediately, deduplicating
+        // Push new comment to the top of feed immediately
         setComments((prev) => [newEnriched, ...prev.filter((c) => c.id !== newEnriched.id)]);
         setLikesCountMap((prev) => ({ ...prev, [newEnriched.id]: 0 }));
         setCitesCountMap((prev) => ({ ...prev, [newEnriched.id]: 0 }));
@@ -463,22 +415,17 @@ export function CommunityVoicesTab(_props: CommunityVoicesTabProps) {
           });
         }
 
-        // Reset filters so user is 100% guaranteed to see their post at the top of the feed
-        setSelectedCategory('all');
         setSearchQuery('');
-
         setSubmitSuccess(true);
         setCommentText('');
         setReplyTarget(null);
         setIsComposerExpanded(false);
 
-        // Smooth scroll to top of feed
         topFeedRef.current?.scrollIntoView({ behavior: 'smooth' });
-
         setTimeout(() => setSubmitSuccess(false), 3000);
       } else {
         const err = await res.json().catch(() => ({}));
-        setFormError(err.error || 'Failed to post comment');
+        setFormError(err.error || 'Failed to post note to database');
       }
     } catch (err: any) {
       setFormError(err.message || 'Error submitting comment');
@@ -488,24 +435,17 @@ export function CommunityVoicesTab(_props: CommunityVoicesTabProps) {
   }
 
 
-  // Filtered comments timeline
+  // Filtered comments timeline (search by keyword/handle/author)
   const filteredComments = useMemo(() => {
+    if (!searchQuery.trim()) return comments;
+    const q = searchQuery.toLowerCase();
     return comments.filter((cmt) => {
-      if (selectedCategory !== 'all' && cmt.category !== selectedCategory) {
-        return false;
-      }
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchesContent = cmt.comment.toLowerCase().includes(q);
-        const matchesAuthor = cmt.authorName.toLowerCase().includes(q);
-        const matchesHandle = cmt.handle?.toLowerCase().includes(q);
-        if (!matchesContent && !matchesAuthor && !matchesHandle) {
-          return false;
-        }
-      }
-      return true;
+      const matchesContent = cmt.comment.toLowerCase().includes(q);
+      const matchesAuthor = cmt.authorName.toLowerCase().includes(q);
+      const matchesHandle = cmt.handle?.toLowerCase().includes(q);
+      return matchesContent || matchesAuthor || matchesHandle;
     });
-  }, [comments, selectedCategory, searchQuery]);
+  }, [comments, searchQuery]);
 
   return (
     <div className="space-y-4 rise select-text">
@@ -514,22 +454,6 @@ export function CommunityVoicesTab(_props: CommunityVoicesTabProps) {
       {/* TWEET-STYLE COMPOSER (Top of Feed) */}
       <section className="card p-3.5 border-emerald-500/25 bg-gradient-to-b from-white/[0.04] to-white/[0.01] shadow-xl">
         <form onSubmit={handlePostComment} className="space-y-3">
-          {/* Tagged Location Pill */}
-          <div className="flex items-center justify-between gap-2 flex-wrap pb-2 border-b border-white/[0.06]">
-
-            {/* Category Chip Selector */}
-            <select
-              value={category}
-              onChange={(e: any) => setCategory(e.target.value)}
-              className="bg-black/50 border border-white/10 rounded-lg px-2 py-1 text-[11px] text-slate-200 focus:outline-none focus:border-emerald-500 font-mono"
-            >
-              <option value="oral-history">📜 Oral History</option>
-              <option value="dialect">🗣️ Dialect & Phrase</option>
-              <option value="lineage">🌿 Lineage & Clan</option>
-              <option value="tradition">🎭 Traditional Customs</option>
-              <option value="general">📢 General Update</option>
-            </select>
-          </div>
 
 
           {/* Citation Banner if replying */}
@@ -696,39 +620,19 @@ export function CommunityVoicesTab(_props: CommunityVoicesTabProps) {
 
         {/* State Filter Chips with Compact Refresh Action */}
         <div className="flex items-center justify-between gap-1.5 py-0.5">
+          <span className="text-[11px] font-mono text-slate-400">
+            Global Public Timeline ({comments.length} posts)
+          </span>
           <button
             type="button"
             onClick={() => loadInitialComments()}
-            className="shrink-0 p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-slate-400 hover:text-white transition-all active:scale-95"
+            className="shrink-0 p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-slate-400 hover:text-white transition-all active:scale-95 flex items-center gap-1.5 text-[11px]"
             title="Refresh Timeline"
             aria-label="Refresh Timeline"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-emerald-400' : ''}`} />
+            <span>Refresh</span>
           </button>
-        </div>
-
-        {/* Category Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar">
-          {[
-            { id: 'all', label: 'All Categories' },
-            { id: 'oral-history', label: '📜 Oral History' },
-            { id: 'dialect', label: '🗣️ Dialect' },
-            { id: 'lineage', label: '🌿 Lineage' },
-            { id: 'tradition', label: '🎭 Tradition' },
-          ].map((cat) => (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`px-2 py-0.5 rounded-md text-[10px] font-mono transition-all shrink-0 ${
-                selectedCategory === cat.id
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
         </div>
       </div>
 
@@ -796,12 +700,6 @@ export function CommunityVoicesTab(_props: CommunityVoicesTabProps) {
                       )}
                     </div>
                   </div>
-
-                  {cmt.category && (
-                    <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/[0.08] text-slate-300 shrink-0">
-                      {cmt.category.replace('-', ' ')}
-                    </span>
-                  )}
                 </div>
 
                 {/* Replying indicator */}
