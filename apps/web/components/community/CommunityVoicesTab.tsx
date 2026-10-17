@@ -256,19 +256,46 @@ export function CommunityVoicesTab({
         const data = await res.json();
         const items: EnrichedComment[] = Array.isArray(data) ? data : (data.comments || []);
         const sorted = items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        setComments(sorted);
+
+        // Deduplicate and preserve any locally posted comments that may not be in the server slice yet
+        setComments((prev) => {
+          const serverIds = new Set(sorted.map((s) => s.id));
+          const localOnly = prev.filter(
+            (p) => !serverIds.has(p.id) && Date.now() - new Date(p.createdAt).getTime() < 120000
+          );
+          const combined = [...localOnly, ...sorted];
+          return combined.sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+        });
+
         setNextCursor(data.nextCursor || null);
         setHasMore(Boolean(data.hasMore));
 
-        // Populate initial likes & cites map
-        const initialLikes: Record<string, number> = {};
-        const initialCites: Record<string, number> = {};
-        sorted.forEach((c) => {
-          initialLikes[c.id] = c.likes ?? 0;
-          initialCites[c.id] = c.citesCount ?? 0;
+        // Populate initial likes & cites map, preserving active optimistic counts
+        setLikesCountMap((prev) => {
+          const next = { ...prev };
+          sorted.forEach((c) => {
+            if (next[c.id] === undefined) {
+              next[c.id] = c.likes ?? 0;
+            } else {
+              next[c.id] = Math.max(next[c.id], c.likes ?? 0);
+            }
+          });
+          return next;
         });
-        setLikesCountMap(initialLikes);
-        setCitesCountMap(initialCites);
+
+        setCitesCountMap((prev) => {
+          const next = { ...prev };
+          sorted.forEach((c) => {
+            if (next[c.id] === undefined) {
+              next[c.id] = c.citesCount ?? 0;
+            } else {
+              next[c.id] = Math.max(next[c.id], c.citesCount ?? 0);
+            }
+          });
+          return next;
+        });
       }
     } catch (err) {
       console.error('Failed to load comments:', err);
@@ -354,7 +381,10 @@ export function CommunityVoicesTab({
     setReplyTarget(comment);
     const handle = comment.handle || `@${comment.authorName.replace(/\s+/g, '')}`;
     setCommentText((prev) => (prev ? `${prev} ${handle} ` : `${handle} `));
-    setSelectedCommId(comment.communityId);
+    const match = communities.find(
+      (c) => c.id === comment.communityId || (c.name && c.name.toLowerCase() === comment.communityName.toLowerCase())
+    );
+    setSelectedCommId(match?.id || comment.communityId || comment.communityName);
     composerTextareaRef.current?.focus();
     topFeedRef.current?.scrollIntoView({ behavior: 'smooth' });
   }
@@ -480,7 +510,12 @@ export function CommunityVoicesTab({
 
   // Current selected community object for composer tag
   const activeTaggedCommunity = useMemo(() => {
-    return communities.find((c) => c.id === selectedCommId);
+    if (!selectedCommId) return undefined;
+    return communities.find(
+      (c) =>
+        c.id === selectedCommId ||
+        (c.name && c.name.toLowerCase() === selectedCommId.toLowerCase())
+    );
   }, [communities, selectedCommId]);
 
   // Filtered community options for autocomplete picker

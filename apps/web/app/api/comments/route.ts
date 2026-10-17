@@ -9,18 +9,19 @@ import {
   readCommentsStore,
   type StoredComment,
 } from '@/lib/comment-store';
+import { readCommunityStore } from '@/lib/community-store';
 import { createNotification } from '@/lib/notification-store';
 import { findProfileByUsername } from '@/lib/profile-store';
 
 export const dynamic = 'force-dynamic';
 
-// In-memory microcache to avoid Supabase egress exhaustion on repeated feed loads
+// In-memory microcache to avoid unnecessary database pressure on rapid feed refreshes
 interface CommentsCacheEntry {
   data: { comments: EnrichedComment[]; nextCursor: string | null; hasMore: boolean };
   timestamp: number;
 }
 const commentsCache = new Map<string, CommentsCacheEntry>();
-const CACHE_TTL_MS = 10000; // 10 seconds
+const CACHE_TTL_MS = 5000; // 5 seconds
 
 function invalidateCommentsCache() {
   commentsCache.clear();
@@ -56,9 +57,8 @@ export interface EnrichedComment {
 
 /**
  * GET /api/comments
- * Returns a unified global feed of oral testimonies and comments.
- * Merges comments from both PostgreSQL (if available) and the persistent store,
- * guaranteeing zero disappeared comments across all devices.
+ * Returns a unified global feed of oral testimonies and comments with newest at the head.
+ * Direct PostgreSQL access via Prisma is authoritative, seamlessly merged with persistent store.
  */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
   const cursor = searchParams.get('cursor') || undefined;
   const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '15', 10), 1), 50);
 
-  // Egress optimization: check microcache
+  // Check microcache
   const cacheKey = `${stateFilter || 'all'}:${communityId || 'all'}:${cursor || 'start'}:${limit}`;
   const cached = commentsCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
@@ -76,128 +76,166 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // 1. Load comments from local offline-first persistent store
-  const storeComments = readCommentsStore();
   const commentsMap = new Map<string, EnrichedComment>();
+  const communityStore = readCommunityStore();
 
-  // Populate from persistent store first
-  for (const c of storeComments) {
-    commentsMap.set(c.id, {
-      id: c.id,
-      communityId: c.communityId,
-      communityName: c.communityName,
-      lgaName: c.lgaName,
-      stateName: c.stateName,
-      coordinates: c.coordinates,
-      authorName: c.authorName,
-      handle: c.handle,
-      affiliation: c.affiliation || 'Community Member',
-      category: c.category,
-      comment: c.comment,
-      likes: c.likes || 0,
-      citesCount: c.citesCount || 0,
-      replyToHandle: c.replyToHandle,
-      replyToCommentId: c.replyToCommentId,
-      createdAt: c.createdAt,
-    });
-  }
-
-  // 2. Query Supabase directly first, with Prisma as fallback
+  // 1. Primary Source: Query PostgreSQL via Prisma (server-level connection)
   try {
-    const { data: sbComments, error: sbErr } = await supabase
-      .from('Comment')
-      .select(`
-        id,
-        communityId,
-        author,
-        handle,
-        content,
-        category,
-        likes,
-        citesCount,
-        replyToHandle,
-        replyToCommentId,
-        createdAt,
-        community:Community (
-          id,
-          name,
-          lgaName,
-          stateName,
-          longitude,
-          latitude
-        )
-      `)
-      .order('createdAt', { ascending: false })
-      .limit(100);
-
-    if (!sbErr && sbComments) {
-      for (const cmt of sbComments as any[]) {
-        if (!commentsMap.has(cmt.id)) {
-          const comm = Array.isArray(cmt.community) ? cmt.community[0] : cmt.community;
-          commentsMap.set(cmt.id, {
-            id: cmt.id,
-            communityId: cmt.communityId || '',
-            communityName: comm?.name || 'Community',
-            lgaName: comm?.lgaName,
-            stateName: comm?.stateName,
-            coordinates: [comm?.longitude || 7.0, comm?.latitude || 6.2],
-            authorName: cmt.author,
-            handle: cmt.handle || `@${cmt.author?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'resident'}`,
-            affiliation: 'Community Member',
-            category: cmt.category,
-            comment: cmt.content,
-            likes: cmt.likes || 0,
-            citesCount: cmt.citesCount || 0,
-            replyToHandle: cmt.replyToHandle || undefined,
-            replyToCommentId: cmt.replyToCommentId || undefined,
-            createdAt: typeof cmt.createdAt === 'string' ? cmt.createdAt : new Date(cmt.createdAt).toISOString(),
-          });
-        }
-      }
-    } else {
-      // Supabase PostgREST had an issue, fallback to Prisma
-      const dbComments = await prisma.comment.findMany({
-        include: {
-          community: {
-            select: {
-              id: true,
-              name: true,
-              lgaName: true,
-              stateName: true,
-              longitude: true,
-              latitude: true,
-            },
+    const dbComments = await prisma.comment.findMany({
+      include: {
+        community: {
+          select: {
+            id: true,
+            name: true,
+            lgaName: true,
+            stateName: true,
+            longitude: true,
+            latitude: true,
           },
         },
-        orderBy: { createdAt: 'desc' },
-        take: 100,
-      });
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
 
-      for (const cmt of dbComments) {
-        if (!commentsMap.has(cmt.id)) {
-          commentsMap.set(cmt.id, {
-            id: cmt.id,
-            communityId: cmt.communityId || '',
-            communityName: cmt.community?.name || 'Community',
-            lgaName: cmt.community?.lgaName,
-            stateName: cmt.community?.stateName,
-            coordinates: [cmt.community?.longitude || 7.0, cmt.community?.latitude || 6.2],
-            authorName: cmt.author,
-            handle: cmt.handle || `@${cmt.author.toLowerCase().replace(/[^a-z0-9]/g, '') || 'resident'}`,
-            affiliation: 'Community Member',
-            category: cmt.category,
-            comment: cmt.content,
-            likes: cmt.likes,
-            citesCount: (cmt as any).citesCount || 0,
-            replyToHandle: (cmt as any).replyToHandle || undefined,
-            replyToCommentId: (cmt as any).replyToCommentId || undefined,
-            createdAt: cmt.createdAt.toISOString(),
-          });
+    for (const cmt of dbComments) {
+      let commName = cmt.community?.name;
+      let lgaName = cmt.community?.lgaName;
+      let stateName = cmt.community?.stateName;
+      let coords: [number, number] = [cmt.community?.longitude || 7.0, cmt.community?.latitude || 6.2];
+
+      // If relation is null (e.g. communityId was a store ID or slug), hydrate from community store
+      if ((!commName || !stateName) && cmt.communityId) {
+        const matched = communityStore.find(
+          (c) =>
+            c.id === cmt.communityId ||
+            (c.name && c.name.toLowerCase() === cmt.communityId?.toLowerCase())
+        );
+        if (matched) {
+          commName = commName || matched.name;
+          lgaName = lgaName || matched.lgaName;
+          stateName = stateName || matched.stateName;
+          coords = [matched.longitude, matched.latitude];
         }
       }
+
+      // Also fall back to location string if stored
+      if (!commName && cmt.location) {
+        commName = cmt.location;
+      }
+
+      commentsMap.set(cmt.id, {
+        id: cmt.id,
+        communityId: cmt.communityId || '',
+        communityName: commName || 'Igbo Settlement',
+        lgaName: lgaName || undefined,
+        stateName: stateName || undefined,
+        coordinates: coords,
+        authorName: cmt.author,
+        handle: cmt.handle || `@${cmt.author.toLowerCase().replace(/[^a-z0-9]/g, '') || 'resident'}`,
+        affiliation: 'Community Member',
+        category: cmt.category,
+        comment: cmt.content,
+        likes: cmt.likes || 0,
+        citesCount: (cmt as any).citesCount || 0,
+        replyToHandle: (cmt as any).replyToHandle || undefined,
+        replyToCommentId: (cmt as any).replyToCommentId || undefined,
+        createdAt: cmt.createdAt.toISOString(),
+      });
     }
-  } catch (err: any) {
-    // Database offline - proceed with merged file store
+  } catch (dbErr: any) {
+    console.warn('[CommentsAPI] Primary Prisma fetch failed, checking Supabase/store fallback:', dbErr.message);
+    try {
+      const { data: sbComments, error: sbErr } = await supabase
+        .from('Comment')
+        .select(`
+          id,
+          communityId,
+          author,
+          handle,
+          content,
+          category,
+          likes,
+          citesCount,
+          replyToHandle,
+          replyToCommentId,
+          createdAt,
+          community:Community (
+            id,
+            name,
+            lgaName,
+            stateName,
+            longitude,
+            latitude
+          )
+        `)
+        .order('createdAt', { ascending: false })
+        .limit(100);
+
+      if (!sbErr && Array.isArray(sbComments) && sbComments.length > 0) {
+        for (const cmt of sbComments as any[]) {
+          if (!commentsMap.has(cmt.id)) {
+            const comm = Array.isArray(cmt.community) ? cmt.community[0] : cmt.community;
+            commentsMap.set(cmt.id, {
+              id: cmt.id,
+              communityId: cmt.communityId || '',
+              communityName: comm?.name || 'Community',
+              lgaName: comm?.lgaName,
+              stateName: comm?.stateName,
+              coordinates: [comm?.longitude || 7.0, comm?.latitude || 6.2],
+              authorName: cmt.author,
+              handle: cmt.handle || `@${cmt.author?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'resident'}`,
+              affiliation: 'Community Member',
+              category: cmt.category,
+              comment: cmt.content,
+              likes: cmt.likes || 0,
+              citesCount: cmt.citesCount || 0,
+              replyToHandle: cmt.replyToHandle || undefined,
+              replyToCommentId: cmt.replyToCommentId || undefined,
+              createdAt: typeof cmt.createdAt === 'string' ? cmt.createdAt : new Date(cmt.createdAt).toISOString(),
+            });
+          }
+        }
+      }
+    } catch {
+      // Supabase offline
+    }
+  }
+
+  // 2. Secondary Source: Merge persistent file store comments
+  const storeComments = readCommentsStore();
+  for (const c of storeComments) {
+    const existing = commentsMap.get(c.id);
+    if (existing) {
+      // Reconcile maximum likes/cites counts between store and DB
+      existing.likes = Math.max(existing.likes || 0, c.likes || 0);
+      existing.citesCount = Math.max(existing.citesCount || 0, c.citesCount || 0);
+      if (!existing.replyToCommentId && c.replyToCommentId) {
+        existing.replyToCommentId = c.replyToCommentId;
+      }
+      if (!existing.replyToHandle && c.replyToHandle) {
+        existing.replyToHandle = c.replyToHandle;
+      }
+    } else {
+      commentsMap.set(c.id, {
+        id: c.id,
+        communityId: c.communityId,
+        communityName: c.communityName,
+        lgaName: c.lgaName,
+        stateName: c.stateName,
+        coordinates: c.coordinates,
+        authorName: c.authorName,
+        handle: c.handle,
+        affiliation: c.affiliation || 'Community Member',
+        category: c.category,
+        comment: c.comment,
+        likes: c.likes || 0,
+        citesCount: c.citesCount || 0,
+        replyToHandle: c.replyToHandle,
+        replyToCommentId: c.replyToCommentId,
+        createdAt: c.createdAt,
+      });
+    }
   }
 
   // 3. Attach full citedComment details for any comment that cites another
@@ -214,11 +252,24 @@ export async function GET(req: NextRequest) {
           coordinates: cited.coordinates,
           comment: cited.comment,
         };
+      } else {
+        const fromStore = storeComments.find((sc) => sc.id === c.replyToCommentId);
+        if (fromStore) {
+          c.citedComment = {
+            id: fromStore.id,
+            authorName: fromStore.authorName,
+            handle: fromStore.handle,
+            communityName: fromStore.communityName,
+            stateName: fromStore.stateName,
+            coordinates: fromStore.coordinates,
+            comment: fromStore.comment,
+          };
+        }
       }
     }
   }
 
-  // 4. Convert to sorted unified array
+  // 4. Convert to sorted unified array (newest at the head)
   let allUnified = Array.from(commentsMap.values()).sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
@@ -255,7 +306,7 @@ export async function GET(req: NextRequest) {
     hasMore,
   };
 
-  // Cache response to protect free tier egress
+  // Cache response to protect server egress
   commentsCache.set(cacheKey, {
     data: resultPayload,
     timestamp: Date.now(),
@@ -346,7 +397,15 @@ export async function POST(req: NextRequest) {
           : `@${handle.trim().slice(0, 39)}`
         : `@${targetAuthor.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30) || 'resident'}`;
 
-    // 4. Resolve community details from Prisma to prevent foreign key errors
+    // 4. Resolve community details from persistent community store and Prisma
+    const communityStore = readCommunityStore();
+    const storeComm = communityStore.find(
+      (c) =>
+        c.id === communityId ||
+        (c.name && c.name.toLowerCase() === String(communityId).toLowerCase())
+    );
+    const lookupName = storeComm?.name || communityId;
+
     let resolvedComm: {
       id: string;
       name: string;
@@ -362,7 +421,8 @@ export async function POST(req: NextRequest) {
         where: {
           OR: [
             { id: communityId },
-            { name: { equals: communityId, mode: 'insensitive' } },
+            { name: { equals: lookupName, mode: 'insensitive' } },
+            { name: { contains: lookupName, mode: 'insensitive' } },
           ],
         },
         select: {
@@ -380,6 +440,15 @@ export async function POST(req: NextRequest) {
     } catch {
       // DB offline - fallback to store
     }
+
+    const finalCommunityName = resolvedComm?.name || storeComm?.name || location || 'Igbo Settlement';
+    const finalStateName = resolvedComm?.stateName || storeComm?.stateName || undefined;
+    const finalLgaName = resolvedComm?.lgaName || storeComm?.lgaName || undefined;
+    const finalCoords: [number, number] = resolvedComm
+      ? [resolvedComm.longitude, resolvedComm.latitude]
+      : storeComm
+      ? [storeComm.longitude, storeComm.latitude]
+      : [7.0, 6.2];
 
     // 5. Look up cited comment if replying/citing
     let citedCommentDetails: EnrichedComment['citedComment'] = undefined;
@@ -407,7 +476,7 @@ export async function POST(req: NextRequest) {
               id: dbCited.id,
               authorName: dbCited.author,
               handle: dbCited.handle || `@${dbCited.author.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
-              communityName: dbCited.community?.name || 'Community',
+              communityName: dbCited.community?.name || dbCited.location || 'Community',
               stateName: dbCited.community?.stateName || undefined,
               coordinates: dbCited.community ? [dbCited.community.longitude, dbCited.community.latitude] : undefined,
               comment: dbCited.content,
@@ -421,18 +490,18 @@ export async function POST(req: NextRequest) {
 
     // 6. Save to unified persistent store
     const stored = saveCommentToStore({
-      communityId: resolvedDbCommunityId || communityId,
-      communityName: resolvedComm?.name,
-      lgaName: resolvedComm?.lgaName || undefined,
-      stateName: resolvedComm?.stateName || undefined,
-      coordinates: resolvedComm ? [resolvedComm.longitude, resolvedComm.latitude] : undefined,
+      communityId: resolvedDbCommunityId || storeComm?.id || communityId,
+      communityName: finalCommunityName,
+      lgaName: finalLgaName,
+      stateName: finalStateName,
+      coordinates: finalCoords,
       authorName: targetAuthor,
       handle: targetHandle,
       comment: targetComment.trim(),
       category: String(category).slice(0, 50),
       affiliation: affiliation ? String(affiliation).slice(0, 60) : undefined,
       deviceId,
-      location: location ? String(location).slice(0, 100) : undefined,
+      location: location ? String(location).slice(0, 100) : finalCommunityName.slice(0, 100),
       replyToHandle: replyToHandle || undefined,
       replyToCommentId: replyToCommentId || undefined,
     });
@@ -497,9 +566,9 @@ export async function POST(req: NextRequest) {
       console.warn('[CommentsAPI] Notification trigger error:', notifErr.message);
     }
 
-    // 8. Persist to database via Prisma (server-level admin connection)
-    try {
-      if (deviceId) {
+    // 8. Persist to PostgreSQL via Prisma (isolated blocks for absolute reliability)
+    if (deviceId) {
+      try {
         await prisma.device.upsert({
           where: { id: deviceId },
           update: {
@@ -513,20 +582,25 @@ export async function POST(req: NextRequest) {
             fingerprintHash: cleanFingerprint,
           },
         });
+      } catch (devErr: any) {
+        console.warn('[CommentsAPI] Device upsert warning:', devErr.message);
       }
+    }
 
-      // If this comment cited an existing comment, increment citesCount in Postgres
-      if (replyToCommentId) {
-        try {
-          await (prisma.comment as any).update({
-            where: { id: replyToCommentId },
-            data: { citesCount: { increment: 1 } },
-          });
-        } catch (citeErr: any) {
-          console.warn('[CommentsAPI] Failed to increment citesCount on cited comment:', citeErr.message);
-        }
+    // If this comment cited an existing comment, increment citesCount in Postgres
+    if (replyToCommentId) {
+      try {
+        await (prisma.comment as any).update({
+          where: { id: replyToCommentId },
+          data: { citesCount: { increment: 1 } },
+        });
+      } catch (citeErr: any) {
+        console.warn('[CommentsAPI] Failed to increment citesCount on cited comment:', citeErr.message);
       }
+    }
 
+    // Insert comment into PostgreSQL
+    try {
       await (prisma.comment as any).create({
         data: {
           id: stored.id,
@@ -536,7 +610,7 @@ export async function POST(req: NextRequest) {
           handle: targetHandle,
           content: targetComment.trim(),
           category: String(category).slice(0, 50),
-          location: location ? String(location).slice(0, 100) : null,
+          location: location ? String(location).slice(0, 100) : finalCommunityName.slice(0, 100),
           likes: 0,
           citesCount: 0,
           replyToCommentId: replyToCommentId || null,

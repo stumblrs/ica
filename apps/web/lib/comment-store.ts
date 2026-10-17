@@ -62,14 +62,9 @@ export function readCommentsStore(): StoredComment[] {
 }
 
 export function writeCommentsStore(comments: StoredComment[]): boolean {
-  // On serverless / Vercel production, local filesystem is read-only.
-  if (process.env.NODE_ENV === 'production') {
-    return false;
-  }
-
   const cwd = process.cwd();
   const existing = findExistingCommentStorePath();
-  const target = existing || path.resolve(cwd, '.data/comments_store.json');
+  const target = existing || path.resolve(cwd, 'apps/web/.data/comments_store.json');
 
   try {
     fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -105,7 +100,9 @@ export function saveCommentToStore(item: {
   // Try to find community info from communities_store
   const communities = readCommunityStore();
   const matchedComm = communities.find(
-    (c) => c.id === item.communityId || c.name.toLowerCase() === item.communityId.toLowerCase()
+    (c) =>
+      c.id === item.communityId ||
+      (c.name && item.communityId && c.name.toLowerCase() === String(item.communityId).toLowerCase())
   );
 
   const author = item.authorName?.trim() || 'Anonymous Resident';

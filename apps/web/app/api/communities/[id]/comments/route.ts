@@ -6,6 +6,7 @@ import {
   getCommentsFromStore,
   type StoredComment,
 } from '@/lib/comment-store';
+import { readCommunityStore } from '@/lib/community-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,16 +18,54 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   const { id } = params;
+  const communityStore = readCommunityStore();
+  const matched = communityStore.find(
+    (c) => c.id === id || (c.name && c.name.toLowerCase() === id.toLowerCase())
+  );
+  const lookupName = matched?.name || id;
 
-  // 1. Try Supabase directly first
+  // 1. Primary: Direct query via Prisma
+  try {
+    const comments = await prisma.comment.findMany({
+      where: {
+        OR: [
+          { communityId: id },
+          ...(matched ? [{ communityId: matched.id }] : []),
+          { location: { equals: lookupName, mode: 'insensitive' } },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    if (comments.length > 0) {
+      const formatted = comments.map((c) => ({
+        id: c.id,
+        communityId: c.communityId || id,
+        authorName: c.author,
+        handle: c.handle || `@${c.author.toLowerCase().replace(/[^a-z0-9]/g, '') || 'resident'}`,
+        affiliation: 'Community Member',
+        comment: c.content,
+        likes: c.likes || 0,
+        citesCount: (c as any).citesCount || 0,
+        category: c.category,
+        createdAt: c.createdAt.toISOString(),
+      }));
+      return NextResponse.json(formatted);
+    }
+  } catch (err: any) {
+    console.warn(`[CommunityCommentsAPI] Prisma error: ${err.message}. Checking fallbacks.`);
+  }
+
+  // 2. Fallback: Supabase directly
   try {
     const { data: comments, error } = await supabase
       .from('Comment')
-      .select('id, communityId, author, handle, content, category, likes, createdAt')
-      .eq('communityId', id)
+      .select('id, communityId, author, handle, content, category, likes, citesCount, createdAt')
+      .or(`communityId.eq.${id},location.ilike.${lookupName}`)
       .order('createdAt', { ascending: false });
 
-    if (!error && comments && comments.length > 0) {
+    if (!error && Array.isArray(comments) && comments.length > 0) {
       const formatted = comments.map((c) => ({
         id: c.id,
         communityId: c.communityId,
@@ -35,6 +74,7 @@ export async function GET(
         affiliation: 'Community Member',
         comment: c.content,
         likes: c.likes || 0,
+        citesCount: c.citesCount || 0,
         category: c.category,
         createdAt: typeof c.createdAt === 'string' ? c.createdAt : new Date(c.createdAt).toISOString(),
       }));
@@ -42,31 +82,6 @@ export async function GET(
     }
   } catch (err: any) {
     // Supabase error fallback
-  }
-
-  // 2. Try Prisma fallback
-  try {
-    const comments = await prisma.comment.findMany({
-      where: { communityId: id },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    if (comments.length > 0) {
-      const formatted = comments.map((c) => ({
-        id: c.id,
-        communityId: c.communityId,
-        authorName: c.author,
-        handle: c.handle || `@${c.author.toLowerCase().replace(/[^a-z0-9]/g, '') || 'resident'}`,
-        affiliation: 'Community Member',
-        comment: c.content,
-        likes: c.likes,
-        category: c.category,
-        createdAt: c.createdAt.toISOString(),
-      }));
-      return NextResponse.json(formatted);
-    }
-  } catch (err: any) {
-    console.warn(`[CommunityCommentsAPI] PostgreSQL offline: ${err.message}. Reading from store.`);
   }
 
   // 3. Offline store fallback
@@ -104,20 +119,49 @@ export async function POST(
         : 'Anonymous Contributor';
     const cleanHandle = `@${cleanAuthor.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30) || 'resident'}`;
 
-    // 1. Always save to offline file store first
+    // Resolve community
+    const communityStore = readCommunityStore();
+    const matched = communityStore.find(
+      (c) => c.id === id || (c.name && c.name.toLowerCase() === id.toLowerCase())
+    );
+    const lookupName = matched?.name || id;
+
+    let resolvedDbCommunityId: string | null = null;
+    try {
+      const comm = await prisma.community.findFirst({
+        where: {
+          OR: [
+            { id },
+            { name: { equals: lookupName, mode: 'insensitive' } },
+            { name: { contains: lookupName, mode: 'insensitive' } },
+          ],
+        },
+        select: { id: true, name: true },
+      });
+      if (comm) resolvedDbCommunityId = comm.id;
+    } catch {}
+
+    const finalCommunityName = matched?.name || lookupName;
+
+    // 1. Always save to offline file store
     const stored = saveCommentToStore({
-      communityId: id,
+      communityId: resolvedDbCommunityId || matched?.id || id,
+      communityName: finalCommunityName,
+      stateName: matched?.stateName,
+      lgaName: matched?.lgaName,
+      coordinates: matched ? [matched.longitude, matched.latitude] : undefined,
       authorName: cleanAuthor,
       handle: cleanHandle,
       comment: commentText.trim(),
       category: String(category).slice(0, 50),
       affiliation: affiliation ? String(affiliation).slice(0, 60) : undefined,
       deviceId,
+      location: finalCommunityName,
     });
 
-    // 2. Persist to database via Prisma (server-level admin connection)
-    try {
-      if (deviceId) {
+    // 2. Persist device to database
+    if (deviceId) {
+      try {
         await prisma.device.upsert({
           where: { id: deviceId },
           update: {
@@ -131,23 +175,13 @@ export async function POST(
             fingerprintHash: cleanFingerprint,
           },
         });
+      } catch (devErr: any) {
+        console.warn('[CommunityCommentsAPI] Device upsert warning:', devErr.message);
       }
+    }
 
-      // Resolve community to prevent foreign key errors
-      let resolvedDbCommunityId: string | null = null;
-      try {
-        const comm = await prisma.community.findFirst({
-          where: {
-            OR: [
-              { id },
-              { name: { equals: id, mode: 'insensitive' } },
-            ],
-          },
-          select: { id: true },
-        });
-        if (comm) resolvedDbCommunityId = comm.id;
-      } catch {}
-
+    // 3. Persist comment to database via Prisma
+    try {
       const prismaCreated = await (prisma.comment as any).create({
         data: {
           id: stored.id,
@@ -157,6 +191,7 @@ export async function POST(
           handle: cleanHandle,
           content: commentText.trim(),
           category: String(category).slice(0, 50),
+          location: finalCommunityName.slice(0, 100),
           likes: 0,
           citesCount: 0,
         },
@@ -165,12 +200,16 @@ export async function POST(
       return NextResponse.json(
         {
           id: prismaCreated.id,
-          communityId: prismaCreated.communityId,
+          communityId: prismaCreated.communityId || id,
+          communityName: finalCommunityName,
+          stateName: matched?.stateName,
+          coordinates: matched ? [matched.longitude, matched.latitude] : [7.0, 6.2],
           authorName: prismaCreated.author,
           handle: prismaCreated.handle,
           affiliation: affiliation || 'Community Member',
           comment: prismaCreated.content,
-          likes: prismaCreated.likes,
+          likes: prismaCreated.likes || 0,
+          citesCount: 0,
           category: prismaCreated.category,
           createdAt: prismaCreated.createdAt.toISOString(),
         },
