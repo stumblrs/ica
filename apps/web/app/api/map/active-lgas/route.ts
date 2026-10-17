@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'node:fs';
-import path from 'node:path';
-
-const DB_FILE = path.resolve(process.cwd(), 'public/data/communities_store.json');
-
 import { prisma } from '@/lib/prisma';
+import { readCommunityStore } from '@/lib/community-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,19 +40,18 @@ export async function GET(req: NextRequest) {
     }
   } catch (err) {
     // Fallback to local store if DB connection fails
-    if (fs.existsSync(DB_FILE)) {
-      const communities = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-      for (const c of communities) {
-        if (
-          !SOUTHEAST_STATE_PCODS.includes(c.stateId) &&
-          !EXCLUDED_NON_IGBO_STATE_PCODS.includes(c.stateId) &&
-          c.lgaId &&
-          !c.lgaId.startsWith('NG032') &&
-          !c.lgaId.startsWith('NG002')
-        ) {
-          if (['igbo', 'mixed', 'historically_igbo', 'igbo_associated'].includes(c.identityStatus)) {
-            activeExternalLgaCodes.add(c.lgaId);
-          }
+    const communities = readCommunityStore();
+    for (const c of communities) {
+      if (
+        c.stateId &&
+        !SOUTHEAST_STATE_PCODS.includes(c.stateId) &&
+        !EXCLUDED_NON_IGBO_STATE_PCODS.includes(c.stateId) &&
+        c.lgaId &&
+        !c.lgaId.startsWith('NG032') &&
+        !c.lgaId.startsWith('NG002')
+      ) {
+        if (c.identityStatus && ['igbo', 'mixed', 'historically_igbo', 'igbo_associated'].includes(c.identityStatus)) {
+          activeExternalLgaCodes.add(c.lgaId);
         }
       }
     }

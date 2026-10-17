@@ -273,16 +273,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Comment text is required.' }, { status: 400 });
     }
 
+    if (targetComment.trim().length > 1000) {
+      return NextResponse.json({ error: 'Comment text cannot exceed 1000 characters.' }, { status: 400 });
+    }
+
     const deviceId = req.headers.get('x-device-id') || body.deviceId || null;
     const rawFingerprint = req.headers.get('x-device-fingerprint') || body.fingerprintHash || null;
     const cleanFingerprint = rawFingerprint && String(rawFingerprint).startsWith('fp_') ? String(rawFingerprint) : null;
-    const targetAuthor = (authorName || author || '').trim() || 'Anonymous Resident';
+    const targetAuthor = (authorName || author || '').trim().slice(0, 60) || 'Anonymous Resident';
     const targetHandle =
       handle && typeof handle === 'string' && handle.trim()
         ? handle.trim().startsWith('@')
-          ? handle.trim()
-          : `@${handle.trim()}`
-        : `@${targetAuthor.toLowerCase().replace(/[^a-z0-9]/g, '') || 'resident'}`;
+          ? handle.trim().slice(0, 40)
+          : `@${handle.trim().slice(0, 39)}`
+        : `@${targetAuthor.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30) || 'resident'}`;
 
     // 3. Save to unified persistent store
     const stored = saveCommentToStore({
@@ -290,10 +294,10 @@ export async function POST(req: NextRequest) {
       authorName: targetAuthor,
       handle: targetHandle,
       comment: targetComment.trim(),
-      category,
-      affiliation,
+      category: String(category).slice(0, 50),
+      affiliation: affiliation ? String(affiliation).slice(0, 60) : undefined,
       deviceId,
-      location,
+      location: location ? String(location).slice(0, 100) : undefined,
     });
 
     // 4. In-App Notification Trigger for Citations & Mentions
@@ -329,16 +333,21 @@ export async function POST(req: NextRequest) {
           communityId: stored.communityId,
           communityName: stored.communityName,
           coordinates: JSON.stringify(stored.coordinates),
-          snippet: targetComment.trim(),
+          snippet: targetComment.trim().slice(0, 300),
           type: (replyToHandle ? 'citation' : 'mention') as 'citation' | 'mention',
           isRead: false,
         };
 
-        // 1. Persist to Supabase Notification table
+        // 1. Persist to Prisma Notification table
         try {
-          await supabase.from('Notification').insert(notifItem);
-        } catch (sbNotifErr: any) {
-          console.warn('[CommentsAPI] Supabase Notification insert error:', sbNotifErr.message);
+          await prisma.notification.create({
+            data: {
+              ...notifItem,
+              coordinates: notifItem.coordinates,
+            },
+          });
+        } catch (prismaNotifErr: any) {
+          console.warn('[CommentsAPI] Prisma Notification insert error:', prismaNotifErr.message);
         }
 
         // 2. Mirror to local file store
@@ -351,59 +360,39 @@ export async function POST(req: NextRequest) {
       console.warn('[CommentsAPI] Notification trigger error:', notifErr.message);
     }
 
-    // 5. Persist to Supabase directly first, with Prisma as secondary fallback
+    // 5. Persist to database via Prisma (server-level admin connection)
     try {
       if (deviceId) {
-        await supabase
-          .from('Device')
-          .upsert({
+        await prisma.device.upsert({
+          where: { id: deviceId },
+          update: {
+            lastActiveAt: new Date(),
+            ...(cleanFingerprint ? { fingerprintHash: cleanFingerprint } : {}),
+          },
+          create: {
             id: deviceId,
             trustScore: 100,
-            lastActiveAt: new Date().toISOString(),
-            ...(cleanFingerprint ? { fingerprintHash: cleanFingerprint } : {}),
-          });
+            lastActiveAt: new Date(),
+            fingerprintHash: cleanFingerprint,
+          },
+        });
       }
 
-      const { error: insertError } = await supabase.from('Comment').insert({
-        id: stored.id,
-        communityId,
-        deviceId: deviceId || null,
-        author: targetAuthor,
-        handle: targetHandle,
-        content: targetComment.trim(),
-        category,
-        location: location || null,
-        likes: 0,
+      await prisma.comment.create({
+        data: {
+          id: stored.id,
+          communityId,
+          deviceId: deviceId || null,
+          author: targetAuthor,
+          handle: targetHandle,
+          content: targetComment.trim(),
+          category: String(category).slice(0, 50),
+          location: location ? String(location).slice(0, 100) : null,
+          likes: 0,
+        },
       });
-
-      if (insertError) {
-        // Fallback to Prisma if Supabase reported an error
-        try {
-          if (deviceId) {
-            await prisma.device.upsert({
-              where: { id: deviceId },
-              update: {},
-              create: { id: deviceId, trustScore: 100 },
-            });
-          }
-
-          await prisma.comment.create({
-            data: {
-              id: stored.id,
-              communityId,
-              deviceId: deviceId || null,
-              author: targetAuthor,
-              handle: targetHandle,
-              content: targetComment.trim(),
-              category,
-              location: location || null,
-              likes: 0,
-            },
-          });
-        } catch {}
-      }
     } catch (dbErr: any) {
-      // Database offline - safely saved in persistent store
+      console.warn('[CommentsAPI] Database insert error, preserved in persistent store:', dbErr.message);
     }
 
     // Invalidate comments microcache so newly posted comment is instantly visible

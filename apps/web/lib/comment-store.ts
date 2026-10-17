@@ -23,12 +23,11 @@ export function getCommentCandidatePaths(): string[] {
   const cwd = process.cwd();
   return Array.from(
     new Set([
-      path.resolve(cwd, 'apps/web/public/data/comments_store.json'),
-      path.resolve(cwd, 'public/data/comments_store.json'),
-      path.resolve(cwd, '../public/data/comments_store.json'),
-      path.resolve(__dirname, '../../public/data/comments_store.json'),
-      path.resolve(__dirname, '../../../public/data/comments_store.json'),
-      path.resolve(__dirname, '../../../../public/data/comments_store.json'),
+      path.resolve(cwd, 'apps/web/.data/comments_store.json'),
+      path.resolve(cwd, '.data/comments_store.json'),
+      path.resolve(cwd, '../.data/comments_store.json'),
+      path.resolve(__dirname, '../../.data/comments_store.json'),
+      path.resolve(__dirname, '../../../.data/comments_store.json'),
     ])
   );
 }
@@ -60,36 +59,23 @@ export function readCommentsStore(): StoredComment[] {
 }
 
 export function writeCommentsStore(comments: StoredComment[]): boolean {
+  // On serverless / Vercel production, local filesystem is read-only.
+  if (process.env.NODE_ENV === 'production') {
+    return false;
+  }
+
   const cwd = process.cwd();
   const existing = findExistingCommentStorePath();
-  const targets = new Set<string>();
+  const target = existing || path.resolve(cwd, '.data/comments_store.json');
 
-  if (existing) targets.add(existing);
-
-  const webPublic = path.resolve(cwd, 'apps/web/public/data/comments_store.json');
-  const rootPublic = path.resolve(cwd, 'public/data/comments_store.json');
-
-  if (fs.existsSync(path.dirname(webPublic))) targets.add(webPublic);
-  if (fs.existsSync(path.dirname(rootPublic))) targets.add(rootPublic);
-
-  if (targets.size === 0) {
-    targets.add(path.resolve(cwd, 'apps/web/public/data/comments_store.json'));
+  try {
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, JSON.stringify(comments, null, 2), 'utf8');
+    return true;
+  } catch (err: any) {
+    console.warn(`[CommentStore] Local write disabled:`, err.message);
+    return false;
   }
-
-  let wroteAny = false;
-  const jsonContent = JSON.stringify(comments, null, 2);
-
-  for (const target of Array.from(targets)) {
-    try {
-      fs.mkdirSync(path.dirname(target), { recursive: true });
-      fs.writeFileSync(target, jsonContent, 'utf8');
-      wroteAny = true;
-    } catch (err: any) {
-      console.error(`[CommentStore] Failed writing comments to ${target}:`, err.message);
-    }
-  }
-
-  return wroteAny;
 }
 
 /**

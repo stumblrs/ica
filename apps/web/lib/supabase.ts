@@ -25,6 +25,7 @@ function getCredentials() {
 
 // Global singleton for browser & API route usage
 let clientInstance: SupabaseClient | null = null;
+let adminInstance: SupabaseClient | null = null;
 
 export function getSupabase(): SupabaseClient {
   if (!clientInstance) {
@@ -45,6 +46,23 @@ export function getSupabase(): SupabaseClient {
   return clientInstance;
 }
 
+export function getSupabaseAdmin(): SupabaseClient | null {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceKey) return null;
+
+  if (!adminInstance) {
+    const { url } = getCredentials();
+    adminInstance = createClient(url, serviceKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+  }
+  return adminInstance;
+}
+
 export const supabase = getSupabase();
+export const supabaseAdmin = getSupabaseAdmin();
 
 export default supabase;

@@ -18,67 +18,45 @@ export async function POST(request: NextRequest) {
       ? String(fingerprintHash)
       : null;
 
-    // 1. Upsert Device in Supabase with non-null fingerprintHash and lastActiveAt
+    // 1. Upsert Device via Prisma
     try {
-      await supabase
-        .from('Device')
-        .upsert({
+      await prisma.device.upsert({
+        where: { id: deviceId },
+        update: {
+          fingerprintHash: cleanFingerprint,
+          lastActiveAt: new Date(),
+        },
+        create: {
           id: deviceId,
           fingerprintHash: cleanFingerprint,
-          lastActiveAt: new Date().toISOString(),
           trustScore: 100,
-        });
-    } catch (sbErr: any) {
-      console.warn('[DeviceSync] Supabase Device upsert error, falling back to Prisma:', sbErr.message);
-      try {
-        await prisma.device.upsert({
-          where: { id: deviceId },
-          update: {
-            fingerprintHash: cleanFingerprint,
-            lastActiveAt: new Date(),
-          },
-          create: {
-            id: deviceId,
-            fingerprintHash: cleanFingerprint,
-            trustScore: 100,
-            lastActiveAt: new Date(),
-          },
-        });
-      } catch (prismaErr: any) {
-        console.warn('[DeviceSync] Prisma Device upsert error:', prismaErr.message);
-      }
+          lastActiveAt: new Date(),
+        },
+      });
+    } catch (prismaErr: any) {
+      console.warn('[DeviceSync] Prisma Device upsert error:', prismaErr.message);
     }
 
     // 2. Check if a Profile is already linked to this device or fingerprint
     let matchedProfile: any = null;
 
     try {
-      // Direct lookup by deviceId
-      const { data: profileByDevice, error: devErr } = await supabase
-        .from('Profile')
-        .select('*')
-        .eq('deviceId', deviceId)
-        .maybeSingle();
+      // Direct lookup by deviceId via Prisma
+      matchedProfile = await prisma.profile.findUnique({
+        where: { deviceId },
+      });
 
-      if (!devErr && profileByDevice) {
-        matchedProfile = profileByDevice;
-      } else if (cleanFingerprint) {
+      if (!matchedProfile && cleanFingerprint) {
         // Fallback: lookup by hardware fingerprint hash
-        const { data: profileByFp, error: fpErr } = await supabase
-          .from('Profile')
-          .select('*')
-          .eq('fingerprintHash', cleanFingerprint)
-          .maybeSingle();
-
-        if (!fpErr && profileByFp) {
-          matchedProfile = profileByFp;
-        }
+        matchedProfile = await prisma.profile.findFirst({
+          where: { fingerprintHash: cleanFingerprint },
+        });
       }
     } catch (err: any) {
       console.warn('[DeviceSync] Profile lookup error:', err.message);
     }
 
-    // Fallback to local profile store if Supabase returned nothing
+    // Fallback to local profile store if Prisma returned nothing
     if (!matchedProfile) {
       const localProfile = getProfileByDeviceId(deviceId);
       if (localProfile) {
@@ -89,21 +67,36 @@ export async function POST(request: NextRequest) {
     // 3. If a profile exists, ensure its fingerprintHash and deviceId are linked
     if (matchedProfile && cleanFingerprint && !matchedProfile.fingerprintHash) {
       try {
-        await supabase
-          .from('Profile')
-          .update({ fingerprintHash: cleanFingerprint })
-          .eq('deviceId', matchedProfile.deviceId);
+        await prisma.profile.update({
+          where: { deviceId: matchedProfile.deviceId },
+          data: { fingerprintHash: cleanFingerprint },
+        });
       } catch {}
     }
+
+    // Strip sensitive fingerprint hash from profile before returning
+    const safeProfile = matchedProfile ? {
+      deviceId: matchedProfile.deviceId,
+      username: matchedProfile.username,
+      displayName: matchedProfile.displayName,
+      homeTown: matchedProfile.homeTown,
+      stateOfOrigin: matchedProfile.stateOfOrigin,
+      kindredClan: matchedProfile.kindredClan,
+      bio: matchedProfile.bio,
+      avatarSymbol: matchedProfile.avatarSymbol,
+      role: matchedProfile.role,
+      createdAt: matchedProfile.createdAt,
+      updatedAt: matchedProfile.updatedAt,
+    } : null;
 
     return NextResponse.json({
       success: true,
       deviceId,
-      fingerprintHash: cleanFingerprint,
-      profile: matchedProfile || null,
-      message: matchedProfile
-        ? `Device verified and linked to @${matchedProfile.username}.`
-        : 'Device and browser fingerprint registered anonymously.',
+      verified: true,
+      profile: safeProfile,
+      message: safeProfile
+        ? `Device verified and linked to @${safeProfile.username}.`
+        : 'Device and browser identity verified anonymously.',
     });
   } catch (error: any) {
     console.error('[DeviceSync] Fatal error:', error);

@@ -194,7 +194,7 @@ export async function evaluateInquiryOutcome(inquiryId: string): Promise<{
       lgaName: updatedInquiry.community?.lgaName,
       stateName: updatedInquiry.community?.stateName,
       type: updatedInquiry.type as InquiryType,
-      petitionerDeviceId: updatedInquiry.petitionerDeviceId,
+      petitionerDeviceId: updatedInquiry.petitionerDeviceId ? `Member #${updatedInquiry.petitionerDeviceId.slice(-4)}` : 'Anonymous',
       reason: updatedInquiry.reason,
       citations: updatedInquiry.citations,
       evidenceUrls: updatedInquiry.evidenceUrls ? JSON.parse(updatedInquiry.evidenceUrls) : [],
@@ -271,7 +271,7 @@ export async function getInquiries(filters?: {
       lgaName: r.community?.lgaName,
       stateName: r.community?.stateName,
       type: r.type as InquiryType,
-      petitionerDeviceId: r.petitionerDeviceId,
+      petitionerDeviceId: r.petitionerDeviceId ? `Member #${r.petitionerDeviceId.slice(-4)}` : 'Anonymous',
       reason: r.reason,
       citations: r.citations,
       evidenceUrls: r.evidenceUrls ? JSON.parse(r.evidenceUrls) : [],
@@ -314,12 +314,22 @@ export async function createInquiry(data: {
     clanLineage,
   } = data;
 
-  // 1. Ensure petitioner device profile exists
-  await prisma.device.upsert({
+  // 1. Validate petitioner device exists and has sufficient trust score (SEC-04 Sybil Defense)
+  const petitioner = await prisma.device.findUnique({
     where: { id: petitionerDeviceId },
-    update: {},
-    create: { id: petitionerDeviceId, trustScore: 100 },
   });
+
+  if (!petitioner) {
+    throw new Error('Unregistered device identity. Please initialize your device on the atlas before opening a governance petition.');
+  }
+
+  if (petitioner.trustScore < 50) {
+    throw new Error('Device trust score is insufficient to open a formal community status petition.');
+  }
+
+  if (!reason || reason.trim().length < 10 || reason.trim().length > 1000) {
+    throw new Error('Petition rationale must be between 10 and 1000 characters.');
+  }
 
   // 2. Fetch community and compute authoritative governance policy
   const community = await prisma.community.findUnique({
@@ -423,7 +433,7 @@ export async function createInquiry(data: {
     lgaName: inquiry.community?.lgaName,
     stateName: inquiry.community?.stateName,
     type: inquiry.type as InquiryType,
-    petitionerDeviceId: inquiry.petitionerDeviceId,
+    petitionerDeviceId: inquiry.petitionerDeviceId ? `Member #${inquiry.petitionerDeviceId.slice(-4)}` : 'Anonymous',
     reason: inquiry.reason,
     citations: inquiry.citations,
     evidenceUrls: inquiry.evidenceUrls ? JSON.parse(inquiry.evidenceUrls) : [],
@@ -460,12 +470,22 @@ export async function castVote(data: {
 }> {
   const { inquiryId, deviceId, choice, evidenceNote, isLocalObserver } = data;
 
-  // 1. Ensure device exists
-  await prisma.device.upsert({
+  // 1. Validate voter device exists and has sufficient trust score (SEC-04 Sybil Defense)
+  const voterDevice = await prisma.device.findUnique({
     where: { id: deviceId },
-    update: {},
-    create: { id: deviceId, trustScore: 100 },
   });
+
+  if (!voterDevice) {
+    throw new Error('Device identity is not registered. Please sync your device before participating in governance.');
+  }
+
+  if (voterDevice.trustScore < 50) {
+    throw new Error('Device trust score is insufficient to participate in community governance deliberations.');
+  }
+
+  if (evidenceNote && evidenceNote.trim().length > 500) {
+    throw new Error('Evidence note exceeds maximum permitted length of 500 characters.');
+  }
 
   // 2. Fetch inquiry
   const inquiry = await prisma.governanceInquiry.findUnique({
@@ -557,7 +577,7 @@ export async function castVote(data: {
       lgaName: inquiry.community?.lgaName,
       stateName: inquiry.community?.stateName,
       type: inquiry.type as InquiryType,
-      petitionerDeviceId: inquiry.petitionerDeviceId,
+      petitionerDeviceId: inquiry.petitionerDeviceId ? `Member #${inquiry.petitionerDeviceId.slice(-4)}` : 'Anonymous',
       reason: inquiry.reason,
       citations: inquiry.citations,
       evidenceUrls: inquiry.evidenceUrls ? JSON.parse(inquiry.evidenceUrls) : [],
@@ -598,7 +618,7 @@ export async function getAuditLogs(communityId?: string): Promise<CommunityAudit
     id: r.id,
     communityId: r.communityId,
     communityName: r.community?.name,
-    deviceId: r.deviceId,
+    deviceId: r.deviceId ? `Member #${r.deviceId.slice(-4)}` : null,
     action: r.action as CommunityAuditLog['action'],
     summary: r.summary,
     createdAt: r.createdAt.toISOString(),
@@ -626,7 +646,7 @@ export async function appendAuditLog(data: {
   return {
     id: row.id,
     communityId: row.communityId,
-    deviceId: row.deviceId,
+    deviceId: row.deviceId ? `Member #${row.deviceId.slice(-4)}` : null,
     action: row.action as CommunityAuditLog['action'],
     summary: row.summary,
     createdAt: row.createdAt.toISOString(),

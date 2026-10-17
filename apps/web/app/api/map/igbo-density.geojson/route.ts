@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'node:fs';
-import path from 'node:path';
 import { prisma } from '@/lib/prisma';
-
-const DB_FILE = path.resolve(process.cwd(), 'public/data/communities_store.json');
+import { readCommunityStore } from '@/lib/community-store';
 
 // Excluded non-Igbo reference states
 const EXCLUDED_STATES = ['NG032', 'NG002', 'Plateau', 'Adamawa'];
@@ -46,16 +43,15 @@ export async function GET(req: NextRequest) {
     });
     communities = dbCommunities;
   } catch (err) {
-    if (fs.existsSync(DB_FILE)) {
-      communities = JSON.parse(fs.readFileSync(DB_FILE, 'utf8')).filter(
-        (c: any) =>
-          !EXCLUDED_STATES.includes(c.stateId) &&
-          !EXCLUDED_STATES.includes(c.stateName) &&
-          (c.stateName || '').toLowerCase() !== 'plateau' &&
-          (c.stateName || '').toLowerCase() !== 'adamawa' &&
-          c.lifecycleStatus !== 'DELISTED'
-      );
-    }
+    const local = readCommunityStore();
+    communities = local.filter(
+      (c: any) =>
+        !EXCLUDED_STATES.includes(c.stateId) &&
+        !EXCLUDED_STATES.includes(c.stateName) &&
+        (c.stateName || '').toLowerCase() !== 'plateau' &&
+        (c.stateName || '').toLowerCase() !== 'adamawa' &&
+        c.lifecycleStatus !== 'DELISTED'
+    );
   }
 
   // Weight point intensity based on:

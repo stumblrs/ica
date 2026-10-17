@@ -28,11 +28,46 @@ export async function POST(request: NextRequest) {
       durationDays = 7,
     } = body;
 
-    const deviceId = request.headers.get('x-device-id') || body.deviceId || 'anon-device';
+    const deviceId = request.headers.get('x-device-id') || body.deviceId;
+
+    if (!deviceId) {
+      return NextResponse.json(
+        { error: 'A verified device ID is required to open a governance petition.' },
+        { status: 400 }
+      );
+    }
 
     if (!communityId || !type || !reason) {
       return NextResponse.json(
-        { error: 'Missing required parameters (communityId, type, reason)' },
+        { error: 'Missing required parameters: communityId, type, reason.' },
+        { status: 400 }
+      );
+    }
+
+    if (type !== 'DELIST' && type !== 'REINSTATE') {
+      return NextResponse.json(
+        { error: "Invalid petition type. Must be 'DELIST' or 'REINSTATE'." },
+        { status: 400 }
+      );
+    }
+
+    if (typeof reason !== 'string' || reason.trim().length < 10 || reason.trim().length > 1000) {
+      return NextResponse.json(
+        { error: 'Petition reason must be between 10 and 1000 characters.' },
+        { status: 400 }
+      );
+    }
+
+    if (citations && (typeof citations !== 'string' || citations.length > 1000)) {
+      return NextResponse.json(
+        { error: 'Citations must be a string up to 1000 characters.' },
+        { status: 400 }
+      );
+    }
+
+    if (clanLineage && (typeof clanLineage !== 'string' || clanLineage.length > 200)) {
+      return NextResponse.json(
+        { error: 'Clan lineage must be a string up to 200 characters.' },
         { status: 400 }
       );
     }
@@ -41,17 +76,21 @@ export async function POST(request: NextRequest) {
       communityId,
       type: type as InquiryType,
       petitionerDeviceId: deviceId,
-      reason,
-      citations,
-      evidenceUrls: evidenceUrls || [],
-      clanLineage,
+      reason: reason.trim(),
+      citations: citations?.trim(),
+      evidenceUrls: Array.isArray(evidenceUrls) ? evidenceUrls.slice(0, 10) : [],
+      clanLineage: clanLineage?.trim(),
       quorumThreshold: quorumThreshold ? Number(quorumThreshold) : undefined,
       durationDays: durationDays ? Number(durationDays) : undefined,
     });
 
     return NextResponse.json(newInquiry, { status: 201 });
   } catch (err: any) {
-    const status = err.message?.includes('already in progress') ? 409 : 500;
+    const status = err.message?.includes('already in progress')
+      ? 409
+      : err.message?.includes('Unregistered device') || err.message?.includes('insufficient')
+      ? 403
+      : 500;
     return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status });
   }
 }

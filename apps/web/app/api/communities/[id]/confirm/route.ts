@@ -1,24 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'node:fs';
-import path from 'node:path';
+import { prisma } from '@/lib/prisma';
+import { readCommunityStore, writeCommunityStore } from '@/lib/community-store';
 
-const DB_FILE = path.resolve(process.cwd(), 'public/data/communities_store.json');
-
-function getCommunities(): any[] {
-  if (fs.existsSync(DB_FILE)) {
-    return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-  }
-  return [];
-}
-
-function saveCommunities(records: any[]) {
-  fs.mkdirSync(path.dirname(DB_FILE), { recursive: true });
-  fs.writeFileSync(DB_FILE, JSON.stringify(records, null, 2), 'utf8');
-}
+export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/communities/:id/confirm
- * Section 8 & Section 10: Community confirmation workflow
+ * Community confirmation workflow
  */
 export async function POST(
   req: NextRequest,
@@ -29,35 +17,50 @@ export async function POST(
     const body = await req.json().catch(() => ({}));
     const { note } = body;
 
-    const communities = getCommunities();
+    // 1. Try Prisma first
+    try {
+      const comm = await prisma.community.findUnique({ where: { id } });
+      if (comm) {
+        const nextConfirmations = (comm.confirmationsCount || 0) + 1;
+        const nextConfidence = comm.confidence < 0.95
+          ? Number(Math.min(0.99, comm.confidence + 0.05).toFixed(2))
+          : comm.confidence;
+
+        const updated = await prisma.community.update({
+          where: { id },
+          data: {
+            confirmationsCount: nextConfirmations,
+            confidence: nextConfidence,
+          },
+        });
+
+        return NextResponse.json({
+          success: true,
+          confirmationsCount: updated.confirmationsCount,
+          confidence: updated.confidence,
+        });
+      }
+    } catch {
+      // Fallback below
+    }
+
+    // 2. Fallback to local store (gated for development)
+    const communities = readCommunityStore();
     const index = communities.findIndex((c) => c.id === id);
 
     if (index === -1) {
-      return NextResponse.json(
-        { error: 'Community not found.' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Community not found.' }, { status: 404 });
     }
 
     const comm = communities[index];
     comm.confirmationsCount = (comm.confirmationsCount || 0) + 1;
-    
-    // Slight confidence increase on community confirmation
-    if (comm.confidence < 0.95) {
-      comm.confidence = Number(Math.min(0.99, comm.confidence + 0.05).toFixed(2));
+    const currentConfidence = comm.confidence ?? 0.8;
+    if (currentConfidence < 0.95) {
+      comm.confidence = Number(Math.min(0.99, currentConfidence + 0.05).toFixed(2));
     }
     comm.updatedAt = new Date().toISOString();
 
-    if (!comm.confirmations) {
-      comm.confirmations = [];
-    }
-    comm.confirmations.push({
-      id: 'conf-' + Date.now(),
-      note: note?.trim() || null,
-      createdAt: new Date().toISOString(),
-    });
-
-    saveCommunities(communities);
+    writeCommunityStore(communities);
 
     return NextResponse.json({
       success: true,
@@ -65,9 +68,6 @@ export async function POST(
       confidence: comm.confidence,
     });
   } catch (err: any) {
-    return NextResponse.json(
-      { error: 'Server error: ' + err.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Server error: ' + err.message }, { status: 500 });
   }
 }

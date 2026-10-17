@@ -91,14 +91,18 @@ export async function POST(
       return NextResponse.json({ error: 'Comment text is required.' }, { status: 400 });
     }
 
+    if (commentText.trim().length > 1000) {
+      return NextResponse.json({ error: 'Comment text cannot exceed 1000 characters.' }, { status: 400 });
+    }
+
     const deviceId = req.headers.get('x-device-id') || body.deviceId || null;
     const rawFingerprint = req.headers.get('x-device-fingerprint') || body.fingerprintHash || null;
     const cleanFingerprint = rawFingerprint && String(rawFingerprint).startsWith('fp_') ? String(rawFingerprint) : null;
     const cleanAuthor =
       authorName && typeof authorName === 'string' && authorName.trim()
-        ? authorName.trim()
+        ? authorName.trim().slice(0, 60)
         : 'Anonymous Contributor';
-    const cleanHandle = `@${cleanAuthor.toLowerCase().replace(/[^a-z0-9]/g, '') || 'resident'}`;
+    const cleanHandle = `@${cleanAuthor.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30) || 'resident'}`;
 
     // 1. Always save to offline file store first
     const stored = saveCommentToStore({
@@ -106,57 +110,29 @@ export async function POST(
       authorName: cleanAuthor,
       handle: cleanHandle,
       comment: commentText.trim(),
-      category,
-      affiliation,
+      category: String(category).slice(0, 50),
+      affiliation: affiliation ? String(affiliation).slice(0, 60) : undefined,
       deviceId,
     });
 
-    // 2. Persist to Supabase directly first, with Prisma as secondary fallback
+    // 2. Persist to database via Prisma (server-level admin connection)
     try {
       if (deviceId) {
-        await supabase
-          .from('Device')
-          .upsert({
+        await prisma.device.upsert({
+          where: { id: deviceId },
+          update: {
+            lastActiveAt: new Date(),
+            ...(cleanFingerprint ? { fingerprintHash: cleanFingerprint } : {}),
+          },
+          create: {
             id: deviceId,
             trustScore: 100,
-            lastActiveAt: new Date().toISOString(),
-            ...(cleanFingerprint ? { fingerprintHash: cleanFingerprint } : {}),
-          });
-      }
-
-      const { data: created, error } = await supabase
-        .from('Comment')
-        .insert({
-          id: stored.id,
-          communityId: id,
-          deviceId: deviceId || null,
-          author: cleanAuthor,
-          handle: cleanHandle,
-          content: commentText.trim(),
-          category,
-          likes: 0,
-        })
-        .select()
-        .single();
-
-      if (!error && created) {
-        return NextResponse.json(
-          {
-            id: created.id,
-            communityId: created.communityId,
-            authorName: created.author,
-            handle: created.handle,
-            affiliation: affiliation || 'Community Member',
-            comment: created.content,
-            likes: created.likes || 0,
-            category: created.category,
-            createdAt: typeof created.createdAt === 'string' ? created.createdAt : new Date(created.createdAt).toISOString(),
+            lastActiveAt: new Date(),
+            fingerprintHash: cleanFingerprint,
           },
-          { status: 201 }
-        );
+        });
       }
 
-      // Fallback to Prisma if Supabase had an error
       const prismaCreated = await prisma.comment.create({
         data: {
           id: stored.id,
@@ -165,7 +141,7 @@ export async function POST(
           author: cleanAuthor,
           handle: cleanHandle,
           content: commentText.trim(),
-          category,
+          category: String(category).slice(0, 50),
           likes: 0,
         },
       });
@@ -185,7 +161,7 @@ export async function POST(
         { status: 201 }
       );
     } catch (dbErr: any) {
-      console.warn(`[CommunityCommentsAPI] Database error (${dbErr.message}). Persisted to comments_store.json.`);
+      console.warn(`[CommunityCommentsAPI] Database error (${dbErr.message}). Persisted to local store.`);
     }
 
     // Return stored comment

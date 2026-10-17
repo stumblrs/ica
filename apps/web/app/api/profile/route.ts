@@ -101,13 +101,13 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 2. By Device ID lookup
+    // 2. By Device ID lookup (self device identity)
     if (deviceId) {
       // Try Supabase Profile first
       try {
         const { data: sbProfile, error } = await supabase
           .from('Profile')
-          .select('deviceId, fingerprintHash, username, displayName, homeTown, stateOfOrigin, kindredClan, bio, avatarSymbol, role, createdAt, updatedAt')
+          .select('deviceId, username, displayName, homeTown, stateOfOrigin, kindredClan, bio, avatarSymbol, role, createdAt, updatedAt')
           .eq('deviceId', deviceId)
           .maybeSingle();
 
@@ -119,20 +119,50 @@ export async function GET(request: NextRequest) {
         }
       } catch {}
 
+      // Try Prisma if Supabase was unavailable
+      try {
+        const dbProfile = await prisma.profile.findUnique({
+          where: { deviceId },
+          select: {
+            deviceId: true,
+            username: true,
+            displayName: true,
+            homeTown: true,
+            stateOfOrigin: true,
+            kindredClan: true,
+            bio: true,
+            avatarSymbol: true,
+            role: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
+
+        if (dbProfile) {
+          return NextResponse.json({
+            ...dbProfile,
+            autoSignContributions: true,
+          });
+        }
+      } catch {}
+
       // Fallback to local file store
       const fileProfile = getProfileByDeviceId(deviceId);
       if (fileProfile) {
-        return NextResponse.json(fileProfile);
+        const { ...safeFileProfile } = fileProfile;
+        return NextResponse.json(safeFileProfile);
       }
     }
 
-    // 3. By Username lookup
+    // 3. By Username lookup (public profile viewing - NEVER leak deviceId or fingerprintHash)
     if (username) {
+      const cleanTarget = cleanUsername(username);
+
       try {
         const { data: sbProfile, error } = await supabase
           .from('Profile')
-          .select('deviceId, fingerprintHash, username, displayName, homeTown, stateOfOrigin, kindredClan, bio, avatarSymbol, role, createdAt, updatedAt')
-          .eq('username', cleanUsername(username))
+          .select('username, displayName, homeTown, stateOfOrigin, kindredClan, bio, avatarSymbol, role, createdAt, updatedAt')
+          .eq('username', cleanTarget)
           .maybeSingle();
 
         if (!error && sbProfile) {
@@ -140,12 +170,36 @@ export async function GET(request: NextRequest) {
         }
       } catch {}
 
+      try {
+        const dbProfile = await prisma.profile.findUnique({
+          where: { username: cleanTarget },
+          select: {
+            username: true,
+            displayName: true,
+            homeTown: true,
+            stateOfOrigin: true,
+            kindredClan: true,
+            bio: true,
+            avatarSymbol: true,
+            role: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
+
+        if (dbProfile) {
+          return NextResponse.json(dbProfile);
+        }
+      } catch {}
+
       const allProfiles = readProfilesStore();
       const match = Object.values(allProfiles).find(
-        (p) => cleanUsername(p.username) === cleanUsername(username)
+        (p) => cleanUsername(p.username) === cleanTarget
       );
       if (match) {
-        return NextResponse.json(match);
+        // Redact deviceId and any hardware identifiers
+        const { deviceId: _devId, ...publicProfile } = match;
+        return NextResponse.json(publicProfile);
       }
     }
 
@@ -236,39 +290,42 @@ export async function POST(request: NextRequest) {
     const targetClan = kindredClan ? String(kindredClan).trim() : null;
     const targetBio = bio ? String(bio).trim() : null;
 
-    // 2. Ensure Device exists FIRST in Supabase / Prisma (satisfying foreign key constraint)
+    // 2. Ensure Device exists FIRST in Prisma (satisfying foreign key constraint)
     try {
-      await supabase.from('Device').upsert({
-        id: deviceId,
-        fingerprintHash: cleanFingerprint,
-        trustScore: 100,
-        lastActiveAt: new Date().toISOString(),
+      await prisma.device.upsert({
+        where: { id: deviceId },
+        update: {
+          fingerprintHash: cleanFingerprint,
+          lastActiveAt: new Date(),
+        },
+        create: {
+          id: deviceId,
+          fingerprintHash: cleanFingerprint,
+          trustScore: 100,
+          lastActiveAt: new Date(),
+        },
       });
     } catch (devErr: any) {
-      console.warn('[ProfileAPI] Device upsert in Supabase error, falling back to Prisma:', devErr.message);
-      try {
-        await prisma.device.upsert({
-          where: { id: deviceId },
-          update: {
-            fingerprintHash: cleanFingerprint,
-            lastActiveAt: new Date(),
-          },
-          create: {
-            id: deviceId,
-            fingerprintHash: cleanFingerprint,
-            trustScore: 100,
-            lastActiveAt: new Date(),
-          },
-        });
-      } catch {}
+      console.warn('[ProfileAPI] Prisma Device upsert error:', devErr.message);
     }
 
-    // 3. Persist to Supabase Profile table linked with fingerprintHash
+    // 3. Persist to Prisma Profile table linked with fingerprintHash
     let savedProfile: any = null;
     try {
-      const { data: sbSaved, error: sbErr } = await supabase
-        .from('Profile')
-        .upsert({
+      savedProfile = await prisma.profile.upsert({
+        where: { deviceId },
+        update: {
+          fingerprintHash: cleanFingerprint,
+          username: cleanHandle,
+          displayName: targetDisplayName,
+          homeTown: targetTown,
+          stateOfOrigin: targetState,
+          kindredClan: targetClan,
+          bio: targetBio,
+          avatarSymbol: targetAvatar,
+          role: targetRole,
+        },
+        create: {
           deviceId,
           fingerprintHash: cleanFingerprint,
           username: cleanHandle,
@@ -279,16 +336,10 @@ export async function POST(request: NextRequest) {
           bio: targetBio,
           avatarSymbol: targetAvatar,
           role: targetRole,
-          updatedAt: new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (!sbErr && sbSaved) {
-        savedProfile = sbSaved;
-      }
+        },
+      });
     } catch (err: any) {
-      console.warn('[ProfileAPI] Supabase Profile upsert failed, falling back to local file store:', err.message);
+      console.warn('[ProfileAPI] Prisma Profile upsert failed, falling back to local file store:', err.message);
     }
 
     // 4. Mirror to local file store as offline backup
@@ -314,10 +365,13 @@ export async function POST(request: NextRequest) {
       usernameCheckCache.delete(`${cleanHandle}:`);
     }
 
+    // Strip sensitive hardware identifiers before returning profile to client
+    const { fingerprintHash: _fph, ...safeProfile } = savedProfile || {};
+
     return NextResponse.json({
       success: true,
       profile: {
-        ...savedProfile,
+        ...safeProfile,
         autoSignContributions: autoSignContributions ?? true,
       },
       message: 'Profile successfully linked to device and synchronized globally.',

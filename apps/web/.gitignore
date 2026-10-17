@@ -18,3 +18,8 @@ out/
 *.sqlite
 dev.db
 prisma/dev.db
+
+# Private offline JSON stores (never exposed in public/)
+.data/
+*.data/
+

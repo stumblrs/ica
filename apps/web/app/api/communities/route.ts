@@ -55,12 +55,16 @@ export async function GET(req: NextRequest) {
     try {
       let query = supabase.from('Community').select('*');
 
-      if (q) {
-        query = query.or(`name.ilike.%${q}%,lgaName.ilike.%${q}%,stateName.ilike.%${q}%`);
+      // SEC-06: Sanitize search and state parameters to prevent PostgREST filter injection
+      const cleanQ = q ? q.replace(/[,().":;\\/%]/g, '').trim().slice(0, 100) : '';
+      const cleanState = state ? state.replace(/[,().":;\\/%]/g, '').trim().slice(0, 50) : '';
+
+      if (cleanQ) {
+        query = query.or(`name.ilike.%${cleanQ}%,lgaName.ilike.%${cleanQ}%,stateName.ilike.%${cleanQ}%`);
       }
 
-      if (state) {
-        query = query.or(`stateName.ilike.%${state}%,stateId.ilike.%${state}%`);
+      if (cleanState) {
+        query = query.or(`stateName.ilike.%${cleanState}%,stateId.ilike.%${cleanState}%`);
       }
 
       if (status) {
@@ -147,6 +151,41 @@ export async function POST(req: NextRequest) {
     if (!name || !type || latitude == null || longitude == null || !identityStatus) {
       return NextResponse.json(
         { error: 'Missing required fields: name, type, latitude, longitude, identityStatus' },
+        { status: 400 }
+      );
+    }
+
+    if (typeof name !== 'string' || name.trim().length === 0 || name.trim().length > 120) {
+      return NextResponse.json(
+        { error: 'Community name must be a string between 1 and 120 characters.' },
+        { status: 400 }
+      );
+    }
+
+    if (typeof latitude !== 'number' || typeof longitude !== 'number' || isNaN(latitude) || isNaN(longitude)) {
+      return NextResponse.json(
+        { error: 'Latitude and longitude must be valid numeric coordinates.' },
+        { status: 400 }
+      );
+    }
+
+    if (description && (typeof description !== 'string' || description.length > 2000)) {
+      return NextResponse.json(
+        { error: 'Description must not exceed 2000 characters.' },
+        { status: 400 }
+      );
+    }
+
+    if (languageStatus && (typeof languageStatus !== 'string' || languageStatus.length > 500)) {
+      return NextResponse.json(
+        { error: 'Language status must not exceed 500 characters.' },
+        { status: 400 }
+      );
+    }
+
+    if (historicalStatus && (typeof historicalStatus !== 'string' || historicalStatus.length > 500)) {
+      return NextResponse.json(
+        { error: 'Historical status must not exceed 500 characters.' },
         { status: 400 }
       );
     }

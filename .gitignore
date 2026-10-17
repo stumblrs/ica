@@ -34,6 +34,9 @@ prisma/dev.db
 *.pem
 *.key
 *.cert
+.data/
+*.data/
+
 
 # Logs
 npm-debug.log*

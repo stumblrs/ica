@@ -12,6 +12,19 @@ export const dynamic = 'force-dynamic';
  */
 async function handleEvaluate(req: NextRequest) {
   try {
+    const authHeader = req.headers.get('authorization');
+    const cronSecret = process.env.CRON_SECRET;
+
+    // SEC-05: Authenticate cron requests using CRON_SECRET
+    if (process.env.NODE_ENV === 'production' || cronSecret) {
+      if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+        return NextResponse.json(
+          { error: 'Unauthorized: Missing or invalid cron authorization token.' },
+          { status: 401 }
+        );
+      }
+    }
+
     const now = new Date();
 
     // Query all OPEN inquiries whose deadline has elapsed

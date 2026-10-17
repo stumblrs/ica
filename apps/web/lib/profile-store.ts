@@ -67,12 +67,11 @@ export function getProfileCandidatePaths(): string[] {
   const cwd = process.cwd();
   return Array.from(
     new Set([
-      path.resolve(cwd, 'apps/web/public/data/profiles_store.json'),
-      path.resolve(cwd, 'public/data/profiles_store.json'),
-      path.resolve(cwd, '../public/data/profiles_store.json'),
-      path.resolve(__dirname, '../../public/data/profiles_store.json'),
-      path.resolve(__dirname, '../../../public/data/profiles_store.json'),
-      path.resolve(__dirname, '../../../../public/data/profiles_store.json'),
+      path.resolve(cwd, 'apps/web/.data/profiles_store.json'),
+      path.resolve(cwd, '.data/profiles_store.json'),
+      path.resolve(cwd, '../.data/profiles_store.json'),
+      path.resolve(__dirname, '../../.data/profiles_store.json'),
+      path.resolve(__dirname, '../../../.data/profiles_store.json'),
     ])
   );
 }
@@ -104,36 +103,23 @@ export function readProfilesStore(): Record<string, StoredUserProfile> {
 }
 
 export function writeProfilesStore(store: Record<string, StoredUserProfile>): boolean {
+  // On serverless / Vercel production, local filesystem is read-only.
+  if (process.env.NODE_ENV === 'production') {
+    return false;
+  }
+
   const cwd = process.cwd();
   const existing = findExistingProfileStorePath();
-  const targets = new Set<string>();
+  const target = existing || path.resolve(cwd, '.data/profiles_store.json');
 
-  if (existing) targets.add(existing);
-
-  const webPublic = path.resolve(cwd, 'apps/web/public/data/profiles_store.json');
-  const rootPublic = path.resolve(cwd, 'public/data/profiles_store.json');
-
-  if (fs.existsSync(path.dirname(webPublic))) targets.add(webPublic);
-  if (fs.existsSync(path.dirname(rootPublic))) targets.add(rootPublic);
-
-  if (targets.size === 0) {
-    targets.add(path.resolve(cwd, 'apps/web/public/data/profiles_store.json'));
+  try {
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, JSON.stringify(store, null, 2), 'utf8');
+    return true;
+  } catch (err: any) {
+    console.warn(`[ProfileStore] Local write disabled:`, err.message);
+    return false;
   }
-
-  let wroteAny = false;
-  const jsonContent = JSON.stringify(store, null, 2);
-
-  for (const target of Array.from(targets)) {
-    try {
-      fs.mkdirSync(path.dirname(target), { recursive: true });
-      fs.writeFileSync(target, jsonContent, 'utf8');
-      wroteAny = true;
-    } catch (err: any) {
-      console.error(`[ProfileStore] Failed writing profiles to ${target}:`, err.message);
-    }
-  }
-
-  return wroteAny;
 }
 
 export function getProfileByDeviceId(deviceId: string): StoredUserProfile | null {

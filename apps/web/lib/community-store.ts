@@ -45,12 +45,11 @@ export function getStoreCandidatePaths(): string[] {
   const cwd = process.cwd();
   return Array.from(
     new Set([
-      path.resolve(cwd, 'apps/web/public/data/communities_store.json'),
-      path.resolve(cwd, 'public/data/communities_store.json'),
-      path.resolve(cwd, '../public/data/communities_store.json'),
-      path.resolve(__dirname, '../../public/data/communities_store.json'),
-      path.resolve(__dirname, '../../../public/data/communities_store.json'),
-      path.resolve(__dirname, '../../../../public/data/communities_store.json'),
+      path.resolve(cwd, 'apps/web/.data/communities_store.json'),
+      path.resolve(cwd, '.data/communities_store.json'),
+      path.resolve(cwd, '../.data/communities_store.json'),
+      path.resolve(__dirname, '../../.data/communities_store.json'),
+      path.resolve(__dirname, '../../../.data/communities_store.json'),
     ])
   );
 }
@@ -98,41 +97,23 @@ export function readCommunityStore(): StoredCommunity[] {
 }
 
 export function writeCommunityStore(records: StoredCommunity[]): boolean {
-  const existingPath = findExistingStorePath();
-  const targets = new Set<string>();
-
-  if (existingPath) {
-    targets.add(existingPath);
+  // On serverless / Vercel production, local filesystem is read-only.
+  if (process.env.NODE_ENV === 'production') {
+    return false;
   }
 
-  // Also include standard paths based on current working directory
   const cwd = process.cwd();
-  if (fs.existsSync(path.resolve(cwd, 'apps/web/public/data'))) {
-    targets.add(path.resolve(cwd, 'apps/web/public/data/communities_store.json'));
-  }
-  if (fs.existsSync(path.resolve(cwd, 'public/data'))) {
-    targets.add(path.resolve(cwd, 'public/data/communities_store.json'));
-  }
+  const existingPath = findExistingStorePath();
+  const target = existingPath || path.resolve(cwd, '.data/communities_store.json');
 
-  // Fallback default target if none existed yet
-  if (targets.size === 0) {
-    targets.add(path.resolve(cwd, 'apps/web/public/data/communities_store.json'));
+  try {
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, JSON.stringify(records, null, 2), 'utf8');
+    return true;
+  } catch (err: any) {
+    console.warn(`[CommunityStore] Local write disabled:`, err.message);
+    return false;
   }
-
-  let wroteAny = false;
-  const jsonContent = JSON.stringify(records, null, 2);
-
-  for (const target of Array.from(targets)) {
-    try {
-      fs.mkdirSync(path.dirname(target), { recursive: true });
-      fs.writeFileSync(target, jsonContent, 'utf8');
-      wroteAny = true;
-    } catch (err: any) {
-      console.error(`[CommunityStore] Failed writing store to ${target}:`, err.message);
-    }
-  }
-
-  return wroteAny;
 }
 
 export function saveMediaToStore(params: {

@@ -32,11 +32,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result);
   } catch (err: any) {
     const status =
-      err.message?.includes('already cast a vote')
+      err.message?.includes('already cast a vote') ||
+      err.message?.includes('not registered') ||
+      err.message?.includes('insufficient')
         ? 403
         : err.message?.includes('not found')
         ? 404
-        : err.message?.includes('closed')
+        : err.message?.includes('closed') || err.message?.includes('concluded')
         ? 400
         : 500;
     return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status });
