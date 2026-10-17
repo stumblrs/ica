@@ -67,10 +67,11 @@ export async function GET(req: NextRequest) {
   const cursor = searchParams.get('cursor') || undefined;
   const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '15', 10), 1), 50);
 
-  // Check microcache
+  // Check microcache (bypassed if client explicitly requests fresh data or on initial feed loads)
+  const isNoCache = req.headers.get('cache-control')?.includes('no-cache');
   const cacheKey = `${stateFilter || 'all'}:${communityId || 'all'}:${cursor || 'start'}:${limit}`;
   const cached = commentsCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+  if (!isNoCache && cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
     return NextResponse.json(cached.data, {
       headers: { 'x-cache': 'HIT', 'Cache-Control': 'no-cache, no-store, must-revalidate' },
     });
@@ -566,7 +567,8 @@ export async function POST(req: NextRequest) {
       console.warn('[CommentsAPI] Notification trigger error:', notifErr.message);
     }
 
-    // 8. Persist to PostgreSQL via Prisma (isolated blocks for absolute reliability)
+    // 8. Persist to PostgreSQL via Prisma (isolated blocks with automatic constraint recovery)
+    let validDeviceId: string | null = null;
     if (deviceId) {
       try {
         await prisma.device.upsert({
@@ -582,8 +584,15 @@ export async function POST(req: NextRequest) {
             fingerprintHash: cleanFingerprint,
           },
         });
+        validDeviceId = deviceId;
       } catch (devErr: any) {
-        console.warn('[CommentsAPI] Device upsert warning:', devErr.message);
+        console.warn('[CommentsAPI] Device upsert warning, verifying existence:', devErr.message);
+        try {
+          const exists = await prisma.device.findUnique({ where: { id: deviceId }, select: { id: true } });
+          if (exists) validDeviceId = exists.id;
+        } catch {
+          validDeviceId = null;
+        }
       }
     }
 
@@ -599,13 +608,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Insert comment into PostgreSQL
+    // Insert comment into PostgreSQL with automatic constraint recovery
     try {
       await (prisma.comment as any).create({
         data: {
           id: stored.id,
           communityId: resolvedDbCommunityId,
-          deviceId: deviceId || null,
+          deviceId: validDeviceId,
           author: targetAuthor,
           handle: targetHandle,
           content: targetComment.trim(),
@@ -618,7 +627,29 @@ export async function POST(req: NextRequest) {
         },
       });
     } catch (dbErr: any) {
-      console.warn('[CommentsAPI] Database insert error, preserved in persistent store:', dbErr.message);
+      console.warn('[CommentsAPI] Primary insert failed, retrying with unconstrained fallback:', dbErr.message);
+      try {
+        // Fallback: If foreign key constraint failed on communityId or deviceId, persist with null relations
+        await (prisma.comment as any).create({
+          data: {
+            id: stored.id,
+            communityId: null,
+            deviceId: null,
+            author: targetAuthor,
+            handle: targetHandle,
+            content: targetComment.trim(),
+            category: String(category).slice(0, 50),
+            location: location ? String(location).slice(0, 100) : finalCommunityName.slice(0, 100),
+            likes: 0,
+            citesCount: 0,
+            replyToCommentId: replyToCommentId || null,
+            replyToHandle: replyToHandle || null,
+          },
+        });
+        console.log('[CommentsAPI] Unconstrained fallback comment insert succeeded!');
+      } catch (fallbackErr: any) {
+        console.error('[CommentsAPI] Critical database error on comment insert:', fallbackErr.message);
+      }
     }
 
     // Invalidate comments microcache so newly posted comment is instantly visible on next query

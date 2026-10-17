@@ -76,6 +76,12 @@ export function InlineCommunityComments({
       if (res.ok) {
         const added = await res.json().catch(() => null);
         if (added) {
+          try {
+            const raw = localStorage.getItem('ica_local_posted_comments_v2');
+            const list = raw ? JSON.parse(raw) : [];
+            const updated = [added, ...(Array.isArray(list) ? list.filter((c: any) => c.id !== added.id) : [])].slice(0, 100);
+            localStorage.setItem('ica_local_posted_comments_v2', JSON.stringify(updated));
+          } catch {}
           window.dispatchEvent(new CustomEvent('ica:comment-posted', { detail: added }));
         }
         setCommentText('');

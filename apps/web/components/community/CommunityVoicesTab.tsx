@@ -61,13 +61,56 @@ function timeAgo(dateString: string): string {
   }
 }
 
+const LOCAL_POSTED_COMMENTS_KEY = 'ica_local_posted_comments_v2';
+const LOCAL_CITES_MAP_KEY = 'ica_local_cites_map_v2';
+
+function getLocalPostedComments(): EnrichedComment[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(LOCAL_POSTED_COMMENTS_KEY);
+    if (!raw) return [];
+    const list = JSON.parse(raw);
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalPostedComment(cmt: EnrichedComment) {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getLocalPostedComments();
+    const updated = [cmt, ...current.filter((c) => c.id !== cmt.id)].slice(0, 100);
+    localStorage.setItem(LOCAL_POSTED_COMMENTS_KEY, JSON.stringify(updated));
+  } catch {}
+}
+
+function getLocalCitesMap(): Record<string, number> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(LOCAL_CITES_MAP_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveLocalCiteCount(id: string, count: number) {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getLocalCitesMap();
+    current[id] = count;
+    localStorage.setItem(LOCAL_CITES_MAP_KEY, JSON.stringify(current));
+  } catch {}
+}
+
 export function CommunityVoicesTab({
   communities,
   onFlyTo,
   onSelectCommunityByName,
   selectedFeature,
 }: CommunityVoicesTabProps) {
-  const [comments, setComments] = useState<EnrichedComment[]>([]);
+  const [comments, setComments] = useState<EnrichedComment[]>(() => getLocalPostedComments());
   const [loading, setLoading] = useState(true);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -133,15 +176,21 @@ export function CommunityVoicesTab({
       const newCmt = customEvent.detail;
       if (!newCmt) return;
 
+      saveLocalPostedComment(newCmt);
+
       setComments((prev) => [newCmt, ...prev.filter((c) => c.id !== newCmt.id)]);
       setLikesCountMap((prev) => ({ ...prev, [newCmt.id]: newCmt.likes || 0 }));
       setCitesCountMap((prev) => ({ ...prev, [newCmt.id]: newCmt.citesCount || 0 }));
 
       if (newCmt.replyToCommentId) {
-        setCitesCountMap((prev) => ({
-          ...prev,
-          [newCmt.replyToCommentId!]: (prev[newCmt.replyToCommentId!] || 0) + 1,
-        }));
+        setCitesCountMap((prev) => {
+          const newCount = (prev[newCmt.replyToCommentId!] || 0) + 1;
+          saveLocalCiteCount(newCmt.replyToCommentId!, newCount);
+          return {
+            ...prev,
+            [newCmt.replyToCommentId!]: newCount,
+          };
+        });
       }
 
       // Reset filters so the new comment appears right at the top of the feed
@@ -251,28 +300,40 @@ export function CommunityVoicesTab({
     try {
       setLoading(true);
       const url = `/api/comments?limit=15${state !== 'all' ? `&state=${encodeURIComponent(state)}` : ''}`;
-      const res = await fetch(url, { cache: 'no-store' });
+      const res = await fetch(url, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' },
+      });
       if (res.ok) {
         const data = await res.json();
         const items: EnrichedComment[] = Array.isArray(data) ? data : (data.comments || []);
         const sorted = items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-        // Deduplicate and preserve any locally posted comments that may not be in the server slice yet
-        setComments((prev) => {
-          const serverIds = new Set(sorted.map((s) => s.id));
-          const localOnly = prev.filter(
-            (p) => !serverIds.has(p.id) && Date.now() - new Date(p.createdAt).getTime() < 120000
-          );
-          const combined = [...localOnly, ...sorted];
-          return combined.sort(
-            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-        });
+        // Merge with local persistent storage so comments posted on this device NEVER disappear
+        const localSaved = getLocalPostedComments();
+        const serverIds = new Set(sorted.map((s) => s.id));
+        const localOnly = localSaved.filter((p) => !serverIds.has(p.id));
+        const combined = [...localOnly, ...sorted];
+        const finalComments = combined.sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
 
+        setComments(finalComments);
         setNextCursor(data.nextCursor || null);
         setHasMore(Boolean(data.hasMore));
 
-        // Populate initial likes & cites map, preserving active optimistic counts
+        // Restore likes & cites maps, merging local increments with server values
+        const localCites = getLocalCitesMap();
+        setCitesCountMap((prev) => {
+          const next = { ...localCites, ...prev };
+          sorted.forEach((c) => {
+            const serverVal = c.citesCount ?? 0;
+            const currentVal = next[c.id] ?? 0;
+            next[c.id] = Math.max(serverVal, currentVal);
+          });
+          return next;
+        });
+
         setLikesCountMap((prev) => {
           const next = { ...prev };
           sorted.forEach((c) => {
@@ -284,21 +345,13 @@ export function CommunityVoicesTab({
           });
           return next;
         });
-
-        setCitesCountMap((prev) => {
-          const next = { ...prev };
-          sorted.forEach((c) => {
-            if (next[c.id] === undefined) {
-              next[c.id] = c.citesCount ?? 0;
-            } else {
-              next[c.id] = Math.max(next[c.id], c.citesCount ?? 0);
-            }
-          });
-          return next;
-        });
       }
     } catch (err) {
       console.error('Failed to load comments:', err);
+      const localSaved = getLocalPostedComments();
+      if (localSaved.length > 0) {
+        setComments(localSaved);
+      }
     } finally {
       setLoading(false);
     }
@@ -437,16 +490,23 @@ export function CommunityVoicesTab({
       if (res.ok) {
         const newEnriched: EnrichedComment = await res.json();
 
-        // Push new comment to the top of feed immediately, deduplicating
+        // 1. Immediately persist to localStorage so it never disappears on refresh, filter, or tab switch
+        saveLocalPostedComment(newEnriched);
+
+        // 2. Push new comment to the top of feed immediately, deduplicating
         setComments((prev) => [newEnriched, ...prev.filter((c) => c.id !== newEnriched.id)]);
         setLikesCountMap((prev) => ({ ...prev, [newEnriched.id]: 0 }));
         setCitesCountMap((prev) => ({ ...prev, [newEnriched.id]: 0 }));
 
         if (replyTarget?.id) {
-          setCitesCountMap((prev) => ({
-            ...prev,
-            [replyTarget.id]: (prev[replyTarget.id] || 0) + 1,
-          }));
+          setCitesCountMap((prev) => {
+            const newCount = (prev[replyTarget.id] || 0) + 1;
+            saveLocalCiteCount(replyTarget.id, newCount);
+            return {
+              ...prev,
+              [replyTarget.id]: newCount,
+            };
+          });
         }
 
         // Reset filters so user is 100% guaranteed to see their post at the top of the feed

@@ -130,6 +130,12 @@ export function TwitterVoiceModal({
       if (res.ok) {
         const newCmt = await res.json().catch(() => null);
         if (newCmt) {
+          try {
+            const raw = localStorage.getItem('ica_local_posted_comments_v2');
+            const list = raw ? JSON.parse(raw) : [];
+            const updated = [newCmt, ...(Array.isArray(list) ? list.filter((c: any) => c.id !== newCmt.id) : [])].slice(0, 100);
+            localStorage.setItem('ica_local_posted_comments_v2', JSON.stringify(updated));
+          } catch {}
           window.dispatchEvent(new CustomEvent('ica:comment-posted', { detail: newCmt }));
         }
         onSuccess();
