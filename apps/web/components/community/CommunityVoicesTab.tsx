@@ -115,6 +115,7 @@ export function CommunityVoicesTab({
   // Social interactions
   const [likedMap, setLikedMap] = useState<Record<string, boolean>>({});
   const [likesCountMap, setLikesCountMap] = useState<Record<string, number>>({});
+  const [citesCountMap, setCitesCountMap] = useState<Record<string, number>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const composerTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -124,6 +125,36 @@ export function CommunityVoicesTab({
   useEffect(() => {
     communitiesRef.current = communities;
   }, [communities]);
+
+  // Listen for externally posted comments (e.g. from TwitterVoiceModal or InlineCommunityComments)
+  useEffect(() => {
+    function handleExternalComment(e: Event) {
+      const customEvent = e as CustomEvent<EnrichedComment>;
+      const newCmt = customEvent.detail;
+      if (!newCmt) return;
+
+      setComments((prev) => [newCmt, ...prev.filter((c) => c.id !== newCmt.id)]);
+      setLikesCountMap((prev) => ({ ...prev, [newCmt.id]: newCmt.likes || 0 }));
+      setCitesCountMap((prev) => ({ ...prev, [newCmt.id]: newCmt.citesCount || 0 }));
+
+      if (newCmt.replyToCommentId) {
+        setCitesCountMap((prev) => ({
+          ...prev,
+          [newCmt.replyToCommentId!]: (prev[newCmt.replyToCommentId!] || 0) + 1,
+        }));
+      }
+
+      // Reset filters so the new comment appears right at the top of the feed
+      setSelectedState('all');
+      setSelectedCategory('all');
+      setSearchQuery('');
+
+      topFeedRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    window.addEventListener('ica:comment-posted', handleExternalComment);
+    return () => window.removeEventListener('ica:comment-posted', handleExternalComment);
+  }, []);
 
   // Automatically pre-fill community if a feature is selected on the map
   useEffect(() => {
@@ -220,7 +251,7 @@ export function CommunityVoicesTab({
     try {
       setLoading(true);
       const url = `/api/comments?limit=15${state !== 'all' ? `&state=${encodeURIComponent(state)}` : ''}`;
-      const res = await fetch(url);
+      const res = await fetch(url, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         const items: EnrichedComment[] = Array.isArray(data) ? data : (data.comments || []);
@@ -229,12 +260,15 @@ export function CommunityVoicesTab({
         setNextCursor(data.nextCursor || null);
         setHasMore(Boolean(data.hasMore));
 
-        // Populate initial likes map
+        // Populate initial likes & cites map
         const initialLikes: Record<string, number> = {};
+        const initialCites: Record<string, number> = {};
         sorted.forEach((c) => {
           initialLikes[c.id] = c.likes ?? 0;
+          initialCites[c.id] = c.citesCount ?? 0;
         });
         setLikesCountMap(initialLikes);
+        setCitesCountMap(initialCites);
       }
     } catch (err) {
       console.error('Failed to load comments:', err);
@@ -248,7 +282,7 @@ export function CommunityVoicesTab({
     try {
       setLoadingMore(true);
       const url = `/api/comments?limit=15&cursor=${encodeURIComponent(nextCursor)}${selectedState !== 'all' ? `&state=${encodeURIComponent(selectedState)}` : ''}`;
-      const res = await fetch(url);
+      const res = await fetch(url, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         const newItems: EnrichedComment[] = Array.isArray(data) ? data : (data.comments || []);
@@ -260,6 +294,14 @@ export function CommunityVoicesTab({
           const next = { ...prev };
           newItems.forEach((c) => {
             next[c.id] = c.likes ?? 0;
+          });
+          return next;
+        });
+
+        setCitesCountMap((prev) => {
+          const next = { ...prev };
+          newItems.forEach((c) => {
+            next[c.id] = c.citesCount ?? 0;
           });
           return next;
         });
@@ -368,6 +410,19 @@ export function CommunityVoicesTab({
         // Push new comment to the top of feed immediately, deduplicating
         setComments((prev) => [newEnriched, ...prev.filter((c) => c.id !== newEnriched.id)]);
         setLikesCountMap((prev) => ({ ...prev, [newEnriched.id]: 0 }));
+        setCitesCountMap((prev) => ({ ...prev, [newEnriched.id]: 0 }));
+
+        if (replyTarget?.id) {
+          setCitesCountMap((prev) => ({
+            ...prev,
+            [replyTarget.id]: (prev[replyTarget.id] || 0) + 1,
+          }));
+        }
+
+        // Reset filters so user is 100% guaranteed to see their post at the top of the feed
+        setSelectedState('all');
+        setSelectedCategory('all');
+        setSearchQuery('');
 
         setSubmitSuccess(true);
         setCommentText('');
@@ -786,6 +841,8 @@ export function CommunityVoicesTab({
           filteredComments.map((cmt) => {
             const isLiked = !!likedMap[cmt.id];
             const currentLikes = likesCountMap[cmt.id] ?? (cmt.likes || 0);
+            const currentCites = citesCountMap[cmt.id] ?? (cmt.citesCount || 0);
+            const citedItem = cmt.citedComment || (cmt.replyToCommentId ? comments.find((c) => c.id === cmt.replyToCommentId) : null);
 
             return (
               <article
@@ -831,6 +888,14 @@ export function CommunityVoicesTab({
                   )}
                 </div>
 
+                {/* Replying indicator */}
+                {cmt.replyToHandle && (
+                  <div className="flex items-center gap-1 text-[11px] text-sky-400 font-mono pl-1">
+                    <Quote className="w-3 h-3 shrink-0" />
+                    <span>Citing <span className="font-semibold text-sky-300">{cmt.replyToHandle}</span></span>
+                  </div>
+                )}
+
                 {/* SPATIAL ANCHOR LOCATION PILL (Click to fly map!) */}
                 <div>
                   <button
@@ -871,7 +936,39 @@ export function CommunityVoicesTab({
                   );
                 })()}
 
-                {/* TWEET INTERACTION BAR (Like, Fly, Reply, Share) */}
+                {/* Embedded Citation / Quoted Tweet Card */}
+                {citedItem && (
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const coords = (citedItem as any).coordinates;
+                      if (coords && coords[0] && coords[1]) {
+                        onFlyTo(coords, 12);
+                      }
+                      onSelectCommunityByName(citedItem.communityName);
+                    }}
+                    className="mt-2 p-2.5 sm:p-3 rounded-xl bg-black/40 hover:bg-black/60 border border-sky-500/25 hover:border-sky-500/40 transition-all cursor-pointer space-y-1.5 group/quote"
+                    title="Click to view quoted community location"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 text-[11px] min-w-0">
+                        <div className="w-4 h-4 rounded-full bg-sky-500/20 text-sky-300 flex items-center justify-center font-bold text-[9px] shrink-0">
+                          {citedItem.authorName.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="font-bold text-slate-200 truncate">{citedItem.authorName}</span>
+                        <span className="text-slate-400 font-mono text-[10px] truncate">{citedItem.handle}</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-sky-300 px-1.5 py-0.5 rounded bg-sky-500/10 border border-sky-500/20 shrink-0">
+                        {citedItem.communityName}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 line-clamp-3 leading-relaxed whitespace-pre-wrap pl-2 border-l-2 border-sky-500/40 group-hover/quote:border-sky-400">
+                      {'comment' in citedItem ? (citedItem as any).comment : (citedItem as any).content}
+                    </p>
+                  </div>
+                )}
+
+                {/* TWEET INTERACTION BAR (Like, Fly, Reply/Cite, Share) */}
                 <div className="pt-2 border-t border-white/[0.05] flex items-center justify-between text-slate-400 text-xs">
                   {/* Fly Map Action */}
                   <button
@@ -888,13 +985,14 @@ export function CommunityVoicesTab({
                     <span className="text-[11px]">Map</span>
                   </button>
 
-                  {/* Like Button */}
+                  {/* Like Button with Count */}
                   <button
                     type="button"
                     onClick={() => handleLike(cmt.id)}
                     className={`flex items-center gap-1.5 transition-all ${
                       isLiked ? 'text-rose-400 font-bold' : 'hover:text-rose-300'
                     }`}
+                    title="Like this testimony"
                   >
                     <Heart
                       className={`w-3.5 h-3.5 ${
@@ -904,14 +1002,16 @@ export function CommunityVoicesTab({
                     <span className="text-[11px] font-mono">{currentLikes}</span>
                   </button>
 
-                  {/* Reply Action */}
+                  {/* Reply / Cite Action with Count */}
                   <button
                     type="button"
                     onClick={() => handleReply(cmt)}
-                    className="flex items-center gap-1 hover:text-sky-300 transition-colors"
+                    className="flex items-center gap-1.5 hover:text-sky-300 transition-colors group/cite"
+                    title="Cite this testimony on the timeline"
                   >
-                    <Quote className="w-3.5 h-3.5" />
-                    <span className="text-[11px]">Cite</span>
+                    <Quote className="w-3.5 h-3.5 group-hover/cite:scale-110 transition-transform" />
+                    <span className="text-[11px] font-mono">{currentCites}</span>
+                    <span className="text-[10px] text-slate-500 hidden sm:inline">Cite</span>
                   </button>
 
                   {/* Share Action */}

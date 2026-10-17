@@ -122,8 +122,11 @@ model Comment {
   content     String
   location    String?
   category    String    @default("General")
-  likes       Int       @default(0)
-  createdAt   DateTime  @default(now())
+  likes            Int       @default(0)
+  citesCount       Int       @default(0)
+  replyToCommentId String?
+  replyToHandle    String?
+  createdAt        DateTime  @default(now())
 }
 
 // 7. Contributor Profile (Global Identity Bound to Device)

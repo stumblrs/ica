@@ -133,16 +133,32 @@ export async function POST(
         });
       }
 
-      const prismaCreated = await prisma.comment.create({
+      // Resolve community to prevent foreign key errors
+      let resolvedDbCommunityId: string | null = null;
+      try {
+        const comm = await prisma.community.findFirst({
+          where: {
+            OR: [
+              { id },
+              { name: { equals: id, mode: 'insensitive' } },
+            ],
+          },
+          select: { id: true },
+        });
+        if (comm) resolvedDbCommunityId = comm.id;
+      } catch {}
+
+      const prismaCreated = await (prisma.comment as any).create({
         data: {
           id: stored.id,
-          communityId: id,
+          communityId: resolvedDbCommunityId,
           deviceId: deviceId || null,
           author: cleanAuthor,
           handle: cleanHandle,
           content: commentText.trim(),
           category: String(category).slice(0, 50),
           likes: 0,
+          citesCount: 0,
         },
       });
 

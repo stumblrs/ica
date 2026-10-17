@@ -16,6 +16,9 @@ export interface StoredComment {
   category: string;
   comment: string;
   likes: number;
+  citesCount?: number;
+  replyToHandle?: string;
+  replyToCommentId?: string;
   createdAt: string;
 }
 
@@ -90,6 +93,12 @@ export function saveCommentToStore(item: {
   affiliation?: string;
   deviceId?: string | null;
   location?: string;
+  communityName?: string;
+  stateName?: string;
+  lgaName?: string;
+  coordinates?: [number, number];
+  replyToHandle?: string;
+  replyToCommentId?: string;
 }): StoredComment {
   const comments = readCommentsStore();
 
@@ -104,13 +113,26 @@ export function saveCommentToStore(item: {
     ? (item.handle.trim().startsWith('@') ? item.handle.trim() : `@${item.handle.trim()}`)
     : `@${author.toLowerCase().replace(/[^a-z0-9]/g, '') || 'resident'}`;
 
+  // If this comment is citing an existing comment, increment the cite count on that comment
+  if (item.replyToCommentId) {
+    const citedIndex = comments.findIndex((c) => c.id === item.replyToCommentId);
+    if (citedIndex !== -1) {
+      comments[citedIndex].citesCount = (comments[citedIndex].citesCount || 0) + 1;
+    }
+  }
+
+  const finalCommunityName = item.communityName || matchedComm?.name || item.location || 'Igbo Settlement';
+  const finalStateName = item.stateName || matchedComm?.stateName;
+  const finalLgaName = item.lgaName || matchedComm?.lgaName;
+  const finalCoordinates: [number, number] = item.coordinates || (matchedComm ? [matchedComm.longitude, matchedComm.latitude] : [7.0, 6.2]);
+
   const newComment: StoredComment = {
     id: 'cmt_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
     communityId: matchedComm?.id || item.communityId,
-    communityName: matchedComm?.name || item.location || 'Igbo Settlement',
-    lgaName: matchedComm?.lgaName,
-    stateName: matchedComm?.stateName,
-    coordinates: [matchedComm?.longitude || 7.0, matchedComm?.latitude || 6.2],
+    communityName: finalCommunityName,
+    lgaName: finalLgaName,
+    stateName: finalStateName,
+    coordinates: finalCoordinates,
     deviceId: item.deviceId || null,
     authorName: author,
     handle,
@@ -118,6 +140,9 @@ export function saveCommentToStore(item: {
     category: item.category || 'general',
     comment: item.comment.trim(),
     likes: 0,
+    citesCount: 0,
+    replyToHandle: item.replyToHandle,
+    replyToCommentId: item.replyToCommentId,
     createdAt: new Date().toISOString(),
   };
 
@@ -138,6 +163,20 @@ export function likeCommentInStore(commentId: string): number {
     cmt.likes = (cmt.likes || 0) + 1;
     writeCommentsStore(comments);
     return cmt.likes;
+  }
+  return 0;
+}
+
+/**
+ * Increment cites count on a comment in store
+ */
+export function citeCommentInStore(commentId: string): number {
+  const comments = readCommentsStore();
+  const cmt = comments.find((c) => c.id === commentId);
+  if (cmt) {
+    cmt.citesCount = (cmt.citesCount || 0) + 1;
+    writeCommentsStore(comments);
+    return cmt.citesCount;
   }
   return 0;
 }

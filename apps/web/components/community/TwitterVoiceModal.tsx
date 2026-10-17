@@ -128,6 +128,10 @@ export function TwitterVoiceModal({
       });
 
       if (res.ok) {
+        const newCmt = await res.json().catch(() => null);
+        if (newCmt) {
+          window.dispatchEvent(new CustomEvent('ica:comment-posted', { detail: newCmt }));
+        }
         onSuccess();
         onClose();
       } else {

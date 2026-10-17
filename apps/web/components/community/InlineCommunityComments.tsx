@@ -74,6 +74,10 @@ export function InlineCommunityComments({
       });
 
       if (res.ok) {
+        const added = await res.json().catch(() => null);
+        if (added) {
+          window.dispatchEvent(new CustomEvent('ica:comment-posted', { detail: added }));
+        }
         setCommentText('');
         setSuccessMsg(true);
         setTimeout(() => setSuccessMsg(false), 3000);
