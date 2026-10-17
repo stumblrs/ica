@@ -3,9 +3,11 @@ const { Pool } = require('pg');
 
 /**
  * Migration Script: Harden Supabase PostgreSQL Row-Level Security (RLS)
- * - Revokes all anonymous mutation privileges (INSERT, UPDATE, DELETE) across all public tables.
- * - Restricts public client access to safe SELECT only on public data (Community, Comment, GovernanceInquiry, CommunityAuditLog).
+ * - Resolves all Supabase Security Advisor and Linter warnings.
+ * - Restricts public client access to safe SELECT only on public data (Community, Comment, GovernanceInquiry, CommunityAuditLog, Notification, Profile).
  * - Restricts Device, GovernanceVote, and Profile writes strictly to server-side Prisma / Service Role.
+ * - Adds explicit Service Role policies to all tables to resolve 'RLS Enabled No Policy'.
+ * - Revokes public EXECUTE on SECURITY DEFINER function rls_auto_enable().
  * Run with: node scripts/harden-supabase-rls.js
  */
 async function hardenPolicies() {
@@ -27,12 +29,12 @@ async function hardenPolicies() {
     DECLARE
       pol RECORD;
     BEGIN
-      -- 1. Drop all existing legacy/permissive policies created previously
+      -- 1. Drop all insecure legacy/permissive policies
       FOR pol IN 
         SELECT tablename, policyname 
         FROM pg_policies 
         WHERE schemaname = 'public' 
-          AND policyname LIKE 'Allow public%'
+          AND (policyname LIKE 'Allow public%' OR policyname LIKE 'Public insert%' OR policyname LIKE 'Public update%' OR policyname LIKE 'Public select%')
       LOOP
         EXECUTE format('DROP POLICY IF EXISTS %I ON %I;', pol.policyname, pol.tablename);
         RAISE NOTICE 'Dropped legacy policy: % on %', pol.policyname, pol.tablename;
@@ -48,8 +50,8 @@ async function hardenPolicies() {
       ALTER TABLE "Profile" ENABLE ROW LEVEL SECURITY;
       ALTER TABLE "Notification" ENABLE ROW LEVEL SECURITY;
 
-      -- 3. Explicitly REVOKE all mutating actions on all public tables from anon
-      REVOKE INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM anon;
+      -- 3. Explicitly REVOKE all mutating actions on all public tables from anon and authenticated
+      REVOKE INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM anon, authenticated, public;
 
       -- 4. Create strictly scoped SELECT policies for tables that need public visibility
       -- Community (Read-only for interactive map & public atlas)
@@ -77,8 +79,53 @@ async function hardenPolicies() {
         CREATE POLICY "Public read notifications" ON "Notification" FOR SELECT USING (true);
       END IF;
 
-      -- Note: Device, GovernanceVote, and Profile intentionally have NO public mutation policies.
-      -- All mutations on these tables MUST be performed via Next.js server-side API routes using Prisma or Service Role.
+      -- Profile (Read-only for contributor profile lookup and availability check)
+      IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'Profile' AND policyname = 'Public read profiles') THEN
+        CREATE POLICY "Public read profiles" ON "Profile" FOR SELECT USING (true);
+      END IF;
+
+      -- Grant explicit SELECT privilege to anon and authenticated on public read tables
+      GRANT SELECT ON "Community", "Comment", "CommunityAuditLog", "GovernanceInquiry", "Notification", "Profile" TO anon, authenticated;
+
+      -- 5. Add Service Role full access policies on all tables to resolve 'RLS Enabled No Policy' warnings
+      IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'Comment' AND policyname = 'Service role full access on Comment') THEN
+        CREATE POLICY "Service role full access on Comment" ON "Comment" FOR ALL TO service_role USING (true) WITH CHECK (true);
+      END IF;
+
+      IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'Community' AND policyname = 'Service role full access on Community') THEN
+        CREATE POLICY "Service role full access on Community" ON "Community" FOR ALL TO service_role USING (true) WITH CHECK (true);
+      END IF;
+
+      IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'CommunityAuditLog' AND policyname = 'Service role full access on CommunityAuditLog') THEN
+        CREATE POLICY "Service role full access on CommunityAuditLog" ON "CommunityAuditLog" FOR ALL TO service_role USING (true) WITH CHECK (true);
+      END IF;
+
+      IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'Device' AND policyname = 'Service role full access on Device') THEN
+        CREATE POLICY "Service role full access on Device" ON "Device" FOR ALL TO service_role USING (true) WITH CHECK (true);
+      END IF;
+
+      IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'GovernanceInquiry' AND policyname = 'Service role full access on GovernanceInquiry') THEN
+        CREATE POLICY "Service role full access on GovernanceInquiry" ON "GovernanceInquiry" FOR ALL TO service_role USING (true) WITH CHECK (true);
+      END IF;
+
+      IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'GovernanceVote' AND policyname = 'Service role full access on GovernanceVote') THEN
+        CREATE POLICY "Service role full access on GovernanceVote" ON "GovernanceVote" FOR ALL TO service_role USING (true) WITH CHECK (true);
+      END IF;
+
+      IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'Notification' AND policyname = 'Service role full access on Notification') THEN
+        CREATE POLICY "Service role full access on Notification" ON "Notification" FOR ALL TO service_role USING (true) WITH CHECK (true);
+      END IF;
+
+      IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'Profile' AND policyname = 'Service role full access on Profile') THEN
+        CREATE POLICY "Service role full access on Profile" ON "Profile" FOR ALL TO service_role USING (true) WITH CHECK (true);
+      END IF;
+
+      -- 6. Revoke public EXECUTE on SECURITY DEFINER function rls_auto_enable()
+      IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON p.pronamespace = n.oid WHERE n.nspname = 'public' AND p.proname = 'rls_auto_enable') THEN
+        REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM PUBLIC, anon, authenticated;
+        GRANT EXECUTE ON FUNCTION public.rls_auto_enable() TO postgres, service_role;
+      END IF;
+
     END $$;
   `);
 
