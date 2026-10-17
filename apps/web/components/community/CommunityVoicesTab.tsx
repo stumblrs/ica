@@ -32,9 +32,10 @@ import { getOrCreateDeviceId, getDeviceFingerprintSync } from '@/lib/device';
 import { supabase } from '@/lib/supabase';
 
 interface CommunityVoicesTabProps {
-  communities: CommunitySummary[];
-  onFlyTo: (center: [number, number], zoom: number) => void;
-  onSelectCommunityByName: (name: string) => void;
+  /** @deprecated Comments are global; these props are no longer used. */
+  communities?: CommunitySummary[];
+  onFlyTo?: (center: [number, number], zoom: number) => void;
+  onSelectCommunityByName?: (name: string) => void;
   selectedFeature?: SelectedFeature | null;
 }
 
@@ -104,23 +105,16 @@ function saveLocalCiteCount(id: string, count: number) {
   } catch {}
 }
 
-export function CommunityVoicesTab({
-  communities,
-  onFlyTo,
-  onSelectCommunityByName,
-  selectedFeature,
-}: CommunityVoicesTabProps) {
+export function CommunityVoicesTab(_props: CommunityVoicesTabProps) {
   const [comments, setComments] = useState<EnrichedComment[]>(() => getLocalPostedComments());
   const [loading, setLoading] = useState(true);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedState, setSelectedState] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   // Composer state
-  const [selectedCommId, setSelectedCommId] = useState<string>('');
   const [authorName, setAuthorName] = useState<string>('');
   const [authorHandle, setAuthorHandle] = useState<string>('');
   const [affiliation, setAffiliation] = useState<string>('Indigene');
@@ -131,9 +125,6 @@ export function CommunityVoicesTab({
   const [formError, setFormError] = useState<string | null>(null);
   const [isComposerExpanded, setIsComposerExpanded] = useState(false);
 
-  // Community picker in composer
-  const [communitySearch, setCommunitySearch] = useState('');
-  const [isPickingCommunity, setIsPickingCommunity] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [replyTarget, setReplyTarget] = useState<EnrichedComment | null>(null);
 
@@ -163,11 +154,6 @@ export function CommunityVoicesTab({
 
   const composerTextareaRef = useRef<HTMLTextAreaElement>(null);
   const topFeedRef = useRef<HTMLDivElement>(null);
-  const communitiesRef = useRef(communities);
-
-  useEffect(() => {
-    communitiesRef.current = communities;
-  }, [communities]);
 
   // Listen for externally posted comments (e.g. from TwitterVoiceModal or InlineCommunityComments)
   useEffect(() => {
@@ -194,7 +180,6 @@ export function CommunityVoicesTab({
       }
 
       // Reset filters so the new comment appears right at the top of the feed
-      setSelectedState('all');
       setSelectedCategory('all');
       setSearchQuery('');
 
@@ -204,18 +189,6 @@ export function CommunityVoicesTab({
     window.addEventListener('ica:comment-posted', handleExternalComment);
     return () => window.removeEventListener('ica:comment-posted', handleExternalComment);
   }, []);
-
-  // Automatically pre-fill community if a feature is selected on the map
-  useEffect(() => {
-    if (selectedFeature?.name) {
-      const match = communities.find(
-        (c) => c.name.toLowerCase() === selectedFeature.name.toLowerCase()
-      );
-      if (match) {
-        setSelectedCommId(match.id);
-      }
-    }
-  }, [selectedFeature, communities]);
 
   // Realtime live subscription with 1200ms batching buffer (conserve free tier egress)
   useEffect(() => {
@@ -250,14 +223,8 @@ export function CommunityVoicesTab({
 
                     for (const item of toAdd) {
                       if (!existingIds.has(item.id)) {
-                        const comm = communitiesRef.current.find((c) => c.id === item.communityId);
                         newEnriched.push({
                           id: item.id,
-                          communityId: item.communityId || '',
-                          communityName: comm?.name || 'Community',
-                          lgaName: comm?.lgaName,
-                          stateName: comm?.stateName,
-                          coordinates: [comm?.longitude || 7.0, comm?.latitude || 6.2],
                           authorName: item.author || 'Contributor',
                           handle: item.handle || `@${item.author?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'resident'}`,
                           affiliation: 'Community Member',
@@ -293,13 +260,13 @@ export function CommunityVoicesTab({
   }, []); // Mounts once to prevent subscription teardown collisions
 
   useEffect(() => {
-    loadInitialComments(selectedState);
-  }, [selectedState]);
+    loadInitialComments();
+  }, []);
 
-  async function loadInitialComments(state = selectedState) {
+  async function loadInitialComments() {
     try {
       setLoading(true);
-      const url = `/api/comments?limit=15${state !== 'all' ? `&state=${encodeURIComponent(state)}` : ''}`;
+      const url = `/api/comments?limit=15`;
       const res = await fetch(url, {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache' },
@@ -361,12 +328,15 @@ export function CommunityVoicesTab({
     if (loadingMore || !hasMore || !nextCursor) return;
     try {
       setLoadingMore(true);
-      const url = `/api/comments?limit=15&cursor=${encodeURIComponent(nextCursor)}${selectedState !== 'all' ? `&state=${encodeURIComponent(selectedState)}` : ''}`;
+      const url = `/api/comments?limit=15&cursor=${encodeURIComponent(nextCursor)}`;
       const res = await fetch(url, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         const newItems: EnrichedComment[] = Array.isArray(data) ? data : (data.comments || []);
-        setComments((prev) => [...prev, ...newItems]);
+        setComments((prev) => {
+          const seen = new Set(prev.map((c) => c.id));
+          return [...prev, ...newItems.filter((c) => !seen.has(c.id))];
+        });
         setNextCursor(data.nextCursor || null);
         setHasMore(Boolean(data.hasMore));
 
@@ -418,11 +388,7 @@ export function CommunityVoicesTab({
   // Share comment link
   function handleShareComment(comment: EnrichedComment) {
     const url = new URL(window.location.href);
-    if (comment.coordinates) {
-      url.searchParams.set('lng', comment.coordinates[0].toFixed(4));
-      url.searchParams.set('lat', comment.coordinates[1].toFixed(4));
-    }
-    url.searchParams.set('name', comment.communityName);
+    url.searchParams.set('comment', comment.id);
     navigator.clipboard.writeText(url.toString());
     setCopiedId(comment.id);
     setTimeout(() => setCopiedId(null), 2500);
@@ -434,10 +400,6 @@ export function CommunityVoicesTab({
     setReplyTarget(comment);
     const handle = comment.handle || `@${comment.authorName.replace(/\s+/g, '')}`;
     setCommentText((prev) => (prev ? `${prev} ${handle} ` : `${handle} `));
-    const match = communities.find(
-      (c) => c.id === comment.communityId || (c.name && c.name.toLowerCase() === comment.communityName.toLowerCase())
-    );
-    setSelectedCommId(match?.id || comment.communityId || comment.communityName);
     composerTextareaRef.current?.focus();
     topFeedRef.current?.scrollIntoView({ behavior: 'smooth' });
   }
@@ -447,11 +409,6 @@ export function CommunityVoicesTab({
     e.preventDefault();
     if (!commentText.trim()) {
       setFormError('Please write your note before posting.');
-      return;
-    }
-    if (!selectedCommId) {
-      setFormError('Please select or tag a community for this comment.');
-      setIsPickingCommunity(true);
       return;
     }
 
@@ -474,7 +431,6 @@ export function CommunityVoicesTab({
           ...(effectiveFingerprint ? { 'x-device-fingerprint': effectiveFingerprint } : {}),
         },
         body: JSON.stringify({
-          communityId: selectedCommId,
           authorName: finalAuthor,
           handle: finalHandle,
           affiliation: affiliation.trim() || undefined,
@@ -510,7 +466,6 @@ export function CommunityVoicesTab({
         }
 
         // Reset filters so user is 100% guaranteed to see their post at the top of the feed
-        setSelectedState('all');
         setSelectedCategory('all');
         setSearchQuery('');
 
@@ -538,54 +493,21 @@ export function CommunityVoicesTab({
   // Filtered comments timeline
   const filteredComments = useMemo(() => {
     return comments.filter((cmt) => {
-      if (selectedState !== 'all' && cmt.stateName?.toLowerCase() !== selectedState.toLowerCase()) {
-        return false;
-      }
       if (selectedCategory !== 'all' && cmt.category !== selectedCategory) {
         return false;
       }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesContent = cmt.comment.toLowerCase().includes(q);
-        const matchesTown = cmt.communityName.toLowerCase().includes(q);
         const matchesAuthor = cmt.authorName.toLowerCase().includes(q);
         const matchesHandle = cmt.handle?.toLowerCase().includes(q);
-        const matchesLga = cmt.lgaName?.toLowerCase().includes(q);
-        if (!matchesContent && !matchesTown && !matchesAuthor && !matchesHandle && !matchesLga) {
+        if (!matchesContent && !matchesAuthor && !matchesHandle) {
           return false;
         }
       }
       return true;
     });
-  }, [comments, selectedState, selectedCategory, searchQuery]);
-
-  // States available for filter
-  const stateOptions = useMemo(() => {
-    const states = new Set<string>();
-    communities.forEach((c) => {
-      if (c.stateName) states.add(c.stateName);
-    });
-    return Array.from(states).sort();
-  }, [communities]);
-
-  // Current selected community object for composer tag
-  const activeTaggedCommunity = useMemo(() => {
-    if (!selectedCommId) return undefined;
-    return communities.find(
-      (c) =>
-        c.id === selectedCommId ||
-        (c.name && c.name.toLowerCase() === selectedCommId.toLowerCase())
-    );
-  }, [communities, selectedCommId]);
-
-  // Filtered community options for autocomplete picker
-  const filteredCommunityPickerOptions = useMemo(() => {
-    if (!communitySearch.trim()) return communities.slice(0, 15);
-    const q = communitySearch.toLowerCase();
-    return communities
-      .filter((c) => c.name.toLowerCase().includes(q) || c.lgaName?.toLowerCase().includes(q))
-      .slice(0, 15);
-  }, [communities, communitySearch]);
+  }, [comments, selectedCategory, searchQuery]);
 
   return (
     <div className="space-y-4 rise select-text">
@@ -596,34 +518,6 @@ export function CommunityVoicesTab({
         <form onSubmit={handlePostComment} className="space-y-3">
           {/* Tagged Location Pill */}
           <div className="flex items-center justify-between gap-2 flex-wrap pb-2 border-b border-white/[0.06]">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              {activeTaggedCommunity ? (
-                <div className="flex items-center gap-1 min-w-0">
-                  <span className="text-xs font-semibold text-emerald-300 truncate">
-                    {activeTaggedCommunity.name}
-                    {activeTaggedCommunity.lgaName ? ` · ${activeTaggedCommunity.lgaName}` : ''}
-                    {activeTaggedCommunity.stateName ? `, ${activeTaggedCommunity.stateName}` : ''}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setIsPickingCommunity(true)}
-                    className="text-[10px] text-slate-400 hover:text-white underline ml-1"
-                  >
-                    Change
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setIsPickingCommunity(true)}
-                  className="text-xs text-amber-300 hover:text-amber-200 underline font-semibold flex items-center gap-1"
-                >
-                  <span>Tag a Community to Post</span>
-                  <ChevronDown className="w-3 h-3" />
-                </button>
-              )}
-            </div>
 
             {/* Category Chip Selector */}
             <select
@@ -639,50 +533,6 @@ export function CommunityVoicesTab({
             </select>
           </div>
 
-          {/* Autocomplete Community Search Modal / Dropdown */}
-          {isPickingCommunity && (
-            <div className="p-2.5 rounded-xl bg-[#090e1c] border border-emerald-500/30 space-y-2 animate-in fade-in duration-150">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-white uppercase font-mono">Select Location to Tag</span>
-                <button
-                  type="button"
-                  onClick={() => setIsPickingCommunity(false)}
-                  className="p-1 text-slate-400 hover:text-white"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-              <input
-                type="text"
-                placeholder="Search from 736+ towns, clans, LGAs…"
-                value={communitySearch}
-                onChange={(e) => setCommunitySearch(e.target.value)}
-                className="w-full h-8 px-2.5 rounded-lg bg-white/[0.05] border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-                autoFocus
-              />
-              <div className="max-h-36 overflow-y-auto space-y-1">
-                {filteredCommunityPickerOptions.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedCommId(c.id);
-                      setIsPickingCommunity(false);
-                      setCommunitySearch('');
-                    }}
-                    className={`w-full text-left px-2 py-1.5 rounded-lg text-xs flex items-center justify-between hover:bg-emerald-500/20 ${
-                      selectedCommId === c.id ? 'bg-emerald-500/25 text-emerald-300 font-bold' : 'text-slate-300'
-                    }`}
-                  >
-                    <span className="truncate">{c.name}</span>
-                    <span className="text-[10px] text-slate-500 font-mono shrink-0 ml-2">
-                      {c.lgaName ? `${c.lgaName}, ` : ''}{c.stateName}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Citation Banner if replying */}
           {replyTarget && (
@@ -690,7 +540,7 @@ export function CommunityVoicesTab({
               <div className="flex items-center gap-1.5 truncate">
                 <Quote className="w-3.5 h-3.5 text-sky-400 shrink-0" />
                 <span className="truncate">
-                  Citing <strong className="text-white">{replyTarget.handle}</strong> in {replyTarget.communityName}
+                  Citing <strong className="text-white">{replyTarget.handle}</strong>
                 </span>
               </div>
               <button
@@ -848,36 +698,9 @@ export function CommunityVoicesTab({
 
         {/* State Filter Chips with Compact Refresh Action */}
         <div className="flex items-center justify-between gap-1.5 py-0.5">
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-            <button
-              type="button"
-              onClick={() => setSelectedState('all')}
-              className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all shrink-0 ${
-                selectedState === 'all'
-                  ? 'bg-emerald-500 text-black shadow-sm'
-                  : 'bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 border border-white/[0.06]'
-              }`}
-            >
-              All States ({comments.length})
-            </button>
-            {stateOptions.map((st) => (
-              <button
-                key={st}
-                type="button"
-                onClick={() => setSelectedState(st)}
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all shrink-0 ${
-                  selectedState === st
-                    ? 'bg-emerald-500 text-black shadow-sm'
-                    : 'bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 border border-white/[0.06]'
-                }`}
-              >
-                {st}
-              </button>
-            ))}
-          </div>
           <button
             type="button"
-            onClick={() => loadInitialComments(selectedState)}
+            onClick={() => loadInitialComments()}
             className="shrink-0 p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-slate-400 hover:text-white transition-all active:scale-95"
             title="Refresh Timeline"
             aria-label="Refresh Timeline"
@@ -922,7 +745,7 @@ export function CommunityVoicesTab({
           <div className="p-6 text-center rounded-2xl bg-white/[0.02] border border-white/[0.06] space-y-2">
             <BookOpen className="w-6 h-6 text-slate-500 mx-auto" />
             <p className="text-xs text-slate-400">
-              No comments found {selectedState !== 'all' ? `for ${selectedState}` : ''} {searchQuery ? `matching "${searchQuery}"` : ''}.
+              No comments found {searchQuery ? `matching "${searchQuery}"` : ''}.
             </p>
             <button
               type="button"
@@ -991,28 +814,6 @@ export function CommunityVoicesTab({
                   </div>
                 )}
 
-                {/* SPATIAL ANCHOR LOCATION PILL (Click to fly map!) */}
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (cmt.coordinates && cmt.coordinates[0] && cmt.coordinates[1]) {
-                        onFlyTo(cmt.coordinates, 12);
-                      }
-                      onSelectCommunityByName(cmt.communityName);
-                    }}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/25 text-emerald-300 text-[11px] font-semibold transition-all group-hover:border-emerald-500/50"
-                    title={`Fly map to ${cmt.communityName}`}
-                  >
-                    <MapPin className="w-3 h-3 text-emerald-400 shrink-0" />
-                    <span className="truncate max-w-[240px]">
-                      {cmt.communityName}
-                      {cmt.lgaName ? ` · ${cmt.lgaName}` : ''}
-                      {cmt.stateName ? `, ${cmt.stateName}` : ''}
-                    </span>
-                    <ArrowUpRight className="w-3 h-3 text-emerald-400/80 shrink-0 ml-0.5" />
-                  </button>
-                </div>
 
                 {/* TWEET BODY TEXT & EXTRACTED MEDIA GALLERY */}
                 {(() => {
@@ -1034,16 +835,7 @@ export function CommunityVoicesTab({
                 {/* Embedded Citation / Quoted Tweet Card */}
                 {citedItem && (
                   <div
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const coords = (citedItem as any).coordinates;
-                      if (coords && coords[0] && coords[1]) {
-                        onFlyTo(coords, 12);
-                      }
-                      onSelectCommunityByName(citedItem.communityName);
-                    }}
-                    className="mt-2 p-2.5 sm:p-3 rounded-xl bg-black/40 hover:bg-black/60 border border-sky-500/25 hover:border-sky-500/40 transition-all cursor-pointer space-y-1.5 group/quote"
-                    title="Click to view quoted community location"
+                    className="mt-2 p-2.5 sm:p-3 rounded-xl bg-black/40 border border-sky-500/25 space-y-1.5 group/quote"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 text-[11px] min-w-0">
@@ -1053,9 +845,6 @@ export function CommunityVoicesTab({
                         <span className="font-bold text-slate-200 truncate">{citedItem.authorName}</span>
                         <span className="text-slate-400 font-mono text-[10px] truncate">{citedItem.handle}</span>
                       </div>
-                      <span className="text-[10px] font-mono text-sky-300 px-1.5 py-0.5 rounded bg-sky-500/10 border border-sky-500/20 shrink-0">
-                        {citedItem.communityName}
-                      </span>
                     </div>
                     <p className="text-xs text-slate-300 line-clamp-3 leading-relaxed whitespace-pre-wrap pl-2 border-l-2 border-sky-500/40 group-hover/quote:border-sky-400">
                       {'comment' in citedItem ? (citedItem as any).comment : (citedItem as any).content}
@@ -1065,20 +854,6 @@ export function CommunityVoicesTab({
 
                 {/* TWEET INTERACTION BAR (Like, Fly, Reply/Cite, Share) */}
                 <div className="pt-2 border-t border-white/[0.05] flex items-center justify-between text-slate-400 text-xs">
-                  {/* Fly Map Action */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (cmt.coordinates && cmt.coordinates[0] && cmt.coordinates[1]) {
-                        onFlyTo(cmt.coordinates, 12);
-                      }
-                      onSelectCommunityByName(cmt.communityName);
-                    }}
-                    className="flex items-center gap-1 hover:text-emerald-300 transition-colors"
-                  >
-                    <MapPin className="w-3.5 h-3.5" />
-                    <span className="text-[11px]">Map</span>
-                  </button>
 
                   {/* Like Button with Count */}
                   <button

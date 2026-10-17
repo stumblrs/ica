@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -37,12 +37,6 @@ export default function CommunityDetailPage({ params }: { params: { id: string }
   const [challengeReason, setChallengeReason] = useState('');
   const [challenging, setChallenging] = useState(false);
   const [showChallengeModal, setShowChallengeModal] = useState(false);
-
-  const [commentText, setCommentText] = useState('');
-  const [commentAuthor, setCommentAuthor] = useState('');
-  const [commentAffiliation, setCommentAffiliation] = useState('');
-  const [submittingComment, setSubmittingComment] = useState(false);
-  const [commentError, setCommentError] = useState<string | null>(null);
 
   const communityMedia: MediaItem[] = React.useMemo(() => {
     if (!community) return [];
@@ -121,38 +115,6 @@ export default function CommunityDetailPage({ params }: { params: { id: string }
       }
     } finally {
       setChallenging(false);
-    }
-  }
-
-  async function handleCommentSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!commentText.trim()) {
-      setCommentError('Comment text is required');
-      return;
-    }
-    try {
-      setSubmittingComment(true);
-      setCommentError(null);
-      const res = await fetch(`/api/communities/${params.id}/comments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          authorName: commentAuthor.trim() || undefined,
-          affiliation: commentAffiliation.trim() || undefined,
-          comment: commentText.trim(),
-        }),
-      });
-      if (res.ok) {
-        setCommentText('');
-        fetchCommunity();
-      } else {
-        const err = await res.json().catch(() => ({}));
-        setCommentError(err.error || 'Failed to post comment');
-      }
-    } catch (err: any) {
-      setCommentError(err.message || 'Error posting comment');
-    } finally {
-      setSubmittingComment(false);
     }
   }
 
@@ -383,124 +345,6 @@ export default function CommunityDetailPage({ params }: { params: { id: string }
               );
             })()}
           </div>
-        </div>
-      </div>
-
-      {/* Community Comments & Discussion Section */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-5">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <div className="flex items-center gap-2">
-            <MessageSquare className="w-4 h-4 text-emerald-400" />
-            <h3 className="text-sm font-bold text-white font-['Outfit']">
-              Community Discussion & Comments
-            </h3>
-          </div>
-          <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-md bg-white/[0.04] text-slate-300 border border-white/[0.08]">
-            {community.comments?.length || 0} {community.comments?.length === 1 ? 'comment' : 'comments'}
-          </span>
-        </div>
-
-        {/* Comment Submission Form */}
-        <form onSubmit={handleCommentSubmit} className="space-y-3 bg-slate-950/60 border border-slate-800/80 rounded-xl p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-medium text-slate-400 mb-1">
-                Your Name / Alias (Optional)
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Chukwuemeka, Elder Nnamdi"
-                value={commentAuthor}
-                onChange={(e) => setCommentAuthor(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-700/80 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-medium text-slate-400 mb-1">
-                Affiliation / Role (Optional)
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Indigene, Historian, Neighboring Clan"
-                value={commentAffiliation}
-                onChange={(e) => setCommentAffiliation(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-700/80 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-medium text-slate-400 mb-1">
-              Add Comment / Oral History / Perspective *
-            </label>
-            <textarea
-              required
-              rows={3}
-              placeholder="Share cultural context, local dialect details, historical notes, or paste photo/video URLs..."
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-700/80 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-            />
-          </div>
-
-          {commentError && (
-            <p className="text-xs text-red-400">{commentError}</p>
-          )}
-
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={submittingComment || !commentText.trim()}
-              className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-500/20 disabled:opacity-50 transition-all"
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>{submittingComment ? 'Posting...' : 'Post Comment'}</span>
-            </button>
-          </div>
-        </form>
-
-        {/* Comments Feed */}
-        <div className="space-y-3">
-          {community.comments && community.comments.length > 0 ? (
-            community.comments.map((cmt: any) => {
-              const { cleanText, media } = extractMediaFromText(cmt.comment);
-              return (
-                <div key={cmt.id} className="p-3.5 rounded-xl bg-slate-950/40 border border-slate-800/80 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-white font-['Outfit']">
-                        {cmt.authorName}
-                      </span>
-                      {cmt.affiliation && (
-                        <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                          {cmt.affiliation}
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-[10px] font-mono text-slate-500">
-                      {new Date(cmt.createdAt).toLocaleDateString(undefined, {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">
-                    {cleanText}
-                  </p>
-                  {media.length > 0 && (
-                    <div className="pt-1">
-                      <MediaGallery media={media} />
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          ) : (
-            <div className="p-6 text-center text-xs text-slate-500 italic bg-slate-950/20 border border-dashed border-slate-800 rounded-xl">
-              No comments yet. Be the first to share knowledge or feedback about {community.name}.
-            </div>
-          )}
         </div>
       </div>
 

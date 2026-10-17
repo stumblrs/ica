@@ -3,13 +3,10 @@ import { prisma } from '@/lib/prisma';
 import { supabase } from '@/lib/supabase';
 import {
   saveCommentToStore,
-  getCommentsFromStore,
   likeCommentInStore,
   citeCommentInStore,
   readCommentsStore,
-  type StoredComment,
 } from '@/lib/comment-store';
-import { readCommunityStore } from '@/lib/community-store';
 import { createNotification } from '@/lib/notification-store';
 import { findProfileByUsername } from '@/lib/profile-store';
 
@@ -23,17 +20,18 @@ interface CommentsCacheEntry {
 const commentsCache = new Map<string, CommentsCacheEntry>();
 const CACHE_TTL_MS = 5000; // 5 seconds
 
+// Hard cap on rows read from the database per request (free-tier Supabase friendly)
+const DB_FETCH_CAP = 100;
+
 function invalidateCommentsCache() {
   commentsCache.clear();
 }
 
+/**
+ * A single global comment. Comments are NOT tied to any community, state or location.
+ */
 export interface EnrichedComment {
   id: string;
-  communityId: string;
-  communityName: string;
-  lgaName?: string;
-  stateName?: string;
-  coordinates: [number, number];
   authorName: string;
   handle?: string;
   affiliation?: string;
@@ -47,29 +45,26 @@ export interface EnrichedComment {
     id: string;
     authorName: string;
     handle?: string;
-    communityName: string;
-    stateName?: string;
-    coordinates?: [number, number];
     comment: string;
   };
   createdAt: string;
 }
 
+function defaultHandle(author?: string | null) {
+  return `@${(author || '').toLowerCase().replace(/[^a-z0-9]/g, '') || 'resident'}`;
+}
+
 /**
  * GET /api/comments
- * Returns a unified global feed of oral testimonies and comments with newest at the head.
- * Direct PostgreSQL access via Prisma is authoritative, seamlessly merged with persistent store.
+ * Returns the single global timeline, newest first.
  */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const stateFilter = searchParams.get('state')?.toLowerCase();
-  const communityId = searchParams.get('communityId') || undefined;
   const cursor = searchParams.get('cursor') || undefined;
   const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '15', 10), 1), 50);
 
-  // Check microcache (bypassed if client explicitly requests fresh data or on initial feed loads)
   const isNoCache = req.headers.get('cache-control')?.includes('no-cache');
-  const cacheKey = `${stateFilter || 'all'}:${communityId || 'all'}:${cursor || 'start'}:${limit}`;
+  const cacheKey = `${cursor || 'start'}:${limit}`;
   const cached = commentsCache.get(cacheKey);
   if (!isNoCache && cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
     return NextResponse.json(cached.data, {
@@ -78,62 +73,19 @@ export async function GET(req: NextRequest) {
   }
 
   const commentsMap = new Map<string, EnrichedComment>();
-  const communityStore = readCommunityStore();
 
-  // 1. Primary Source: Query PostgreSQL via Prisma (server-level connection)
+  // 1. Primary Source: PostgreSQL via Prisma
   try {
     const dbComments = await prisma.comment.findMany({
-      include: {
-        community: {
-          select: {
-            id: true,
-            name: true,
-            lgaName: true,
-            stateName: true,
-            longitude: true,
-            latitude: true,
-          },
-        },
-      },
       orderBy: { createdAt: 'desc' },
-      take: 100,
+      take: DB_FETCH_CAP,
     });
 
     for (const cmt of dbComments) {
-      let commName = cmt.community?.name;
-      let lgaName = cmt.community?.lgaName;
-      let stateName = cmt.community?.stateName;
-      let coords: [number, number] = [cmt.community?.longitude || 7.0, cmt.community?.latitude || 6.2];
-
-      // If relation is null (e.g. communityId was a store ID or slug), hydrate from community store
-      if ((!commName || !stateName) && cmt.communityId) {
-        const matched = communityStore.find(
-          (c) =>
-            c.id === cmt.communityId ||
-            (c.name && c.name.toLowerCase() === cmt.communityId?.toLowerCase())
-        );
-        if (matched) {
-          commName = commName || matched.name;
-          lgaName = lgaName || matched.lgaName;
-          stateName = stateName || matched.stateName;
-          coords = [matched.longitude, matched.latitude];
-        }
-      }
-
-      // Also fall back to location string if stored
-      if (!commName && cmt.location) {
-        commName = cmt.location;
-      }
-
       commentsMap.set(cmt.id, {
         id: cmt.id,
-        communityId: cmt.communityId || '',
-        communityName: commName || 'Igbo Settlement',
-        lgaName: lgaName || undefined,
-        stateName: stateName || undefined,
-        coordinates: coords,
         authorName: cmt.author,
-        handle: cmt.handle || `@${cmt.author.toLowerCase().replace(/[^a-z0-9]/g, '') || 'resident'}`,
+        handle: cmt.handle || defaultHandle(cmt.author),
         affiliation: 'Community Member',
         category: cmt.category,
         comment: cmt.content,
@@ -145,57 +97,29 @@ export async function GET(req: NextRequest) {
       });
     }
   } catch (dbErr: any) {
-    console.warn('[CommentsAPI] Primary Prisma fetch failed, checking Supabase/store fallback:', dbErr.message);
+    console.warn('[CommentsAPI] Prisma fetch failed, trying Supabase:', dbErr.message);
     try {
       const { data: sbComments, error: sbErr } = await supabase
         .from('Comment')
-        .select(`
-          id,
-          communityId,
-          author,
-          handle,
-          content,
-          category,
-          likes,
-          citesCount,
-          replyToHandle,
-          replyToCommentId,
-          createdAt,
-          community:Community (
-            id,
-            name,
-            lgaName,
-            stateName,
-            longitude,
-            latitude
-          )
-        `)
+        .select('id, author, handle, content, category, likes, citesCount, replyToHandle, replyToCommentId, createdAt')
         .order('createdAt', { ascending: false })
-        .limit(100);
+        .limit(DB_FETCH_CAP);
 
-      if (!sbErr && Array.isArray(sbComments) && sbComments.length > 0) {
+      if (!sbErr && Array.isArray(sbComments)) {
         for (const cmt of sbComments as any[]) {
-          if (!commentsMap.has(cmt.id)) {
-            const comm = Array.isArray(cmt.community) ? cmt.community[0] : cmt.community;
-            commentsMap.set(cmt.id, {
-              id: cmt.id,
-              communityId: cmt.communityId || '',
-              communityName: comm?.name || 'Community',
-              lgaName: comm?.lgaName,
-              stateName: comm?.stateName,
-              coordinates: [comm?.longitude || 7.0, comm?.latitude || 6.2],
-              authorName: cmt.author,
-              handle: cmt.handle || `@${cmt.author?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'resident'}`,
-              affiliation: 'Community Member',
-              category: cmt.category,
-              comment: cmt.content,
-              likes: cmt.likes || 0,
-              citesCount: cmt.citesCount || 0,
-              replyToHandle: cmt.replyToHandle || undefined,
-              replyToCommentId: cmt.replyToCommentId || undefined,
-              createdAt: typeof cmt.createdAt === 'string' ? cmt.createdAt : new Date(cmt.createdAt).toISOString(),
-            });
-          }
+          commentsMap.set(cmt.id, {
+            id: cmt.id,
+            authorName: cmt.author,
+            handle: cmt.handle || defaultHandle(cmt.author),
+            affiliation: 'Community Member',
+            category: cmt.category,
+            comment: cmt.content,
+            likes: cmt.likes || 0,
+            citesCount: cmt.citesCount || 0,
+            replyToHandle: cmt.replyToHandle || undefined,
+            replyToCommentId: cmt.replyToCommentId || undefined,
+            createdAt: typeof cmt.createdAt === 'string' ? cmt.createdAt : new Date(cmt.createdAt).toISOString(),
+          });
         }
       }
     } catch {
@@ -203,28 +127,18 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // 2. Secondary Source: Merge persistent file store comments
+  // 2. Merge persistent file store comments
   const storeComments = readCommentsStore();
   for (const c of storeComments) {
     const existing = commentsMap.get(c.id);
     if (existing) {
-      // Reconcile maximum likes/cites counts between store and DB
       existing.likes = Math.max(existing.likes || 0, c.likes || 0);
       existing.citesCount = Math.max(existing.citesCount || 0, c.citesCount || 0);
-      if (!existing.replyToCommentId && c.replyToCommentId) {
-        existing.replyToCommentId = c.replyToCommentId;
-      }
-      if (!existing.replyToHandle && c.replyToHandle) {
-        existing.replyToHandle = c.replyToHandle;
-      }
+      if (!existing.replyToCommentId && c.replyToCommentId) existing.replyToCommentId = c.replyToCommentId;
+      if (!existing.replyToHandle && c.replyToHandle) existing.replyToHandle = c.replyToHandle;
     } else {
       commentsMap.set(c.id, {
         id: c.id,
-        communityId: c.communityId,
-        communityName: c.communityName,
-        lgaName: c.lgaName,
-        stateName: c.stateName,
-        coordinates: c.coordinates,
         authorName: c.authorName,
         handle: c.handle,
         affiliation: c.affiliation || 'Community Member',
@@ -239,7 +153,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // 3. Attach full citedComment details for any comment that cites another
+  // 3. Attach cited comment details
   for (const c of Array.from(commentsMap.values())) {
     if (c.replyToCommentId && !c.citedComment) {
       const cited = commentsMap.get(c.replyToCommentId);
@@ -248,70 +162,36 @@ export async function GET(req: NextRequest) {
           id: cited.id,
           authorName: cited.authorName,
           handle: cited.handle,
-          communityName: cited.communityName,
-          stateName: cited.stateName,
-          coordinates: cited.coordinates,
           comment: cited.comment,
         };
-      } else {
-        const fromStore = storeComments.find((sc) => sc.id === c.replyToCommentId);
-        if (fromStore) {
-          c.citedComment = {
-            id: fromStore.id,
-            authorName: fromStore.authorName,
-            handle: fromStore.handle,
-            communityName: fromStore.communityName,
-            stateName: fromStore.stateName,
-            coordinates: fromStore.coordinates,
-            comment: fromStore.comment,
-          };
-        }
       }
     }
   }
 
-  // 4. Convert to sorted unified array (newest at the head)
-  let allUnified = Array.from(commentsMap.values()).sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  // 4. Single unified timeline, newest first (id as tie-breaker for stable cursors)
+  const timeline = Array.from(commentsMap.values()).sort((a, b) => {
+    const diff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    return diff !== 0 ? diff : b.id.localeCompare(a.id);
+  });
 
-  // 5. Apply optional state and community filters if specifically requested
-  if (communityId) {
-    allUnified = allUnified.filter(
-      (c) =>
-        c.communityId === communityId ||
-        c.communityName.toLowerCase() === communityId.toLowerCase()
-    );
-  }
-
-  if (stateFilter && stateFilter !== 'all') {
-    allUnified = allUnified.filter((c) => c.stateName?.toLowerCase() === stateFilter);
-  }
-
-  // 6. Pagination
+  // 5. Pagination
   let startIndex = 0;
   if (cursor) {
-    const idx = allUnified.findIndex((c) => c.id === cursor);
-    if (idx !== -1) {
-      startIndex = idx + 1;
+    const idx = timeline.findIndex((c) => c.id === cursor);
+    if (idx === -1) {
+      // Unknown cursor: return empty page instead of repeating page 1
+      const empty = { comments: [], nextCursor: null, hasMore: false };
+      return NextResponse.json(empty, { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' } });
     }
+    startIndex = idx + 1;
   }
 
-  const sliced = allUnified.slice(startIndex, startIndex + limit);
-  const hasMore = startIndex + limit < allUnified.length;
+  const sliced = timeline.slice(startIndex, startIndex + limit);
+  const hasMore = startIndex + limit < timeline.length;
   const nextCursor = hasMore && sliced.length > 0 ? sliced[sliced.length - 1].id : null;
 
-  const resultPayload = {
-    comments: sliced,
-    nextCursor,
-    hasMore,
-  };
-
-  // Cache response to protect server egress
-  commentsCache.set(cacheKey, {
-    data: resultPayload,
-    timestamp: Date.now(),
-  });
+  const resultPayload = { comments: sliced, nextCursor, hasMore };
+  commentsCache.set(cacheKey, { data: resultPayload, timestamp: Date.now() });
 
   return NextResponse.json(resultPayload, {
     headers: { 'x-cache': 'MISS', 'Cache-Control': 'no-cache, no-store, must-revalidate' },
@@ -320,8 +200,7 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/comments
- * Creates a comment / citation, triggers in-app notification to cited author,
- * and permanently records the comment across all devices.
+ * Creates a global comment / citation, or handles like/cite actions.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -343,7 +222,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, likes });
     }
 
-    // 2. Cite action (increment count directly if requested)
+    // 2. Cite action
     if (body.action === 'cite' && body.commentId) {
       let citesCount = citeCommentInStore(body.commentId);
       try {
@@ -359,9 +238,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, citesCount });
     }
 
-    // 3. Create Comment / Citation
+    // 3. Create comment
     const {
-      communityId,
       authorName,
       author,
       handle,
@@ -369,20 +247,14 @@ export async function POST(req: NextRequest) {
       content,
       category = 'general',
       affiliation,
-      location,
       replyToHandle,
       replyToCommentId,
     } = body;
 
     const targetComment = comment || content;
-    if (!communityId) {
-      return NextResponse.json({ error: 'communityId is required.' }, { status: 400 });
-    }
-
     if (!targetComment || typeof targetComment !== 'string' || !targetComment.trim()) {
       return NextResponse.json({ error: 'Comment text is required.' }, { status: 400 });
     }
-
     if (targetComment.trim().length > 1000) {
       return NextResponse.json({ error: 'Comment text cannot exceed 1000 characters.' }, { status: 400 });
     }
@@ -398,88 +270,25 @@ export async function POST(req: NextRequest) {
           : `@${handle.trim().slice(0, 39)}`
         : `@${targetAuthor.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30) || 'resident'}`;
 
-    // 4. Resolve community details from persistent community store and Prisma
-    const communityStore = readCommunityStore();
-    const storeComm = communityStore.find(
-      (c) =>
-        c.id === communityId ||
-        (c.name && c.name.toLowerCase() === String(communityId).toLowerCase())
-    );
-    const lookupName = storeComm?.name || communityId;
-
-    let resolvedComm: {
-      id: string;
-      name: string;
-      lgaName: string | null;
-      stateName: string | null;
-      longitude: number;
-      latitude: number;
-    } | null = null;
-    let resolvedDbCommunityId: string | null = null;
-
-    try {
-      resolvedComm = await prisma.community.findFirst({
-        where: {
-          OR: [
-            { id: communityId },
-            { name: { equals: lookupName, mode: 'insensitive' } },
-            { name: { contains: lookupName, mode: 'insensitive' } },
-          ],
-        },
-        select: {
-          id: true,
-          name: true,
-          lgaName: true,
-          stateName: true,
-          longitude: true,
-          latitude: true,
-        },
-      });
-      if (resolvedComm) {
-        resolvedDbCommunityId = resolvedComm.id;
-      }
-    } catch {
-      // DB offline - fallback to store
-    }
-
-    const finalCommunityName = resolvedComm?.name || storeComm?.name || location || 'Igbo Settlement';
-    const finalStateName = resolvedComm?.stateName || storeComm?.stateName || undefined;
-    const finalLgaName = resolvedComm?.lgaName || storeComm?.lgaName || undefined;
-    const finalCoords: [number, number] = resolvedComm
-      ? [resolvedComm.longitude, resolvedComm.latitude]
-      : storeComm
-      ? [storeComm.longitude, storeComm.latitude]
-      : [7.0, 6.2];
-
-    // 5. Look up cited comment if replying/citing
+    // 4. Look up cited comment if replying/citing
     let citedCommentDetails: EnrichedComment['citedComment'] = undefined;
     if (replyToCommentId) {
-      const allStored = readCommentsStore();
-      const storeCited = allStored.find((c) => c.id === replyToCommentId);
+      const storeCited = readCommentsStore().find((c) => c.id === replyToCommentId);
       if (storeCited) {
         citedCommentDetails = {
           id: storeCited.id,
           authorName: storeCited.authorName,
           handle: storeCited.handle,
-          communityName: storeCited.communityName,
-          stateName: storeCited.stateName,
-          coordinates: storeCited.coordinates,
           comment: storeCited.comment,
         };
       } else {
         try {
-          const dbCited = await prisma.comment.findUnique({
-            where: { id: replyToCommentId },
-            include: { community: { select: { name: true, stateName: true, longitude: true, latitude: true } } },
-          });
+          const dbCited = await prisma.comment.findUnique({ where: { id: replyToCommentId } });
           if (dbCited) {
             citedCommentDetails = {
               id: dbCited.id,
               authorName: dbCited.author,
-              handle: dbCited.handle || `@${dbCited.author.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
-              communityName: dbCited.community?.name || dbCited.location || 'Community',
-              stateName: dbCited.community?.stateName || undefined,
-              coordinates: dbCited.community ? [dbCited.community.longitude, dbCited.community.latitude] : undefined,
+              handle: dbCited.handle || defaultHandle(dbCited.author),
               comment: dbCited.content,
             };
           }
@@ -489,45 +298,34 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 6. Save to unified persistent store
+    // 5. Save to local persistent store (legacy store still expects location fields)
     const stored = saveCommentToStore({
-      communityId: resolvedDbCommunityId || storeComm?.id || communityId,
-      communityName: finalCommunityName,
-      lgaName: finalLgaName,
-      stateName: finalStateName,
-      coordinates: finalCoords,
+      communityId: '',
+      communityName: '',
+      coordinates: [0, 0],
       authorName: targetAuthor,
       handle: targetHandle,
       comment: targetComment.trim(),
       category: String(category).slice(0, 50),
       affiliation: affiliation ? String(affiliation).slice(0, 60) : undefined,
       deviceId,
-      location: location ? String(location).slice(0, 100) : finalCommunityName.slice(0, 100),
       replyToHandle: replyToHandle || undefined,
       replyToCommentId: replyToCommentId || undefined,
-    });
+    } as any);
 
-    // 7. In-App Notification Trigger for Citations & Mentions
+    // 6. In-app notifications for citations & mentions
     try {
       const citedHandles = new Set<string>();
+      if (replyToHandle) citedHandles.add(replyToHandle.replace(/^@+/, '').toLowerCase());
 
-      // Direct reply/citation
-      if (replyToHandle) {
-        citedHandles.add(replyToHandle.replace(/^@+/, '').toLowerCase());
-      }
-
-      // Regex scan for all @mentions in comment body
       const mentionMatches = targetComment.match(/@([a-z0-9_]+)/gi);
       if (mentionMatches) {
         for (const m of mentionMatches) {
           const raw = m.replace(/^@+/, '').toLowerCase();
-          if (raw && raw !== targetHandle.replace(/^@+/, '').toLowerCase()) {
-            citedHandles.add(raw);
-          }
+          if (raw && raw !== targetHandle.replace(/^@+/, '').toLowerCase()) citedHandles.add(raw);
         }
       }
 
-      // Dispatch in-app notification for each mentioned contributor
       for (const citedUser of Array.from(citedHandles)) {
         const ownerProfile = findProfileByUsername(citedUser);
         const notifItem = {
@@ -537,37 +335,24 @@ export async function POST(req: NextRequest) {
           actorHandle: targetHandle,
           actorName: targetAuthor,
           commentId: stored.id,
-          communityId: stored.communityId,
-          communityName: stored.communityName,
-          coordinates: JSON.stringify(stored.coordinates),
           snippet: targetComment.trim().slice(0, 300),
           type: (replyToHandle ? 'citation' : 'mention') as 'citation' | 'mention',
           isRead: false,
         };
 
-        // 1. Persist to Prisma Notification table
         try {
-          await prisma.notification.create({
-            data: {
-              ...notifItem,
-              coordinates: notifItem.coordinates,
-            },
-          });
+          await (prisma.notification as any).create({ data: notifItem });
         } catch (prismaNotifErr: any) {
           console.warn('[CommentsAPI] Prisma Notification insert error:', prismaNotifErr.message);
         }
 
-        // 2. Mirror to local file store
-        createNotification({
-          ...notifItem,
-          coordinates: stored.coordinates,
-        });
+        createNotification(notifItem as any);
       }
     } catch (notifErr: any) {
       console.warn('[CommentsAPI] Notification trigger error:', notifErr.message);
     }
 
-    // 8. Persist to PostgreSQL via Prisma (isolated blocks with automatic constraint recovery)
+    // 7. Persist device (only link comment to device if it exists)
     let validDeviceId: string | null = null;
     if (deviceId) {
       try {
@@ -596,7 +381,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // If this comment cited an existing comment, increment citesCount in Postgres
     if (replyToCommentId) {
       try {
         await (prisma.comment as any).update({
@@ -608,68 +392,40 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Insert comment into PostgreSQL with automatic constraint recovery
+    // 8. Insert into PostgreSQL (no community relation), retry without device on FK failure
+    const baseData = {
+      id: stored.id,
+      author: targetAuthor,
+      handle: targetHandle,
+      content: targetComment.trim(),
+      category: String(category).slice(0, 50),
+      likes: 0,
+      citesCount: 0,
+      replyToCommentId: replyToCommentId || null,
+      replyToHandle: replyToHandle || null,
+    };
     try {
-      await (prisma.comment as any).create({
-        data: {
-          id: stored.id,
-          communityId: resolvedDbCommunityId,
-          deviceId: validDeviceId,
-          author: targetAuthor,
-          handle: targetHandle,
-          content: targetComment.trim(),
-          category: String(category).slice(0, 50),
-          location: location ? String(location).slice(0, 100) : finalCommunityName.slice(0, 100),
-          likes: 0,
-          citesCount: 0,
-          replyToCommentId: replyToCommentId || null,
-          replyToHandle: replyToHandle || null,
-        },
-      });
+      await (prisma.comment as any).create({ data: { ...baseData, deviceId: validDeviceId } });
     } catch (dbErr: any) {
-      console.warn('[CommentsAPI] Primary insert failed, retrying with unconstrained fallback:', dbErr.message);
+      console.warn('[CommentsAPI] Insert failed, retrying without device link:', dbErr.message);
       try {
-        // Fallback: If foreign key constraint failed on communityId or deviceId, persist with null relations
-        await (prisma.comment as any).create({
-          data: {
-            id: stored.id,
-            communityId: null,
-            deviceId: null,
-            author: targetAuthor,
-            handle: targetHandle,
-            content: targetComment.trim(),
-            category: String(category).slice(0, 50),
-            location: location ? String(location).slice(0, 100) : finalCommunityName.slice(0, 100),
-            likes: 0,
-            citesCount: 0,
-            replyToCommentId: replyToCommentId || null,
-            replyToHandle: replyToHandle || null,
-          },
-        });
-        console.log('[CommentsAPI] Unconstrained fallback comment insert succeeded!');
+        await (prisma.comment as any).create({ data: { ...baseData, deviceId: null } });
       } catch (fallbackErr: any) {
         console.error('[CommentsAPI] Critical database error on comment insert:', fallbackErr.message);
       }
     }
 
-    // Invalidate comments microcache so newly posted comment is instantly visible on next query
     invalidateCommentsCache();
 
-    // 9. Return full EnrichedComment representation
     const fullComment: EnrichedComment = {
       id: stored.id,
-      communityId: stored.communityId,
-      communityName: stored.communityName,
-      lgaName: stored.lgaName,
-      stateName: stored.stateName,
-      coordinates: stored.coordinates,
       authorName: stored.authorName,
       handle: stored.handle,
       affiliation: stored.affiliation,
       category: stored.category,
       comment: stored.comment,
-      likes: stored.likes || 0,
-      citesCount: stored.citesCount || 0,
+      likes: 0,
+      citesCount: 0,
       replyToHandle: stored.replyToHandle,
       replyToCommentId: stored.replyToCommentId,
       citedComment: citedCommentDetails,
@@ -678,9 +434,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(fullComment, {
       status: 201,
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-      },
+      headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
     });
   } catch (err: any) {
     console.error('Error creating comment:', err);

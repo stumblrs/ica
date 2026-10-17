@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 import {
@@ -48,7 +48,6 @@ import {
 } from '@/lib/cultural';
 import { BEYOND_SOUTHEAST_REGIONS, SE_STATES, type BeyondRegionData, type SoutheastStateInfo } from '@/lib/geo';
 import { ARCHIVAL_DOCUMENTS, getArchivalDocumentsForFeature, type ArchivalDocument } from '@/lib/archival';
-import { InlineCommunityComments } from '@/components/community/InlineCommunityComments';
 import { CommunityVoicesTab } from '@/components/community/CommunityVoicesTab';
 import { DelistingModal } from '@/components/governance/DelistingModal';
 import { ReinstatementModal } from '@/components/governance/ReinstatementModal';
@@ -765,15 +764,6 @@ export function AtlasOverview(props: AtlasOverviewProps) {
                     <div className="pt-2 border-t border-white/[0.06]">
                       <CommunityAuditHistory communityId={selectedFeature.code} />
                     </div>
-                  )}
-
-                  {/* Inline Community Comments & Oral Histories */}
-                  {selectedFeature.code && (
-                    <InlineCommunityComments
-                      communityId={selectedFeature.code}
-                      communityName={selectedFeature.name}
-                      onCommentAdded={onCommunityUpdated}
-                    />
                   )}
                 </div>
               ) : selectedFeature.type === 'region' ? (
