@@ -104,7 +104,7 @@ export function SocialShareModal({ comment, onClose }: SocialShareModalProps) {
     typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-center p-3 sm:p-4 pt-3 sm:pt-8 overflow-y-auto">
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
@@ -112,12 +112,12 @@ export function SocialShareModal({ comment, onClose }: SocialShareModalProps) {
         aria-hidden="true"
       />
 
-      {/* Modal Card */}
-      <div className="relative w-full max-w-md bg-[#000000] border border-[#2f3336] rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-200 z-10 flex flex-col">
+      {/* Modal Card (Pops up at the top) */}
+      <div className="relative w-full max-w-sm sm:max-w-md bg-[#000000] border border-[#2f3336] rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-top-4 fade-in duration-200 z-10 flex flex-col">
         {/* Header */}
-        <div className="h-12 px-4 border-b border-[#2f3336] flex items-center justify-between shrink-0 bg-[#000000]/95">
-          <div className="flex items-center gap-2">
-            <Share2 className="w-4 h-4 text-emerald-400" />
+        <div className="h-10 px-3.5 border-b border-[#2f3336] flex items-center justify-between shrink-0 bg-[#000000]/95">
+          <div className="flex items-center gap-1.5">
+            <Share2 className="w-3.5 h-3.5 text-emerald-400" />
             <h3 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
               Share Oral Testimony
             </h3>
@@ -133,10 +133,10 @@ export function SocialShareModal({ comment, onClose }: SocialShareModalProps) {
         </div>
 
         {/* Testimony Preview Quote */}
-        <div className="p-4 bg-gradient-to-b from-[#16181c] to-[#0a0c10] border-b border-[#2f3336]">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-400 p-[1px] shrink-0">
-              <div className="w-full h-full rounded-full bg-[#000000] flex items-center justify-center text-[10px] font-bold text-emerald-300">
+        <div className="p-3 bg-gradient-to-b from-[#16181c] to-[#0a0c10] border-b border-[#2f3336]">
+          <div className="flex items-center gap-2 mb-1.5">
+            <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-400 p-[1px] shrink-0">
+              <div className="w-full h-full rounded-full bg-[#000000] flex items-center justify-center text-[9px] font-bold text-emerald-300">
                 {comment.authorName.charAt(0).toUpperCase()}
               </div>
             </div>
@@ -149,18 +149,18 @@ export function SocialShareModal({ comment, onClose }: SocialShareModalProps) {
               </span>
             </div>
           </div>
-          <p className="text-xs text-slate-200 line-clamp-2 leading-relaxed italic border-l-2 border-emerald-500/50 pl-2.5">
+          <p className="text-xs text-slate-200 line-clamp-2 leading-relaxed italic border-l-2 border-emerald-500/50 pl-2">
             "{cleanSnippet}"
           </p>
         </div>
 
         {/* Direct Social Media Share Options */}
-        <div className="p-3 space-y-1.5 max-h-[50vh] overflow-y-auto">
+        <div className="p-2.5 space-y-1 max-h-[52vh] overflow-y-auto">
           <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 px-1 font-semibold">
             Choose Platform to Share
           </span>
 
-          <div className="space-y-1.5 pt-1">
+          <div className="space-y-1 pt-0.5">
             {socialTargets.map((s) => (
               <a
                 key={s.name}
@@ -168,11 +168,11 @@ export function SocialShareModal({ comment, onClose }: SocialShareModalProps) {
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setTimeout(onClose, 400)}
-                className={`w-full p-2.5 rounded-xl border border-white/[0.08] flex items-center justify-between transition-all group active:scale-[0.99] ${s.bgClass}`}
+                className={`w-full p-2 rounded-xl border border-white/[0.08] flex items-center justify-between transition-all group active:scale-[0.99] ${s.bgClass}`}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5">
                   <div
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${s.iconBg}`}
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${s.iconBg}`}
                   >
                     {s.icon}
                   </div>
@@ -185,7 +185,7 @@ export function SocialShareModal({ comment, onClose }: SocialShareModalProps) {
                     </span>
                   </div>
                 </div>
-                <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-white transition-colors" />
+                <ExternalLink className="w-3 h-3 text-slate-500 group-hover:text-white transition-colors mr-1" />
               </a>
             ))}
 
@@ -194,11 +194,11 @@ export function SocialShareModal({ comment, onClose }: SocialShareModalProps) {
               <button
                 type="button"
                 onClick={handleNativeShare}
-                className="w-full p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 flex items-center justify-between transition-all group active:scale-[0.99]"
+                className="w-full p-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 flex items-center justify-between transition-all group active:scale-[0.99]"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                    <Share2 className="w-4 h-4" />
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                    <Share2 className="w-3.5 h-3.5" />
                   </div>
                   <div className="text-left">
                     <span className="text-xs font-bold text-white block leading-tight">
@@ -209,24 +209,24 @@ export function SocialShareModal({ comment, onClose }: SocialShareModalProps) {
                     </span>
                   </div>
                 </div>
-                <Share2 className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
+                <Share2 className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform mr-1" />
               </button>
             )}
           </div>
         </div>
 
         {/* Copy Link Footer Bar */}
-        <div className="p-3 bg-[#111317] border-t border-[#2f3336] flex items-center gap-2">
+        <div className="p-2.5 bg-[#111317] border-t border-[#2f3336] flex items-center gap-2">
           <input
             type="text"
             readOnly
             value={shareUrl}
-            className="flex-1 bg-black/60 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 font-mono truncate focus:outline-none"
+            className="flex-1 bg-black/60 border border-white/10 rounded-lg px-2.5 py-1 text-xs text-slate-300 font-mono truncate focus:outline-none"
           />
           <button
             type="button"
             onClick={handleCopy}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 ${
+            className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 ${
               copied
                 ? 'bg-emerald-500 text-black shadow-md'
                 : 'bg-white/10 hover:bg-white/20 text-white'
