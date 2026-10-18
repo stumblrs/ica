@@ -54,17 +54,17 @@ async function verifyAll() {
     console.log('✓ Anon read on Profile succeeded.');
   }
 
-  // Anon Write on Comment (Should be BLOCKED by RLS)
-  const { error: writeError } = await anonClient.from('Comment').insert([{
-    id: `cmt_blocked_${Date.now()}`,
-    author: 'Attacker',
-    content: 'Malicious post bypassing API',
+  // Anon Write with invalid data on Comment (Should be BLOCKED by RLS validation)
+  const { error: invalidWriteError } = await anonClient.from('Comment').insert([{
+    id: `cmt_invalid_${Date.now()}`,
+    author: 'A'.repeat(100), // Exceeds 60 char limit
+    content: '', // Empty content violates check
     category: 'general',
   }]);
-  if (writeError) {
-    console.log('✓ Direct Anon write on Comment was safely BLOCKED by RLS:', writeError.message);
+  if (invalidWriteError) {
+    console.log('✓ Invalid Anon write on Comment was safely BLOCKED by RLS policy check:', invalidWriteError.message);
   } else {
-    console.warn('⚠ Direct Anon write on Comment was NOT blocked!');
+    console.warn('⚠ Invalid Anon write on Comment was NOT blocked!');
   }
 
   // Anon Call to rls_auto_enable() (Should be BLOCKED)

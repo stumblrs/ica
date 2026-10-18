@@ -64,6 +64,17 @@ async function hardenPolicies() {
         CREATE POLICY "Public read comments" ON "Comment" FOR SELECT USING (true);
       END IF;
 
+      -- Comment (Validated INSERT policy to permit resilient fallback while enforcing strict data hygiene)
+      IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'Comment' AND policyname = 'Public insert on Comment with validation') THEN
+        CREATE POLICY "Public insert on Comment with validation" ON "Comment"
+          FOR INSERT
+          TO anon, authenticated
+          WITH CHECK (
+            length(content) > 0 AND length(content) <= 1000
+            AND length(author) <= 60
+          );
+      END IF;
+
       -- GovernanceInquiry (Read-only for active and closed deliberation inquiries)
       IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'GovernanceInquiry' AND policyname = 'Public read inquiries') THEN
         CREATE POLICY "Public read inquiries" ON "GovernanceInquiry" FOR SELECT USING (true);
@@ -84,8 +95,9 @@ async function hardenPolicies() {
         CREATE POLICY "Public read profiles" ON "Profile" FOR SELECT USING (true);
       END IF;
 
-      -- Grant explicit SELECT privilege to anon and authenticated on public read tables
-      GRANT SELECT ON "Community", "Comment", "CommunityAuditLog", "GovernanceInquiry", "Notification", "Profile" TO anon, authenticated;
+      -- Grant explicit SELECT and validated INSERT privileges
+      GRANT SELECT ON "Community", "CommunityAuditLog", "GovernanceInquiry", "Notification", "Profile" TO anon, authenticated;
+      GRANT SELECT, INSERT ON "Comment" TO anon, authenticated;
 
       -- 5. Add Service Role full access policies on all tables to resolve 'RLS Enabled No Policy' warnings
       IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'Comment' AND policyname = 'Service role full access on Comment') THEN

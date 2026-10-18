@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 let pgPool: Pool | null = null;
 function getPgPool(): Pool {
   if (!pgPool) {
-    const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
+    const connectionString = process.env.DATABASE_URL || process.env.DIRECT_URL || '';
     pgPool = new Pool({
       connectionString: connectionString || undefined,
       ssl: { rejectUnauthorized: false },
@@ -267,7 +267,7 @@ export async function POST(req: NextRequest) {
 
     // 5. Persist directly to PostgreSQL (Tier 1: Prisma, Tier 2: Direct SQL Pool, Tier 3: Supabase REST)
     let saveSuccess = false;
-    let lastError: any = null;
+    const tierErrors: Record<string, string> = {};
 
     try {
       await (prisma.comment as any).create({
@@ -286,7 +286,7 @@ export async function POST(req: NextRequest) {
       });
       saveSuccess = true;
     } catch (prismaErr: any) {
-      lastError = prismaErr;
+      tierErrors.tier1_prisma = prismaErr?.message || String(prismaErr);
       console.warn('[CommentsAPI] Tier 1 Prisma insert failed, trying Tier 2 Direct SQL:', prismaErr.message);
       try {
         const pool = getPgPool();
@@ -297,7 +297,7 @@ export async function POST(req: NextRequest) {
         );
         saveSuccess = true;
       } catch (sqlErr: any) {
-        lastError = sqlErr;
+        tierErrors.tier2_sql = sqlErr?.message || String(sqlErr);
         console.warn('[CommentsAPI] Tier 2 Direct SQL insert failed, trying Tier 3 Supabase REST:', sqlErr.message);
         try {
           const { error: sbErr } = await supabase.from('Comment').insert([{
@@ -315,22 +315,22 @@ export async function POST(req: NextRequest) {
           if (!sbErr) {
             saveSuccess = true;
           } else {
-            lastError = sbErr;
+            tierErrors.tier3_supabase = sbErr?.message || String(sbErr);
             console.error('[CommentsAPI] Tier 3 Supabase REST insert error:', sbErr);
           }
         } catch (sbEx: any) {
-          lastError = sbEx;
+          tierErrors.tier3_supabase = sbEx?.message || String(sbEx);
           console.error('[CommentsAPI] Tier 3 Supabase REST exception:', sbEx.message);
         }
       }
     }
 
     if (!saveSuccess) {
-      console.error('[CommentsAPI] All database persistence tiers failed:', lastError);
+      console.error('[CommentsAPI] All database persistence tiers failed:', tierErrors);
       return NextResponse.json(
         {
           error: 'Failed to write post to database. Please try again.',
-          details: lastError?.message || String(lastError),
+          details: tierErrors,
         },
         { status: 500 }
       );
