@@ -15,7 +15,13 @@
         "region": "heartland",
         "historicalSignificance": "Historic capital of the Eastern Region & Coal City, nestled beneath the Udi escarpment."
       },
-      "geometry": { "type": "Point", "coordinates": [7.5086, 6.4584] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.5086,
+          6.4584
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -30,7 +36,13 @@
         "region": "heartland",
         "historicalSignificance": "Ancient metallurgy and blacksmithing capital of Ala Igbo, seat of Anambra State."
       },
-      "geometry": { "type": "Point", "coordinates": [7.0700, 6.2209] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.07,
+          6.2209
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -45,7 +57,13 @@
         "region": "anioma",
         "historicalSignificance": "Ancient Ahaba on the western bank of the River Niger, historic Anioma capital."
       },
-      "geometry": { "type": "Point", "coordinates": [6.7329, 6.1982] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.7329,
+          6.1982
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -60,7 +78,13 @@
         "region": "heartland",
         "historicalSignificance": "Cultural heartland capital of Imo State between the Otamiri and Nworie rivers."
       },
-      "geometry": { "type": "Point", "coordinates": [7.0260, 5.4832] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.026,
+          5.4832
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -75,7 +99,13 @@
         "region": "heartland",
         "historicalSignificance": "Capital of Abia State, historic agricultural trading center and wartime capital."
       },
-      "geometry": { "type": "Point", "coordinates": [7.5248, 5.5267] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.5248,
+          5.5267
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -90,7 +120,13 @@
         "region": "cross_river_basin",
         "historicalSignificance": "Agrarian powerhouse and capital of Ebonyi State, renowned for rice and lead mining heritage."
       },
-      "geometry": { "type": "Point", "coordinates": [8.1137, 6.3249] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.1137,
+          6.3249
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -105,7 +141,13 @@
         "region": "coastal",
         "historicalSignificance": "Historic coastal terminal and capital of Rivers State, indigenous Ikwerre settlement of Igweocha."
       },
-      "geometry": { "type": "Point", "coordinates": [7.0134, 4.8156] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.0134,
+          4.8156
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -120,7 +162,13 @@
         "region": "anioma",
         "historicalSignificance": "Ancient seat of the Dein of Agbor, leading city-state of the Ika Igbo nation."
       },
-      "geometry": { "type": "Point", "coordinates": [6.1934, 6.2536] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.1934,
+          6.2536
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -128,14 +176,20 @@
       "properties": {
         "id": "igbo-igbanke",
         "name": "Igbanke",
-        "category": "town",
-        "typeLabel": "Town / Community",
+        "category": "capital",
+        "typeLabel": "Regional Capital",
         "stateName": "Edo",
         "lgaName": "Orhionmwon",
         "region": "anioma",
-        "historicalSignificance": "Westernmost Ika Igbo confederation of six autonomous communities bordering Edo."
+        "historicalSignificance": "Ancient Ika-Igboid confederation of six autonomous communities on the western borderland; designated regional capital on the canonical Map of Igbo Land."
       },
-      "geometry": { "type": "Point", "coordinates": [6.1432, 6.4258] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.1432,
+          6.4258
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -148,9 +202,17 @@
         "stateName": "Edo",
         "lgaName": "Igueben",
         "region": "anioma",
-        "historicalSignificance": "Historic border community along the northwestern cultural boundary."
+        "historicalSignificance": "Northernmost Ika-Igboid settlement directly bordering Esanland and facing the Esan town of Ewohimi before the language shifts entirely to Esan.",
+        "frontier": "Northern Frontier (Facing Esan)",
+        "facesDirectly": "Ewohimi"
       },
-      "geometry": { "type": "Point", "coordinates": [6.3210, 6.4800] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.321,
+          6.48
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -165,7 +227,13 @@
         "region": "anioma",
         "historicalSignificance": "Paramount kingdom of Enuani, spiritual origin of several western Igbo lineages."
       },
-      "geometry": { "type": "Point", "coordinates": [6.4802, 6.3050] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.4802,
+          6.305
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -180,7 +248,13 @@
         "region": "anioma",
         "historicalSignificance": "Major Anioma cultural hub, epicenter of the pre-colonial Ekumeku anti-colonial resistance."
       },
-      "geometry": { "type": "Point", "coordinates": [6.5230, 6.1830] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.523,
+          6.183
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -195,7 +269,13 @@
         "region": "anioma",
         "historicalSignificance": "Ancient settlement founded by Prince Umejei of Isu, pivotal Anioma intellectual center."
       },
-      "geometry": { "type": "Point", "coordinates": [6.6342, 6.1856] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.6342,
+          6.1856
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -210,7 +290,13 @@
         "region": "anioma",
         "historicalSignificance": "Ancient riverine trade port on the western bank of the River Niger."
       },
-      "geometry": { "type": "Point", "coordinates": [6.6800, 6.4100] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.68,
+          6.41
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -225,7 +311,13 @@
         "region": "anioma",
         "historicalSignificance": "Historic kingdom famed for traditional medicine, smithing, and forest trade networks."
       },
-      "geometry": { "type": "Point", "coordinates": [6.4350, 6.2300] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.435,
+          6.23
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -240,7 +332,13 @@
         "region": "anioma",
         "historicalSignificance": "Commercial capital of the Ndokwa/Ukwuani clan in the southern western Igbo belt."
       },
-      "geometry": { "type": "Point", "coordinates": [6.4350, 5.7100] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.435,
+          5.71
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -255,7 +353,13 @@
         "region": "anioma",
         "historicalSignificance": "Powerful pre-colonial maritime empire at the apex of the Niger Delta."
       },
-      "geometry": { "type": "Point", "coordinates": [6.5300, 5.5450] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.53,
+          5.545
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -270,7 +374,13 @@
         "region": "coastal",
         "historicalSignificance": "Ancient trading crossroads on the eastern bank of the River Niger bifurcation."
       },
-      "geometry": { "type": "Point", "coordinates": [6.6000, 5.5500] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.6,
+          5.55
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -285,7 +395,13 @@
         "region": "anioma",
         "historicalSignificance": "Riverine settlement along the southern Niger aquatic highway."
       },
-      "geometry": { "type": "Point", "coordinates": [6.4500, 5.3800] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.45,
+          5.38
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -300,22 +416,34 @@
         "region": "anioma",
         "historicalSignificance": "Core settlement of the Owa Kingdom in the northern Ika plains."
       },
-      "geometry": { "type": "Point", "coordinates": [6.2200, 6.2100] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.22,
+          6.21
+        ]
+      }
     },
     {
       "type": "Feature",
       "id": "igbo-enugwu-ezike",
       "properties": {
         "id": "igbo-enugwu-ezike",
-        "name": "Enugwu-Ezike",
-        "category": "town",
-        "typeLabel": "Town / Community",
+        "name": "Enugu Ezike",
+        "category": "capital",
+        "typeLabel": "Regional Capital",
         "stateName": "Enugu",
-        "lgaName": "Igbo Eze North",
-        "region": "northern_borderlands",
-        "historicalSignificance": "Northern bastion of Ala Igbo, famed for palm wine culture, ancient masquerade lore, and dense population."
+        "lgaName": "Igbo-Eze North",
+        "region": "nsukka",
+        "historicalSignificance": "Largest traditional Igbo clan settlement in West Africa and northern frontier regional capital, bordering the Idoma and Igala territories."
       },
-      "geometry": { "type": "Point", "coordinates": [7.4450, 6.9850] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.445,
+          6.985
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -330,7 +458,13 @@
         "region": "northern_borderlands",
         "historicalSignificance": "Historic academic university town and center of ancient iron smelting culture."
       },
-      "geometry": { "type": "Point", "coordinates": [7.3958, 6.8569] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.3958,
+          6.8569
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -345,7 +479,13 @@
         "region": "northern_borderlands",
         "historicalSignificance": "Northern borderlands continuum settlement connecting Igbo and Igala trade."
       },
-      "geometry": { "type": "Point", "coordinates": [7.2800, 7.0800] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.28,
+          7.08
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -360,7 +500,13 @@
         "region": "northern_borderlands",
         "historicalSignificance": "Northern frontier market settlement situated on the ancestral trade route."
       },
-      "geometry": { "type": "Point", "coordinates": [7.3200, 7.0500] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.32,
+          7.05
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -375,7 +521,13 @@
         "region": "northern_borderlands",
         "historicalSignificance": "Ancient river port on the Omambala River linking Nsukka to the River Niger."
       },
-      "geometry": { "type": "Point", "coordinates": [7.0500, 6.9200] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.05,
+          6.92
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -390,7 +542,13 @@
         "region": "heartland",
         "historicalSignificance": "Legendary commercial gateway of West Africa, seat of the Obi of Onitsha on the River Niger."
       },
-      "geometry": { "type": "Point", "coordinates": [6.7865, 6.1528] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.7865,
+          6.1528
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -405,7 +563,13 @@
         "region": "heartland",
         "historicalSignificance": "Riverine agricultural haven along the fertile eastern floodplains of the River Niger."
       },
-      "geometry": { "type": "Point", "coordinates": [6.7300, 5.9500] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.73,
+          5.95
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -420,7 +584,13 @@
         "region": "heartland",
         "historicalSignificance": "Historic fishing port and capital of the Ogbaru clan."
       },
-      "geometry": { "type": "Point", "coordinates": [6.7500, 6.0100] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.75,
+          6.01
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -435,7 +605,13 @@
         "region": "heartland",
         "historicalSignificance": "Sacred ancestral cradle of the Eri clan along the Omambala River."
       },
-      "geometry": { "type": "Point", "coordinates": [6.8850, 6.3450] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.885,
+          6.345
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -450,7 +626,13 @@
         "region": "heartland",
         "historicalSignificance": "Vibrant riverine trading hub and Omambala bridgehead."
       },
-      "geometry": { "type": "Point", "coordinates": [6.8500, 6.3350] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.85,
+          6.335
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -465,7 +647,13 @@
         "region": "heartland",
         "historicalSignificance": "Spiritual homeland of Igbo civilization, source of the Ozo title, peace pacts, and Eze Nri divine kingship."
       },
-      "geometry": { "type": "Point", "coordinates": [7.0300, 6.1550] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.03,
+          6.155
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -480,7 +668,13 @@
         "region": "heartland",
         "historicalSignificance": "Anaedo kingdom, Africa's foremost automotive and indigenous manufacturing hub."
       },
-      "geometry": { "type": "Point", "coordinates": [6.9168, 6.0199] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.9168,
+          6.0199
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -495,7 +689,13 @@
         "region": "heartland",
         "historicalSignificance": "Historic gateway linking the Anambra plains to the Orlu uplands."
       },
-      "geometry": { "type": "Point", "coordinates": [6.8600, 5.8600] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.86,
+          5.86
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -510,7 +710,13 @@
         "region": "heartland",
         "historicalSignificance": "Ancient highland settlement with sacred caves, pine forests, and guardian of Milken Hill."
       },
-      "geometry": { "type": "Point", "coordinates": [7.4350, 6.4450] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.435,
+          6.445
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -525,7 +731,13 @@
         "region": "heartland",
         "historicalSignificance": "Scenic highland plateau clan with deep political and traditional heritage."
       },
-      "geometry": { "type": "Point", "coordinates": [7.3200, 6.3200] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.32,
+          6.32
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -540,7 +752,13 @@
         "region": "heartland",
         "historicalSignificance": "Cultural territory known for the sacred Iheneke caves and pristine natural springs."
       },
-      "geometry": { "type": "Point", "coordinates": [7.2000, 6.4200] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.2,
+          6.42
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -555,7 +773,13 @@
         "region": "heartland",
         "historicalSignificance": "Dramatic hills, terraced farming, and historical missionary educational outpost."
       },
-      "geometry": { "type": "Point", "coordinates": [7.4800, 6.0800] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.48,
+          6.08
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -570,7 +794,13 @@
         "region": "heartland",
         "historicalSignificance": "Vast eastern agricultural clan known for deep communal solidarity and Oji River tributaries."
       },
-      "geometry": { "type": "Point", "coordinates": [7.5800, 6.3800] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.58,
+          6.38
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -585,7 +815,13 @@
         "region": "cross_river_basin",
         "historicalSignificance": "Major northeastern clan renowned for rich soil, communal yam festivals, and warrior traditions."
       },
-      "geometry": { "type": "Point", "coordinates": [8.1800, 6.4500] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.18,
+          6.45
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -600,7 +836,13 @@
         "region": "cross_river_basin",
         "historicalSignificance": "Elder clan of the central Ebonyi basin with expansive historical migrations."
       },
-      "geometry": { "type": "Point", "coordinates": [7.9800, 6.1800] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.98,
+          6.18
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -615,7 +857,13 @@
         "region": "cross_river_basin",
         "historicalSignificance": "Northern Ebonyi agricultural trading community on the Benue boundary."
       },
-      "geometry": { "type": "Point", "coordinates": [8.0500, 6.6300] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.05,
+          6.63
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -630,7 +878,13 @@
         "region": "cross_river_basin",
         "historicalSignificance": "Ancient matrilineal and age-grade society overlooking the Cross River basin, famed for pottery and monoliths."
       },
-      "geometry": { "type": "Point", "coordinates": [7.9350, 5.8850] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.935,
+          5.885
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -645,7 +899,13 @@
         "region": "heartland",
         "historicalSignificance": "Mystical confluence of the blue Oguta Lake and muddy Urashi River, historic palm oil naval port."
       },
-      "geometry": { "type": "Point", "coordinates": [6.8100, 5.7100] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.81,
+          5.71
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -660,7 +920,13 @@
         "region": "heartland",
         "historicalSignificance": "Second commercial hub of Imo State, seat of the ancient Orlu senatorial cultural zone."
       },
-      "geometry": { "type": "Point", "coordinates": [7.0350, 5.7950] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.035,
+          5.795
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -675,7 +941,13 @@
         "region": "heartland",
         "historicalSignificance": "Hilly railway junction and administrative hub, known for cattle markets and scenic escarpments."
       },
-      "geometry": { "type": "Point", "coordinates": [7.3500, 5.8300] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.35,
+          5.83
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -690,7 +962,13 @@
         "region": "heartland",
         "historicalSignificance": "Land of warriors and leaders across the Otamiri-Imo divide."
       },
-      "geometry": { "type": "Point", "coordinates": [7.4800, 5.7200] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.48,
+          5.72
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -705,7 +983,13 @@
         "region": "heartland",
         "historicalSignificance": "Five clans of Mbaise, cultural cradle of the pan-Igbo new yam festival and academic excellence."
       },
-      "geometry": { "type": "Point", "coordinates": [7.2800, 5.5300] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.28,
+          5.53
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -720,7 +1004,13 @@
         "region": "heartland",
         "historicalSignificance": "Historic central market capital and colonial division headquarters of southern Ala Igbo."
       },
-      "geometry": { "type": "Point", "coordinates": [7.6350, 5.5600] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.635,
+          5.56
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -728,14 +1018,20 @@
       "properties": {
         "id": "igbo-ohafia",
         "name": "Ohafia",
-        "category": "town",
-        "typeLabel": "Town / Community",
+        "category": "capital",
+        "typeLabel": "Regional Capital",
         "stateName": "Abia",
         "lgaName": "Ohafia",
-        "region": "heartland",
-        "historicalSignificance": "Legendary warrior clan renowned for their martial bravery and the iconic Ohafia War Dance (Ikpirikpi Ogu)."
+        "region": "cross-river",
+        "historicalSignificance": "Historic militarized regional capital and confederation of 26 ancestral villages renowned for martial valor, warrior traditions (Ikpirikpi Ogu), and monumental architecture."
       },
-      "geometry": { "type": "Point", "coordinates": [7.8500, 5.6200] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.85,
+          5.62
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -743,14 +1039,20 @@
       "properties": {
         "id": "igbo-arochukwu",
         "name": "Arochukwu",
-        "category": "town",
-        "typeLabel": "Town / Community",
+        "category": "capital",
+        "typeLabel": "Regional Capital",
         "stateName": "Abia",
         "lgaName": "Arochukwu",
-        "region": "heartland",
-        "historicalSignificance": "Ancient mercantile and diplomatic empire, seat of the Eze Aro and historic Ibini Ukpabi oracle."
+        "region": "cross-river",
+        "historicalSignificance": "Spiritual, mercantile, and constitutional capital of the historic Aro Confederacy; home of the Long Juju (Ibini Ukpabi) and pan-Igbo trade network."
       },
-      "geometry": { "type": "Point", "coordinates": [7.9100, 5.3900] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.91,
+          5.39
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -765,7 +1067,13 @@
         "region": "heartland",
         "historicalSignificance": "Enyimba City, manufacturing engine of West Africa, home of the historic 1929 Aba Women's War."
       },
-      "geometry": { "type": "Point", "coordinates": [7.3667, 5.1167] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.3667,
+          5.1167
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -780,7 +1088,13 @@
         "region": "coastal",
         "historicalSignificance": "Famous crystal Blue River settlement, historic palm oil export port to the Atlantic."
       },
-      "geometry": { "type": "Point", "coordinates": [7.4300, 4.9600] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.43,
+          4.96
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -795,7 +1109,13 @@
         "region": "coastal",
         "historicalSignificance": "Strategic commercial crossroads in the Ikwerre plains, renowned for pilgrimage and agricultural trade."
       },
-      "geometry": { "type": "Point", "coordinates": [6.8200, 5.1000] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.82,
+          5.1
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -810,7 +1130,13 @@
         "region": "coastal",
         "historicalSignificance": "Crucial railway junction and industrial corridor linking Abia, Imo, and Port Harcourt."
       },
-      "geometry": { "type": "Point", "coordinates": [7.1300, 4.8800] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.13,
+          4.88
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -818,14 +1144,20 @@
       "properties": {
         "id": "igbo-opobo",
         "name": "Opobo",
-        "category": "town",
-        "typeLabel": "Town / Community",
+        "category": "capital",
+        "typeLabel": "Regional Capital",
         "stateName": "Rivers",
         "lgaName": "Opobo/Nkoro",
         "region": "coastal",
-        "historicalSignificance": "Island kingdom founded in 1870 by King Jaja of Opobo, dominant Atlantic palm oil trade state."
+        "historicalSignificance": "Historic coastal island kingdom and regional capital founded by King Jaja of Opobo in 1869, legendary bastion of palm oil commerce and anti-colonial resistance."
       },
-      "geometry": { "type": "Point", "coordinates": [7.5300, 4.5200] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.53,
+          4.52
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -833,14 +1165,20 @@
       "properties": {
         "id": "igbo-ubani",
         "name": "Ubani (Bonny)",
-        "category": "town",
-        "typeLabel": "Town / Community",
+        "category": "capital",
+        "typeLabel": "Regional Capital",
         "stateName": "Rivers",
         "lgaName": "Bonny",
         "region": "coastal",
-        "historicalSignificance": "Ancient coastal island city-state and Atlantic gateway, pivotal in pre-colonial and modern maritime trade."
+        "historicalSignificance": "Historic maritime kingdom and coastal regional capital of the Ibani/Ubani people, premier commercial trading center along the Atlantic Bight of Biafra."
       },
-      "geometry": { "type": "Point", "coordinates": [7.1700, 4.4500] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.17,
+          4.45
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -855,7 +1193,13 @@
         "region": "coastal",
         "historicalSignificance": "Ancient coastal island and mercantile kingdom along the Bonny River / Okrika Creek, deeply intertwined with the inland Ndoki, Ikwerre, and palm oil trading networks."
       },
-      "geometry": { "type": "Point", "coordinates": [7.0833, 4.7417] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.0833,
+          4.7417
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -870,7 +1214,13 @@
         "region": "coastal",
         "historicalSignificance": "Prominent cultural and industrial community historically connecting the inland trade route to the coastal delta."
       },
-      "geometry": { "type": "Point", "coordinates": [7.1180, 4.7930] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.118,
+          4.793
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -885,7 +1235,13 @@
         "region": "coastal",
         "historicalSignificance": "Ancient coastal island town along the mangrove estuary, renowned for traditional canoe navigation and estuary trade."
       },
-      "geometry": { "type": "Point", "coordinates": [7.1950, 4.7080] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.195,
+          4.708
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -900,7 +1256,13 @@
         "region": "coastal",
         "historicalSignificance": "Agricultural and trade nexus historically linking the upland Imo River trade corridors with the coastal riverine communities."
       },
-      "geometry": { "type": "Point", "coordinates": [7.2750, 4.7250] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.275,
+          4.725
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -915,7 +1277,13 @@
         "region": "coastal",
         "historicalSignificance": "Historic regional mercantile capital, traditional market epicenter, and cultural center of the Ogoni continuum."
       },
-      "geometry": { "type": "Point", "coordinates": [7.3650, 4.6750] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.365,
+          4.675
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -930,7 +1298,13 @@
         "region": "coastal",
         "historicalSignificance": "Vibrant agrarian and trading community situated along the lower Imo River trade network."
       },
-      "geometry": { "type": "Point", "coordinates": [7.2880, 4.6530] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.288,
+          4.653
+        ]
+      }
     },
     {
       "type": "Feature",
@@ -938,14 +1312,530 @@
       "properties": {
         "id": "igbo-ngo-andoni",
         "name": "Ngo (Andoni)",
-        "category": "town",
-        "typeLabel": "Town / Community",
+        "category": "capital",
+        "typeLabel": "Regional Capital",
         "stateName": "Rivers",
         "lgaName": "Andoni",
         "region": "coastal",
-        "historicalSignificance": "Historic coastal delta island and maritime trading kingdom adjacent to Opobo and the Atlantic seaboard."
+        "historicalSignificance": "Headquarters and regional capital of Andoni along the Atlantic estuaries, an ancient maritime trade partner and frontier coastal hub."
       },
-      "geometry": { "type": "Point", "coordinates": [7.4450, 4.4750] }
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.445,
+          4.475
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-okposi",
+      "properties": {
+        "id": "igbo-okposi",
+        "name": "Okposi",
+        "category": "capital",
+        "typeLabel": "Regional Capital",
+        "stateName": "Ebonyi",
+        "lgaName": "Ohaozara",
+        "region": "ebonyi",
+        "historicalSignificance": "Renowned ancient salt lake capital and historic trading metropolis of southern Ebonyi (Ohaozara), famed for centuries of women-led salt manufacturing and commerce."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.8045,
+          6.0364
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-amaigbo",
+      "properties": {
+        "id": "igbo-amaigbo",
+        "name": "Amaigbo",
+        "category": "capital",
+        "typeLabel": "Regional Capital",
+        "stateName": "Imo",
+        "lgaName": "Nwangele",
+        "region": "heartland",
+        "historicalSignificance": "Ancient metallurgical cradle, iron smelting center, and ancestral heartland of the Isuama Igbo; birthplace of King Jaja of Opobo."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.1165,
+          5.7292
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-ameka",
+      "properties": {
+        "id": "igbo-ameka",
+        "name": "Ameka",
+        "category": "capital",
+        "typeLabel": "Regional Capital",
+        "stateName": "Ebonyi",
+        "lgaName": "Ezza South",
+        "region": "ebonyi",
+        "historicalSignificance": "Spiritual core, ancient ancestral capital, and warrior headquarters of the Ezza clan in the north-central Ebonyi plains."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.1126,
+          6.1883
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-oju",
+      "properties": {
+        "id": "igbo-oju",
+        "name": "Oju",
+        "category": "capital",
+        "typeLabel": "Regional Capital",
+        "stateName": "Benue",
+        "lgaName": "Oju",
+        "region": "northern-frontier",
+        "historicalSignificance": "Northern frontier regional capital and cultural crossways at the Igede/Igboid interface, historically linking the Benue-Cross River corridors."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.382,
+          6.8588
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-otukpa",
+      "properties": {
+        "id": "igbo-otukpa",
+        "name": "Otukpa",
+        "category": "capital",
+        "typeLabel": "Regional Capital",
+        "stateName": "Benue",
+        "lgaName": "Ogbadibo",
+        "region": "northern-frontier",
+        "historicalSignificance": "Northern gateway regional capital situated at the historic borderlands connecting northern Igboland (Enugu Ezike) and the Benue valley trade routes."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.6638,
+          7.1365
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-frontier-omolua",
+      "properties": {
+        "id": "igbo-frontier-omolua",
+        "name": "Omolua",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Edo",
+        "lgaName": "Orhionmwon",
+        "region": "anioma",
+        "frontier": "Central Frontier (Facing Bini / Edo)",
+        "cluster": "Igbanke cluster",
+        "historicalSignificance": "Westernmost Ika-Igboid village of the Igbanke cluster touching the Bini boundary along the Ossiomo River corridor before the shift to the Edo language."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.1834,
+          6.3594
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-frontier-ottah",
+      "properties": {
+        "id": "igbo-frontier-ottah",
+        "name": "Ottah",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Edo",
+        "lgaName": "Orhionmwon",
+        "region": "anioma",
+        "frontier": "Central Frontier (Facing Bini / Edo)",
+        "cluster": "Igbanke cluster",
+        "historicalSignificance": "Westernmost Ika-Igboid village of the Igbanke cluster touching the Bini boundary along the Ossiomo River corridor before the shift to the Edo language."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.2068,
+          6.3393
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-frontier-idumuodin",
+      "properties": {
+        "id": "igbo-frontier-idumuodin",
+        "name": "Idumuodin",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Edo",
+        "lgaName": "Orhionmwon",
+        "region": "anioma",
+        "frontier": "Central Frontier (Facing Bini / Edo)",
+        "cluster": "Igbanke cluster",
+        "historicalSignificance": "Westernmost Ika-Igboid village of the Igbanke cluster touching the Bini boundary along the Ossiomo River corridor before the shift to the Edo language."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.2027,
+          6.3458
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-frontier-ake",
+      "properties": {
+        "id": "igbo-frontier-ake",
+        "name": "Ake",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Edo",
+        "lgaName": "Orhionmwon",
+        "region": "anioma",
+        "frontier": "Central Frontier (Facing Bini / Edo)",
+        "cluster": "Igbanke cluster",
+        "historicalSignificance": "Westernmost Ika-Igboid village of the Igbanke cluster touching the Bini boundary along the Ossiomo River corridor before the shift to the Edo language."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.205,
+          6.3456
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-frontier-oligie",
+      "properties": {
+        "id": "igbo-frontier-oligie",
+        "name": "Oligie",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Edo",
+        "lgaName": "Orhionmwon",
+        "region": "anioma",
+        "frontier": "Central Frontier (Facing Bini / Edo)",
+        "cluster": "Igbanke cluster",
+        "historicalSignificance": "Westernmost Ika-Igboid village of the Igbanke cluster touching the Bini boundary along the Ossiomo River corridor before the shift to the Edo language."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.2231,
+          6.3343
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-frontier-igbontor",
+      "properties": {
+        "id": "igbo-frontier-igbontor",
+        "name": "Igbontor",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Edo",
+        "lgaName": "Orhionmwon",
+        "region": "anioma",
+        "frontier": "Central Frontier (Facing Bini / Edo)",
+        "cluster": "Igbanke cluster",
+        "historicalSignificance": "Westernmost Ika-Igboid village of the Igbanke cluster touching the Bini boundary along the Ossiomo River corridor before the shift to the Edo language."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.2016,
+          6.3498
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-frontier-owa-riuzo-idu",
+      "properties": {
+        "id": "igbo-frontier-owa-riuzo-idu",
+        "name": "Owa-Riuzo Idu",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Edo",
+        "lgaName": "Orhionmwon",
+        "region": "anioma",
+        "frontier": "Central Frontier (Facing Bini / Edo)",
+        "historicalSignificance": "Westernmost Ika-Igboid village directly sitting on the geographic borderline touching the Bini boundary along the Ossiomo River corridor."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.185,
+          6.295
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-frontier-ute-oheze",
+      "properties": {
+        "id": "igbo-frontier-ute-oheze",
+        "name": "Ute Oheze",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Edo",
+        "lgaName": "Orhionmwon",
+        "region": "anioma",
+        "frontier": "Central Frontier (Facing Bini / Edo)",
+        "historicalSignificance": "Westernmost Ika-Igboid border settlement directly touching the Bini boundary along the Ossiomo River corridor."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.0723,
+          6.2405
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-frontier-ute-obagie-noheze",
+      "properties": {
+        "id": "igbo-frontier-ute-obagie-noheze",
+        "name": "Ute Obagie N'Oheze",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Edo",
+        "lgaName": "Orhionmwon",
+        "region": "anioma",
+        "frontier": "Central Frontier (Facing Bini / Edo)",
+        "historicalSignificance": "Westernmost Ika-Igboid frontier community touching the Bini boundary along the Ossiomo River corridor before the shift to Bini."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.0363,
+          6.2608
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-frontier-owanikeke",
+      "properties": {
+        "id": "igbo-frontier-owanikeke",
+        "name": "Owanikeke",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Edo",
+        "lgaName": "Orhionmwon",
+        "region": "anioma",
+        "frontier": "Central Frontier (Facing Bini / Edo)",
+        "historicalSignificance": "Westernmost Ika-Igboid border community sitting directly on the geographic borderline facing the Edoid tribes."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.125,
+          6.235
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-frontier-igbogili",
+      "properties": {
+        "id": "igbo-frontier-igbogili",
+        "name": "Igbogili",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Edo",
+        "lgaName": "Orhionmwon",
+        "region": "anioma",
+        "frontier": "Central Frontier (Facing Bini / Edo)",
+        "historicalSignificance": "Westernmost Ika-Igboid village touching the Bini boundary along the Ossiomo River corridor before the linguistic boundary."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.1424,
+          6.119
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-frontier-mbiri",
+      "properties": {
+        "id": "igbo-frontier-mbiri",
+        "name": "Mbiri",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Delta",
+        "lgaName": "Ika North East",
+        "region": "anioma",
+        "frontier": "Northern Frontier (Facing Esan)",
+        "facesDirectly": "Ewatto",
+        "historicalSignificance": "Northernmost Ika-Igboid settlement directly bordering Esanland and facing the Esan town of Ewatto before the language shifts to Esan."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.2753,
+          6.3034
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-frontier-idumuesah",
+      "properties": {
+        "id": "igbo-frontier-idumuesah",
+        "name": "Idumuesah",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Delta",
+        "lgaName": "Ika North East",
+        "region": "anioma",
+        "frontier": "Northern Frontier (Facing Esan)",
+        "historicalSignificance": "Northernmost Ika-Igboid settlement directly bordering Esanland along the northern frontier."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.2421,
+          6.1734
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-frontier-igbodo",
+      "properties": {
+        "id": "igbo-frontier-igbodo",
+        "name": "Igbodo",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Delta",
+        "lgaName": "Ika North East",
+        "region": "anioma",
+        "frontier": "Northern Frontier (Facing Esan)",
+        "historicalSignificance": "Northernmost Ika-Igboid settlement directly bordering Esanland along the northern frontier."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.3704,
+          6.3037
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-frontier-umutu",
+      "properties": {
+        "id": "igbo-frontier-umutu",
+        "name": "Umutu",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Delta",
+        "lgaName": "Ukwuani",
+        "region": "anioma",
+        "frontier": "Southern Frontier (Facing Urhobo & Southern Bini)",
+        "facesDirectly": "Urhonigbe (Bini town)",
+        "historicalSignificance": "Westernmost Ukwuani-Igboid border settlement directly facing the Bini town of Urhonigbe across the Ethiope River corridor before the shift to Edoid."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.226,
+          5.9179
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-frontier-obiaruku",
+      "properties": {
+        "id": "igbo-frontier-obiaruku",
+        "name": "Obiaruku",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Delta",
+        "lgaName": "Ukwuani",
+        "region": "anioma",
+        "frontier": "Southern Frontier (Facing Urhobo & Southern Bini)",
+        "facesDirectly": "Abraka (Urhobo clan)",
+        "historicalSignificance": "Westernmost Ukwuani-Igboid border settlement and capital directly facing the Urhobo clan of Abraka across the Ethiope River before the shift to Urhobo."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.155,
+          5.835
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-frontier-ebedei",
+      "properties": {
+        "id": "igbo-frontier-ebedei",
+        "name": "Ebedei",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Delta",
+        "lgaName": "Ukwuani",
+        "region": "anioma",
+        "frontier": "Southern Frontier (Facing Urhobo & Southern Bini)",
+        "historicalSignificance": "Westernmost Ukwuani-Igboid border settlement touching the Urhobo and southern Bini boundaries along the Ethiope River corridor."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.2757,
+          5.8206
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "igbo-frontier-akuku-atuma",
+      "properties": {
+        "id": "igbo-frontier-akuku-atuma",
+        "name": "Akuku-Atuma",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Delta",
+        "lgaName": "Ndokwa West",
+        "region": "anioma",
+        "frontier": "Southern Frontier (Facing Urhobo & Southern Bini)",
+        "historicalSignificance": "Westernmost Ukwuani-Igboid border settlement sitting directly on the geographic borderline touching the Urhobo and southern Bini frontiers."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.3443,
+          6.0807
+        ]
+      }
     }
   ]
 }

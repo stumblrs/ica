@@ -60,9 +60,9 @@ export function TwitterComposeFAB({
               role="button"
               tabIndex={0}
             >
-              <span className="px-3 py-1.5 rounded-xl bg-[#16181c] border border-[#2f3336] text-xs font-semibold text-[#e7e9ea] shadow-xl shadow-black/50 group-hover:border-emerald-500/40 transition-all">
+              {/*<span className="px-3 py-1.5 rounded-xl bg-[#16181c] border border-[#2f3336] text-xs font-semibold text-[#e7e9ea] shadow-xl shadow-black/50 group-hover:border-emerald-500/40 transition-all">
                 Post Voice & Comment
-              </span>
+              </span>*/}
               <button
                 type="button"
                 className="w-11 h-11 rounded-full bg-emerald-500 text-black flex items-center justify-center shadow-lg shadow-emerald-500/30 group-hover:scale-105 active:scale-95 transition-all"
@@ -79,9 +79,9 @@ export function TwitterComposeFAB({
               role="button"
               tabIndex={0}
             >
-              <span className="px-3 py-1.5 rounded-xl bg-[#16181c] border border-[#2f3336] text-xs font-semibold text-[#e7e9ea] shadow-xl shadow-black/50 group-hover:border-emerald-500/40 transition-all">
+              {/*<span className="px-3 py-1.5 rounded-xl bg-[#16181c] border border-[#2f3336] text-xs font-semibold text-[#e7e9ea] shadow-xl shadow-black/50 group-hover:border-emerald-500/40 transition-all">
                 Add Location to Atlas
-              </span>
+              </span>*/}
               <button
                 type="button"
                 className="w-11 h-11 rounded-full bg-gradient-to-tr from-teal-500 to-emerald-400 text-black flex items-center justify-center shadow-lg shadow-emerald-500/30 group-hover:scale-105 active:scale-95 transition-all"
