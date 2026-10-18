@@ -29202,8 +29202,8 @@
     "stateName": "Kogi",
     "stateCode": "NG023",
     "center": [
-      7.2981,
-      7.015
+      7.2629,
+      7.0021
     ]
   },
   {
@@ -29592,8 +29592,8 @@
     "stateName": "Kogi",
     "stateCode": "NG023",
     "center": [
-      6.8028784,
-      6.9138499
+      6.8039,
+      6.9134
     ]
   },
   {
@@ -30073,8 +30073,8 @@
     "stateName": "Kogi",
     "stateCode": "NG023",
     "center": [
-      6.799191,
-      6.708048
+      6.7988,
+      6.7099
     ]
   },
   {
@@ -50824,13 +50824,13 @@
     "id": "node/6038007090",
     "type": "village",
     "name": "Umuoye",
-    "lgaName": "Awgu",
+    "lgaName": "Ibaji",
     "lgaCode": "NG014002",
-    "stateName": "Enugu",
+    "stateName": "Kogi",
     "stateCode": "NG014",
     "center": [
-      7.4690299,
-      6.2467089
+      6.821,
+      6.918
     ]
   },
   {
@@ -64895,8 +64895,8 @@
     "stateName": "Kogi",
     "stateCode": "NG023",
     "center": [
-      6.7821,
-      6.8834
+      6.6759,
+      6.8821
     ]
   },
   {
@@ -67751,13 +67751,13 @@
     "name": "Amaeke",
     "wardName": "Itumbuzo 2",
     "wardCode": "ABSBND12",
-    "lgaName": "Bende",
+    "lgaName": "Igalamela-Odolu",
     "lgaCode": "1004",
-    "stateName": "Abia",
+    "stateName": "Kogi",
     "stateCode": "AB",
     "center": [
-      7.68369,
-      5.45397
+      7.212,
+      6.93
     ]
   },
   {
@@ -160172,13 +160172,13 @@
     "name": "Ozara",
     "wardName": "Ezere",
     "wardCode": "ABSMBL05",
-    "lgaName": "Isuikwuato",
+    "lgaName": "Igalamela-Odolu",
     "lgaCode": "1008",
-    "stateName": "Abia",
+    "stateName": "Kogi",
     "stateCode": "AB",
     "center": [
-      7.52695,
-      5.7871
+      7.2034,
+      6.9299
     ]
   },
   {
@@ -163332,13 +163332,13 @@
     "name": "Amankpo",
     "wardName": "Aku 3",
     "wardCode": "ENSGBO13",
-    "lgaName": "Igbo-Etiti",
+    "lgaName": "Igalamela-Odolu",
     "lgaCode": "14007",
-    "stateName": "Enugu",
+    "stateName": "Kogi",
     "stateCode": "EN",
     "center": [
-      7.32972,
-      6.70704
+      7.206,
+      6.927
     ]
   },
   {
@@ -191998,13 +191998,13 @@
     "name": "Umuobu",
     "wardName": "Umualumaku / Umuihim",
     "wardCode": "IMSEHM06",
-    "lgaName": "Ehime-Mbano",
+    "lgaName": "Ibaji",
     "lgaCode": "17003",
-    "stateName": "Imo",
+    "stateName": "Kogi",
     "stateCode": "IM",
     "center": [
-      7.27545,
-      5.63419
+      6.808,
+      6.905
     ]
   },
   {
@@ -465084,8 +465084,8 @@
     "stateName": "Kogi",
     "stateCode": "KO",
     "center": [
-      6.65639,
-      6.81039
+      6.6564,
+      6.8104
     ]
   },
   {
@@ -660324,8 +660324,8 @@
     "stateName": "Kogi",
     "stateCode": "KO",
     "center": [
-      6.76488,
-      6.63754
+      6.7649,
+      6.6375
     ]
   },
   {
@@ -733104,6 +733104,110 @@
     "center": [
       6.3443,
       6.0807
+    ]
+  },
+  {
+    "id": "search-kogi-frontier-ugwuebonyi",
+    "type": "settlement",
+    "name": "Ugwuebonyi",
+    "lgaName": "Igalamela-Odolu",
+    "stateName": "Kogi",
+    "category": "town",
+    "typeLabel": "Frontier Settlement",
+    "center": [
+      7.208,
+      6.932
+    ]
+  },
+  {
+    "id": "search-kogi-frontier-ebokwe",
+    "type": "settlement",
+    "name": "Ebokwe",
+    "lgaName": "Igalamela-Odolu",
+    "stateName": "Kogi",
+    "category": "town",
+    "typeLabel": "Frontier Settlement",
+    "center": [
+      7.202,
+      6.934
+    ]
+  },
+  {
+    "id": "search-kogi-frontier-amaokwu",
+    "type": "settlement",
+    "name": "Amaokwu",
+    "lgaName": "Igalamela-Odolu",
+    "stateName": "Kogi",
+    "category": "town",
+    "typeLabel": "Frontier Settlement",
+    "center": [
+      7.21,
+      6.935
+    ]
+  },
+  {
+    "id": "search-kogi-frontier-amadiefioha",
+    "type": "settlement",
+    "name": "Amadiefioha",
+    "lgaName": "Igalamela-Odolu",
+    "stateName": "Kogi",
+    "category": "town",
+    "typeLabel": "Frontier Settlement",
+    "center": [
+      7.215,
+      6.933
+    ]
+  },
+  {
+    "id": "search-kogi-frontier-odolu-fringes",
+    "type": "settlement",
+    "name": "Odolu (Fringes)",
+    "lgaName": "Igalamela-Odolu",
+    "stateName": "Kogi",
+    "category": "town",
+    "typeLabel": "Frontier Settlement",
+    "center": [
+      6.8105,
+      7.192
+    ]
+  },
+  {
+    "id": "search-igbo-avurugo",
+    "type": "settlement",
+    "name": "Eke-Avurugo (Avurugo)",
+    "lgaName": "Ibaji",
+    "stateName": "Kogi",
+    "category": "town",
+    "typeLabel": "Frontier Settlement",
+    "center": [
+      6.815,
+      6.915
+    ]
+  },
+  {
+    "id": "search-kogi-frontier-ubulie-umueze",
+    "type": "settlement",
+    "name": "Ubulie-Umueze",
+    "lgaName": "Ibaji",
+    "stateName": "Kogi",
+    "category": "town",
+    "typeLabel": "Frontier Settlement",
+    "center": [
+      6.795,
+      6.925
+    ]
+  },
+  {
+    "id": "search-kogi-frontier-onicha-igo",
+    "type": "settlement",
+    "name": "Onicha-Igo",
+    "lgaName": "Ofu",
+    "stateName": "Kogi",
+    "category": "town",
+    "typeLabel": "Frontier Settlement",
+    "center": [
+      7.3525,
+      7.3295
     ]
   }
 ]

@@ -62157,7 +62157,10 @@
         "adm3_name": null,
         "adm4_pcode": null,
         "adm4_name": null,
-        "name_latin": "Akpanya"
+        "name_latin": "Akpanya",
+        "historicalSignificance": "The most prominent Igboid frontline bastion deep inside Kogi State. Virtually the entire indigenous population speaks Igbo natively, situated on the ancient trade route connecting Nsukka and the Igala heartland.",
+        "cluster": "Igalamela Bastion",
+        "frontier": "Northern Frontier (Facing Igala)"
       },
       "geometry": {
         "type": "Point",
@@ -65981,7 +65984,10 @@
         "adm3_name": null,
         "adm4_pcode": null,
         "adm4_name": null,
-        "name_latin": "Nwajala"
+        "name_latin": "Nwajala",
+        "historicalSignificance": "Indigenous Igbo-speaking village within the purely Igboid Avurugo territory on the southern fringe of Ibaji LGA.",
+        "cluster": "Avurugo Enclave",
+        "frontier": "Northern Frontier (Facing Igala)"
       },
       "geometry": {
         "type": "Point",
@@ -68053,7 +68059,10 @@
         "adm3_name": null,
         "adm4_pcode": null,
         "adm4_name": null,
-        "name_latin": "Odeke"
+        "name_latin": "Odeke",
+        "historicalSignificance": "Riverine waterfront settlement bordering the lower Niger floodplains, marking the historical interface between southern Igala and northern riverine Igbo populations.",
+        "cluster": "Western Ibaji Waterfront",
+        "frontier": "Northern Frontier (Facing Igala)"
       },
       "geometry": {
         "type": "Point",
@@ -127186,7 +127195,10 @@
         "adm3_name": null,
         "adm4_pcode": null,
         "adm4_name": null,
-        "name_latin": "Umuoye"
+        "name_latin": "Umuoye",
+        "historicalSignificance": "Indigenous Igbo-speaking settlement within the Avurugo enclave of southern Ibaji LGA.",
+        "cluster": "Avurugo Enclave",
+        "frontier": "Northern Frontier (Facing Igala)"
       },
       "geometry": {
         "type": "Point",
@@ -157475,6 +157487,306 @@
         "coordinates": [
           6.3443,
           6.0807
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "reg-kogi-frontier-ugwuebonyi",
+      "properties": {
+        "id": "reg-kogi-frontier-ugwuebonyi",
+        "name": "Ugwuebonyi",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Kogi",
+        "lgaName": "Igalamela-Odolu",
+        "historicalSignificance": "Part of the contiguous Ebokwe/Ugwuebonyi cluster of indigenous Igbo-speaking farm settlements directly on the cultural boundary with Nsukka/Enugu."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.208,
+          6.932
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "reg-kogi-frontier-ebokwe",
+      "properties": {
+        "id": "reg-kogi-frontier-ebokwe",
+        "name": "Ebokwe",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Kogi",
+        "lgaName": "Igalamela-Odolu",
+        "historicalSignificance": "Anchor community of the contiguous Ebokwe/Ugwuebonyi cluster of indigenous Igbo-speaking farm settlements directly on the cultural boundary."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.202,
+          6.934
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "reg-kogi-frontier-ozara",
+      "properties": {
+        "id": "reg-kogi-frontier-ozara",
+        "name": "Ozara",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Kogi",
+        "lgaName": "Igalamela-Odolu",
+        "historicalSignificance": "Indigenous Igbo-speaking farming settlement in the Ebokwe/Ugwuebonyi border cluster in southern Igalamela-Odolu LGA."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.2034,
+          6.9299
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "reg-kogi-frontier-amaeke",
+      "properties": {
+        "id": "reg-kogi-frontier-amaeke",
+        "name": "Amaeke",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Kogi",
+        "lgaName": "Igalamela-Odolu",
+        "historicalSignificance": "Indigenous Igbo-speaking village forming part of the contiguous Ebokwe/Ugwuebonyi border cluster."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.212,
+          6.93
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "reg-kogi-frontier-amankpo",
+      "properties": {
+        "id": "reg-kogi-frontier-amankpo",
+        "name": "Amankpo",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Kogi",
+        "lgaName": "Igalamela-Odolu",
+        "historicalSignificance": "Indigenous Igbo-speaking agricultural community within the Ebokwe/Ugwuebonyi border corridor."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.206,
+          6.927
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "reg-kogi-frontier-amaokwu",
+      "properties": {
+        "id": "reg-kogi-frontier-amaokwu",
+        "name": "Amaokwu",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Kogi",
+        "lgaName": "Igalamela-Odolu",
+        "historicalSignificance": "Indigenous Igbo-speaking border settlement in the Ebokwe/Ugwuebonyi frontier cluster."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.21,
+          6.935
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "reg-kogi-frontier-amadiefioha",
+      "properties": {
+        "id": "reg-kogi-frontier-amadiefioha",
+        "name": "Amadiefioha",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Kogi",
+        "lgaName": "Igalamela-Odolu",
+        "historicalSignificance": "Indigenous Igbo-speaking settlement in the contiguous Ebokwe/Ugwuebonyi frontier cluster on the cultural borderline."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.215,
+          6.933
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "reg-kogi-frontier-odolu-fringes",
+      "properties": {
+        "id": "reg-kogi-frontier-odolu-fringes",
+        "name": "Odolu (Fringes)",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Kogi",
+        "lgaName": "Igalamela-Odolu",
+        "historicalSignificance": "A transitional bilingual contact zone where Nsukka-Igbo meets native Igala, marking the linguistic transition in eastern Kogi."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.8105,
+          7.192
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "reg-igbo-avurugo",
+      "properties": {
+        "id": "reg-igbo-avurugo",
+        "name": "Eke-Avurugo (Avurugo)",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Kogi",
+        "lgaName": "Ibaji",
+        "historicalSignificance": "The central periodic market and clan center of the purely Igboid-speaking Avurugo territory on the southern fringe of Ibaji LGA."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.815,
+          6.915
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "reg-kogi-frontier-ubulie-umueze",
+      "properties": {
+        "id": "reg-kogi-frontier-ubulie-umueze",
+        "name": "Ubulie-Umueze",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Kogi",
+        "lgaName": "Ibaji",
+        "historicalSignificance": "Indigenous Igbo-speaking community in the Avurugo enclave of southern Ibaji LGA."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.795,
+          6.925
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "reg-kogi-frontier-umuobu",
+      "properties": {
+        "id": "reg-kogi-frontier-umuobu",
+        "name": "Umuobu",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Kogi",
+        "lgaName": "Ibaji",
+        "historicalSignificance": "Indigenous Igbo-speaking village within the southern fringe Avurugo enclave of Ibaji LGA."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.808,
+          6.905
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "reg-kogi-frontier-anocha",
+      "properties": {
+        "id": "reg-kogi-frontier-anocha",
+        "name": "Anocha",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Kogi",
+        "lgaName": "Ibaji",
+        "historicalSignificance": "Indigenous Igbo-speaking settlement on the southern borderland corridor of Ibaji LGA bordering Anambra."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.7649,
+          6.6375
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "reg-kogi-frontier-onyedega",
+      "properties": {
+        "id": "reg-kogi-frontier-onyedega",
+        "name": "Onyedega",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Kogi",
+        "lgaName": "Ibaji",
+        "historicalSignificance": "Administrative headquarters of Ibaji LGA on the lower Niger floodplains, marking the riverine interface between southern Igala fishermen and northern riverine Igbo migrants."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.6759,
+          6.8821
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "reg-kogi-frontier-iyano",
+      "properties": {
+        "id": "reg-kogi-frontier-iyano",
+        "name": "Iyano",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Kogi",
+        "lgaName": "Ibaji",
+        "historicalSignificance": "Riverine waterfront community in western Ibaji along the Niger floodplains, an ancient fishing and cultural interface settlement."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.6564,
+          6.8104
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "reg-kogi-frontier-onicha-igo",
+      "properties": {
+        "id": "reg-kogi-frontier-onicha-igo",
+        "name": "Onicha-Igo",
+        "category": "town",
+        "typeLabel": "Frontier Settlement",
+        "stateName": "Kogi",
+        "lgaName": "Ofu",
+        "historicalSignificance": "An isolated, northernmost historical Igboid enclave located deep interior toward central Kogi in Ofu LGA, reflecting ancient pre-colonial migrations and trade outposts."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.3525,
+          7.3295
         ]
       }
     }
