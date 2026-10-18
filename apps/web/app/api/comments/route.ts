@@ -42,6 +42,98 @@ function defaultHandle(author?: string | null): string {
   return `@${(author || '').toLowerCase().replace(/[^a-z0-9]/g, '') || 'resident'}`;
 }
 
+async function emitNotification(notif: {
+  recipientDeviceId?: string | null;
+  recipientHandle: string;
+  actorHandle: string;
+  actorName: string;
+  commentId?: string | null;
+  communityId?: string | null;
+  communityName?: string | null;
+  coordinates?: string | null;
+  snippet: string;
+  type: 'citation' | 'like' | 'mention';
+}) {
+  const newNotifId = `ntf_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const now = new Date();
+
+  // Ensure recipient handle has @ prefix for standard lookup
+  const normalizedRecipient = notif.recipientHandle.startsWith('@')
+    ? notif.recipientHandle
+    : `@${notif.recipientHandle}`;
+
+  // Tier 1: Direct SQL Pool
+  try {
+    const pool = getPgPool();
+    await pool.query(
+      `INSERT INTO "Notification" (id, "recipientDeviceId", "recipientHandle", "actorHandle", "actorName", "commentId", "communityId", "communityName", coordinates, snippet, type, "isRead", "createdAt")
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, false, $12)`,
+      [
+        newNotifId,
+        notif.recipientDeviceId || null,
+        normalizedRecipient,
+        notif.actorHandle,
+        notif.actorName,
+        notif.commentId || null,
+        notif.communityId || null,
+        notif.communityName || null,
+        notif.coordinates || null,
+        notif.snippet.slice(0, 300),
+        notif.type,
+        now,
+      ]
+    );
+    return;
+  } catch (sqlErr: any) {
+    console.warn('[CommentsAPI] Tier 1 SQL notification insert failed, trying Tier 2 Prisma:', sqlErr.message);
+  }
+
+  // Tier 2: Prisma
+  try {
+    await prisma.notification.create({
+      data: {
+        id: newNotifId,
+        recipientDeviceId: notif.recipientDeviceId || null,
+        recipientHandle: normalizedRecipient,
+        actorHandle: notif.actorHandle,
+        actorName: notif.actorName,
+        commentId: notif.commentId || null,
+        communityId: notif.communityId || null,
+        communityName: notif.communityName || null,
+        coordinates: notif.coordinates || null,
+        snippet: notif.snippet.slice(0, 300),
+        type: notif.type,
+        isRead: false,
+        createdAt: now,
+      },
+    });
+    return;
+  } catch (prismaErr: any) {
+    console.warn('[CommentsAPI] Tier 2 Prisma notification insert failed, trying Tier 3 Supabase REST:', prismaErr.message);
+  }
+
+  // Tier 3: Supabase REST
+  try {
+    await supabase.from('Notification').insert([{
+      id: newNotifId,
+      recipientDeviceId: notif.recipientDeviceId || null,
+      recipientHandle: normalizedRecipient,
+      actorHandle: notif.actorHandle,
+      actorName: notif.actorName,
+      commentId: notif.commentId || null,
+      communityId: notif.communityId || null,
+      communityName: notif.communityName || null,
+      coordinates: notif.coordinates || null,
+      snippet: notif.snippet.slice(0, 300),
+      type: notif.type,
+      isRead: false,
+      createdAt: now.toISOString(),
+    }]);
+  } catch (sbErr: any) {
+    console.error('[CommentsAPI] All notification tiers failed:', sbErr.message);
+  }
+}
+
 /**
  * GET /api/comments
  * Returns the single, straightforward global feed from PostgreSQL (newest first).
@@ -164,28 +256,63 @@ export async function POST(req: NextRequest) {
 
     // 1. Like action
     if (body.action === 'like' && body.commentId) {
+      let likesResult = 1;
+      let targetCommentRow: any = null;
+
       try {
-        const updated = await prisma.comment.update({
-          where: { id: body.commentId },
-          data: { likes: { increment: 1 } },
-          select: { likes: true },
-        });
-        return NextResponse.json({ success: true, likes: updated.likes });
+        const pool = getPgPool();
+        const res = await pool.query(
+          'UPDATE "Comment" SET likes = likes + 1 WHERE id = $1 RETURNING likes, author, handle, content, "deviceId"',
+          [body.commentId]
+        );
+        if (res.rows.length > 0) {
+          likesResult = res.rows[0].likes;
+          targetCommentRow = res.rows[0];
+        }
       } catch {
         try {
-          const pool = getPgPool();
-          const res = await pool.query(
-            'UPDATE "Comment" SET likes = likes + 1 WHERE id = $1 RETURNING likes',
-            [body.commentId]
-          );
-          return NextResponse.json({ success: true, likes: res.rows[0]?.likes || 1 });
+          const updated = await prisma.comment.update({
+            where: { id: body.commentId },
+            data: { likes: { increment: 1 } },
+            select: { likes: true, author: true, handle: true, content: true, deviceId: true },
+          });
+          likesResult = updated.likes;
+          targetCommentRow = updated;
         } catch {
           try {
             await (supabase.rpc as any)('increment_likes', { comment_id: body.commentId });
           } catch {}
-          return NextResponse.json({ success: true, likes: 1 });
         }
       }
+
+      // Generate in-app notification for the author of the comment being liked
+      if (targetCommentRow) {
+        const actorName = (body.actorName || body.author || 'Someone').trim().slice(0, 60);
+        const actorHandle =
+          body.actorHandle && typeof body.actorHandle === 'string' && body.actorHandle.trim()
+            ? body.actorHandle.trim().startsWith('@')
+              ? body.actorHandle.trim().slice(0, 40)
+              : `@${body.actorHandle.trim().slice(0, 39)}`
+            : defaultHandle(actorName);
+
+        const targetHandle = targetCommentRow.handle || defaultHandle(targetCommentRow.author);
+        const targetDeviceId = targetCommentRow.deviceId || null;
+
+        // Avoid self-notification
+        if (targetHandle.toLowerCase() !== actorHandle.toLowerCase()) {
+          emitNotification({
+            recipientDeviceId: targetDeviceId,
+            recipientHandle: targetHandle,
+            actorHandle,
+            actorName,
+            commentId: body.commentId,
+            snippet: targetCommentRow.content.slice(0, 150),
+            type: 'like',
+          }).catch(() => {});
+        }
+      }
+
+      return NextResponse.json({ success: true, likes: likesResult });
     }
 
     // 2. Cite action
@@ -336,13 +463,60 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // If this post cited another, increment citesCount on the target comment
+    // If this post cited another, increment citesCount and emit citation notification
     if (replyToCommentId) {
       try {
         const pool = getPgPool();
-        await pool.query('UPDATE "Comment" SET "citesCount" = "citesCount" + 1 WHERE id = $1', [replyToCommentId]);
-      } catch {}
+        const res = await pool.query(
+          'UPDATE "Comment" SET "citesCount" = "citesCount" + 1 WHERE id = $1 RETURNING author, handle, content, "deviceId"',
+          [replyToCommentId]
+        );
+        if (res.rows.length > 0) {
+          const citedRow = res.rows[0];
+          const citedHandle = citedRow.handle || defaultHandle(citedRow.author);
+          // Avoid self-notification
+          if (citedHandle.toLowerCase() !== targetHandle.toLowerCase()) {
+            emitNotification({
+              recipientDeviceId: citedRow.deviceId || null,
+              recipientHandle: citedHandle,
+              actorHandle: targetHandle,
+              actorName: targetAuthor,
+              commentId: newId,
+              snippet: targetComment.slice(0, 150),
+              type: 'citation',
+            }).catch(() => {});
+          }
+        }
+      } catch (err: any) {
+        console.warn('[CommentsAPI] Citation notification error:', err.message);
+      }
     }
+
+    // Mention notifications for any @username in the post
+    try {
+      const mentionMatches = targetComment.match(/@([a-zA-Z0-9_]+)/g);
+      if (mentionMatches) {
+        const uniqueMentions = new Set<string>(
+          mentionMatches.map((m: string) => m.toLowerCase().trim())
+        );
+        for (const mention of Array.from(uniqueMentions)) {
+          const mentionHandle: string = mention.startsWith('@') ? mention : `@${mention}`;
+          if (
+            mentionHandle.toLowerCase() !== targetHandle.toLowerCase() &&
+            (!replyToHandle || mentionHandle.toLowerCase() !== replyToHandle.toLowerCase())
+          ) {
+            emitNotification({
+              recipientHandle: mentionHandle,
+              actorHandle: targetHandle,
+              actorName: targetAuthor,
+              commentId: newId,
+              snippet: targetComment.slice(0, 150),
+              type: 'mention',
+            }).catch(() => {});
+          }
+        }
+      }
+    } catch {}
 
     const createdRecord: EnrichedComment = {
       id: newId,

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, Quote, CheckCheck, X, ExternalLink, MessageSquare, MapPin } from 'lucide-react';
+import { Bell, Quote, CheckCheck, X, ExternalLink, MessageSquare, MapPin, Heart } from 'lucide-react';
 import { getUserProfile, type UserProfile } from '@/lib/user-profile';
 import type { StoredNotification } from '@/lib/notification-store';
 import { supabase } from '@/lib/supabase';
@@ -59,11 +59,13 @@ export function AppBarNotificationBell() {
             if (!newNotif) return;
 
             const currentProfile = getUserProfile();
-            const targetHandle = currentProfile.username ? `@${currentProfile.username.toLowerCase()}` : '';
+            const targetUsername = (currentProfile.username || '').toLowerCase().replace(/^@+/, '');
+            const targetDeviceId = currentProfile.deviceId;
+            const notifHandle = (newNotif.recipientHandle || '').toLowerCase().replace(/^@+/, '');
 
             const isTargeted =
-              (newNotif.recipientDeviceId && newNotif.recipientDeviceId === currentProfile.deviceId) ||
-              (newNotif.recipientHandle && targetHandle && newNotif.recipientHandle.toLowerCase() === targetHandle);
+              (targetDeviceId && newNotif.recipientDeviceId === targetDeviceId) ||
+              (targetUsername && notifHandle === targetUsername);
 
             if (isTargeted) {
               const parsed: StoredNotification = {
@@ -241,16 +243,29 @@ export function AppBarNotificationBell() {
                       : 'hover:bg-white/[0.04]'
                   }`}
                 >
-                  <div className="p-2 rounded-xl bg-sky-500/10 text-sky-400 shrink-0 mt-0.5">
-                    <Quote className="w-3.5 h-3.5" />
-                  </div>
+                  {n.type === 'like' ? (
+                    <div className="p-2 rounded-xl bg-rose-500/15 text-rose-400 shrink-0 mt-0.5">
+                      <Heart className="w-3.5 h-3.5 fill-rose-400" />
+                    </div>
+                  ) : n.type === 'mention' ? (
+                    <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-400 shrink-0 mt-0.5">
+                      <MessageSquare className="w-3.5 h-3.5" />
+                    </div>
+                  ) : (
+                    <div className="p-2 rounded-xl bg-sky-500/15 text-sky-400 shrink-0 mt-0.5">
+                      <Quote className="w-3.5 h-3.5" />
+                    </div>
+                  )}
 
                   <div className="min-w-0 flex-1">
                     <p className="text-xs text-slate-200 leading-snug">
                       <strong className="text-white">{n.actorName}</strong>{' '}
                       <span className="font-mono text-emerald-400 text-[11px]">{n.actorHandle}</span>{' '}
-                      cited your comment in{' '}
-                      <span className="text-amber-300 font-semibold">{n.communityName}</span>
+                      {n.type === 'like'
+                        ? 'liked your post'
+                        : n.type === 'mention'
+                        ? 'mentioned you in a note'
+                        : 'cited your post'}
                     </p>
 
                     <p className="text-[11px] text-slate-400 italic line-clamp-2 mt-1 pl-2 border-l border-white/20">
@@ -260,9 +275,7 @@ export function AppBarNotificationBell() {
                     <div className="flex items-center gap-2 mt-1.5 text-[10px] text-slate-500 font-mono">
                       <span>{new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                       <span>&bull;</span>
-                      <span className="text-emerald-400 hover:underline flex items-center gap-0.5">
-                        <MapPin className="w-2.5 h-2.5" /> View Community
-                      </span>
+                      <span className="text-slate-400 capitalize">{n.type}</span>
                     </div>
                   </div>
 

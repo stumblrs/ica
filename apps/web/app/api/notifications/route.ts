@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { supabase } from '@/lib/supabase';
+import { Pool } from 'pg';
 import {
   getNotificationsForUser,
   markNotificationAsRead,
@@ -8,6 +9,19 @@ import {
 } from '@/lib/notification-store';
 
 export const dynamic = 'force-dynamic';
+
+let pgPool: Pool | null = null;
+function getPgPool(): Pool {
+  if (!pgPool) {
+    const connectionString = process.env.DATABASE_URL || process.env.DIRECT_URL || '';
+    pgPool = new Pool({
+      connectionString: connectionString || undefined,
+      ssl: { rejectUnauthorized: false },
+      connectionTimeoutMillis: 10000,
+    });
+  }
+  return pgPool;
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -19,30 +33,30 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ notifications: [], unreadCount: 0 });
     }
 
-    // SEC-06: Sanitize filter parameters against PostgREST injection
+    // Sanitize filter parameters
     const cleanDevId = deviceId ? deviceId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 100) : null;
-    const cleanHandle = handle ? (handle.startsWith('@') ? handle : `@${handle}`).toLowerCase() : null;
-    const sanitizedHandle = cleanHandle ? cleanHandle.replace(/[^a-zA-Z0-9_@]/g, '').slice(0, 50) : null;
+    const cleanHandleNoAt = handle ? handle.replace(/^@+/, '').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 50) : null;
+    const cleanHandleWithAt = cleanHandleNoAt ? `@${cleanHandleNoAt}` : null;
 
-    // 1. Query Supabase directly first (omit recipientDeviceId from public response)
+    // Tier 1: Query Supabase directly first (omit recipientDeviceId from public response)
     try {
       let query = supabase
         .from('Notification')
         .select('id, recipientHandle, actorHandle, actorName, commentId, communityId, communityName, coordinates, snippet, type, isRead, createdAt')
         .order('createdAt', { ascending: false })
-        .limit(30);
+        .limit(40);
 
-      if (cleanDevId && sanitizedHandle) {
-        query = query.or(`recipientDeviceId.eq.${cleanDevId},recipientHandle.eq.${sanitizedHandle}`);
+      if (cleanDevId && cleanHandleWithAt) {
+        query = query.or(`recipientDeviceId.eq.${cleanDevId},recipientHandle.eq.${cleanHandleWithAt},recipientHandle.eq.${cleanHandleNoAt}`);
       } else if (cleanDevId) {
         query = query.eq('recipientDeviceId', cleanDevId);
-      } else if (sanitizedHandle) {
-        query = query.eq('recipientHandle', sanitizedHandle);
+      } else if (cleanHandleWithAt) {
+        query = query.or(`recipientHandle.eq.${cleanHandleWithAt},recipientHandle.eq.${cleanHandleNoAt}`);
       }
 
       const { data, error } = await query;
 
-      if (!error && data) {
+      if (!error && Array.isArray(data) && data.length > 0) {
         const parsed = data.map((n) => ({
           ...n,
           coordinates: typeof n.coordinates === 'string' ? JSON.parse(n.coordinates) : n.coordinates,
@@ -59,18 +73,19 @@ export async function GET(req: NextRequest) {
       // Fallback
     }
 
-    // 2. Query Prisma if Supabase was unavailable
+    // Tier 2: Query Prisma if Supabase was unavailable or empty
     try {
       const where: any = {};
-      if (cleanDevId && sanitizedHandle) {
+      const handleVariants = cleanHandleWithAt && cleanHandleNoAt ? [cleanHandleWithAt, cleanHandleNoAt] : [];
+      if (cleanDevId && handleVariants.length > 0) {
         where.OR = [
           { recipientDeviceId: cleanDevId },
-          { recipientHandle: sanitizedHandle },
+          { recipientHandle: { in: handleVariants } },
         ];
       } else if (cleanDevId) {
         where.recipientDeviceId = cleanDevId;
-      } else if (sanitizedHandle) {
-        where.recipientHandle = sanitizedHandle;
+      } else if (handleVariants.length > 0) {
+        where.recipientHandle = { in: handleVariants };
       }
 
       const dbNotifs = await prisma.notification.findMany({
@@ -90,7 +105,7 @@ export async function GET(req: NextRequest) {
           createdAt: true,
         },
         orderBy: { createdAt: 'desc' },
-        take: 30,
+        take: 40,
       });
 
       if (dbNotifs.length > 0) {
@@ -108,9 +123,40 @@ export async function GET(req: NextRequest) {
       }
     } catch {}
 
-    // 3. Fallback to local file store
-    const localData = getNotificationsForUser({ deviceId: cleanDevId || undefined, handle: sanitizedHandle || undefined });
-    // Mask recipientDeviceId in local store output
+    // Tier 2.5: Direct SQL Pool
+    try {
+      const pool = getPgPool();
+      const res = await pool.query(
+        `SELECT id, "recipientHandle", "actorHandle", "actorName", "commentId", "communityId", "communityName", coordinates, snippet, type, "isRead", "createdAt"
+         FROM "Notification"
+         WHERE ("recipientDeviceId" = $1 AND $1 IS NOT NULL)
+            OR "recipientHandle" = $2
+            OR "recipientHandle" = $3
+         ORDER BY "createdAt" DESC
+         LIMIT 40`,
+        [cleanDevId, cleanHandleWithAt, cleanHandleNoAt]
+      );
+
+      if (res.rows.length > 0) {
+        const parsed = res.rows.map((n) => ({
+          ...n,
+          coordinates: n.coordinates ? JSON.parse(n.coordinates) : null,
+          createdAt: n.createdAt instanceof Date ? n.createdAt.toISOString() : new Date(n.createdAt).toISOString(),
+        }));
+        const unreadCount = parsed.filter((n) => !n.isRead).length;
+        return NextResponse.json({
+          notifications: parsed,
+          unreadCount,
+          source: 'sql_pool',
+        });
+      }
+    } catch {}
+
+    // Tier 3: Fallback to local file store
+    const localData = getNotificationsForUser({
+      deviceId: cleanDevId || undefined,
+      handle: cleanHandleWithAt || cleanHandleNoAt || undefined,
+    });
     const safeNotifications = (localData.notifications || []).map((n: any) => {
       const { recipientDeviceId: _rd, ...safeItem } = n;
       return safeItem;
@@ -132,42 +178,62 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { action, id, deviceId, handle } = body;
     const cleanDevId = deviceId ? String(deviceId).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 100) : null;
-    const cleanHandle = handle ? (handle.startsWith('@') ? handle : `@${handle}`).toLowerCase() : null;
-    const sanitizedHandle = cleanHandle ? cleanHandle.replace(/[^a-zA-Z0-9_@]/g, '').slice(0, 50) : null;
+    const cleanHandleNoAt = handle ? String(handle).replace(/^@+/, '').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 50) : null;
+    const cleanHandleWithAt = cleanHandleNoAt ? `@${cleanHandleNoAt}` : null;
 
     if ((action === 'mark-read' || action === 'mark_read') && id) {
       try {
-        await prisma.notification.update({
-          where: { id: String(id) },
-          data: { isRead: true },
-        });
-      } catch {}
+        const pool = getPgPool();
+        await pool.query('UPDATE "Notification" SET "isRead" = true WHERE id = $1', [String(id)]);
+      } catch {
+        try {
+          await prisma.notification.update({
+            where: { id: String(id) },
+            data: { isRead: true },
+          });
+        } catch {}
+      }
 
-      const success = markNotificationAsRead(id);
+      markNotificationAsRead(id);
       return NextResponse.json({ success: true });
     }
 
     if (action === 'mark-all-read' || action === 'mark_all_read') {
       try {
-        const where: any = {};
-        if (cleanDevId && sanitizedHandle) {
-          where.OR = [
-            { recipientDeviceId: cleanDevId },
-            { recipientHandle: sanitizedHandle },
-          ];
-        } else if (cleanDevId) {
-          where.recipientDeviceId = cleanDevId;
-        } else if (sanitizedHandle) {
-          where.recipientHandle = sanitizedHandle;
-        }
+        const pool = getPgPool();
+        await pool.query(
+          `UPDATE "Notification" SET "isRead" = true
+           WHERE ("recipientDeviceId" = $1 AND $1 IS NOT NULL)
+              OR "recipientHandle" = $2
+              OR "recipientHandle" = $3`,
+          [cleanDevId, cleanHandleWithAt, cleanHandleNoAt]
+        );
+      } catch {
+        try {
+          const where: any = {};
+          const handleVariants = cleanHandleWithAt && cleanHandleNoAt ? [cleanHandleWithAt, cleanHandleNoAt] : [];
+          if (cleanDevId && handleVariants.length > 0) {
+            where.OR = [
+              { recipientDeviceId: cleanDevId },
+              { recipientHandle: { in: handleVariants } },
+            ];
+          } else if (cleanDevId) {
+            where.recipientDeviceId = cleanDevId;
+          } else if (handleVariants.length > 0) {
+            where.recipientHandle = { in: handleVariants };
+          }
 
-        await prisma.notification.updateMany({
-          where,
-          data: { isRead: true },
-        });
-      } catch {}
+          await prisma.notification.updateMany({
+            where,
+            data: { isRead: true },
+          });
+        } catch {}
+      }
 
-      const count = markAllNotificationsAsRead({ deviceId: cleanDevId || undefined, handle: sanitizedHandle || undefined });
+      const count = markAllNotificationsAsRead({
+        deviceId: cleanDevId || undefined,
+        handle: cleanHandleWithAt || cleanHandleNoAt || undefined,
+      });
       return NextResponse.json({ success: true, count });
     }
 

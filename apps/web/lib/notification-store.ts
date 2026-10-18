@@ -8,12 +8,12 @@ export interface StoredNotification {
   recipientHandle: string; // e.g. "@salamander"
   actorHandle: string; // e.g. "@okafor_native"
   actorName: string; // e.g. "Chidi Okafor"
-  commentId: string;
-  communityId: string;
-  communityName: string;
+  commentId?: string | null;
+  communityId?: string | null;
+  communityName?: string | null;
   coordinates?: [number, number];
   snippet: string; // Preview of the comment or citation
-  type: 'citation' | 'mention';
+  type: 'citation' | 'mention' | 'like';
   createdAt: string;
   isRead: boolean;
 }
@@ -90,7 +90,7 @@ export function createNotification(params: {
   communityName: string;
   coordinates?: [number, number];
   snippet: string;
-  type?: 'citation' | 'mention';
+  type?: 'citation' | 'mention' | 'like';
 }): StoredNotification {
   const notifications = readNotificationsStore();
 

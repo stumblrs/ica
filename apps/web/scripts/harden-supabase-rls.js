@@ -90,14 +90,34 @@ async function hardenPolicies() {
         CREATE POLICY "Public read notifications" ON "Notification" FOR SELECT USING (true);
       END IF;
 
+      -- Notification (Validated INSERT policy for resilient in-app notification creation)
+      IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'Notification' AND policyname = 'Public insert on Notification with validation') THEN
+        CREATE POLICY "Public insert on Notification with validation" ON "Notification"
+          FOR INSERT
+          TO anon, authenticated
+          WITH CHECK (
+            length(snippet) > 0 AND length(snippet) <= 500
+            AND length("actorName") <= 60
+            AND length("recipientHandle") <= 60
+          );
+      END IF;
+
       -- Profile (Read-only for contributor profile lookup and availability check)
       IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'Profile' AND policyname = 'Public read profiles') THEN
         CREATE POLICY "Public read profiles" ON "Profile" FOR SELECT USING (true);
       END IF;
 
       -- Grant explicit SELECT and validated INSERT privileges
-      GRANT SELECT ON "Community", "CommunityAuditLog", "GovernanceInquiry", "Notification", "Profile" TO anon, authenticated;
-      GRANT SELECT, INSERT ON "Comment" TO anon, authenticated;
+      GRANT SELECT ON "Community", "CommunityAuditLog", "GovernanceInquiry", "Profile" TO anon, authenticated;
+      GRANT SELECT, INSERT ON "Comment", "Notification" TO anon, authenticated;
+
+      -- Ensure tables are added to supabase_realtime publication
+      IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'Notification') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE "Notification";
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'Comment') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE "Comment";
+      END IF;
 
       -- 5. Add Service Role full access policies on all tables to resolve 'RLS Enabled No Policy' warnings
       IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'Comment' AND policyname = 'Service role full access on Comment') THEN

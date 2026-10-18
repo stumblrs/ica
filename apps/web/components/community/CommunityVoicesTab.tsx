@@ -333,10 +333,19 @@ export function CommunityVoicesTab(_props: CommunityVoicesTabProps) {
     }));
 
     try {
+      const activeProfile = profile || getUserProfile();
+      const actorName = activeProfile?.displayName || activeProfile?.username || 'Community Member';
+      const actorHandle = activeProfile?.username ? `@${activeProfile.username}` : (authorHandle.trim() || '@resident');
+
       await fetch('/api/comments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'like', commentId }),
+        body: JSON.stringify({
+          action: 'like',
+          commentId,
+          actorName,
+          actorHandle,
+        }),
       });
     } catch (e) {
       console.error('Failed to save like:', e);
