@@ -32,6 +32,7 @@ import { TwitterComposeFAB } from '@/components/layout/TwitterComposeFAB';
 import { TwitterVoiceModal } from '@/components/community/TwitterVoiceModal';
 import { MapFeatureFloatingCard } from '@/components/map/MapFeatureFloatingCard';
 import { QuickMediaUploadModal } from '@/components/common/QuickMediaUploadModal';
+import { LocationShareModal } from '@/components/common/LocationShareModal';
 import { SE_STATE_CODES, IGBO_IDENTIFIED_LGAS, BEYOND_SOUTHEAST_REGIONS } from '@/lib/geo';
 import { DIALECT_CLUSTERS, getIgboMarketDay, IGBO_MARKET_DAYS } from '@/lib/cultural';
 import { getOfflineSettlementsList } from '@/lib/offlineStorage';
@@ -78,6 +79,7 @@ export default function HomePage() {
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [pendingNavTarget, setPendingNavTarget] = useState<any | null>(null);
   const [pendingMediaUploadFeature, setPendingMediaUploadFeature] = useState<SelectedFeature | null>(null);
+  const [shareLocationTarget, setShareLocationTarget] = useState<SelectedFeature | null>(null);
 
   const loadCommunities = useCallback(async () => {
     try {
@@ -137,6 +139,65 @@ export default function HomePage() {
   useEffect(() => {
     loadCommunities();
   }, [loadCommunities]);
+
+  // Deep-linking: auto-fly to shared location from URL query params
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const lngStr = params.get('lng');
+      const latStr = params.get('lat');
+      const nameStr = params.get('name') || params.get('location');
+
+      if (lngStr && latStr) {
+        const lng = parseFloat(lngStr);
+        const lat = parseFloat(latStr);
+        if (!isNaN(lng) && !isNaN(lat)) {
+          const coords: [number, number] = [lng, lat];
+          const locName = nameStr ? decodeURIComponent(nameStr) : 'Shared Location';
+
+          const targetFeature: SelectedFeature = {
+            type: 'settlement',
+            id: `shared-${Date.now()}`,
+            name: locName,
+            code: `shared-${locName}`,
+            coordinates: coords,
+            parentName: 'Shared via Igbo Cultural Atlas',
+            placeType: 'Historical Location',
+            colorLabel: 'Shared Location',
+            markerColor: '#10b981',
+          };
+
+          setSelectedFeature(targetFeature);
+          setMobileTab('map');
+          setIsSidebarCollapsed(true);
+
+          // Fly map camera to target with smooth easing
+          const timer = setTimeout(() => {
+            if (mapRef.current) {
+              mapRef.current.resize();
+              mapRef.current.flyTo(coords, 12.0);
+            }
+          }, 350);
+
+          return () => clearTimeout(timer);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to parse shared location URL parameters:', err);
+    }
+  }, []);
+
+  // Event listener for global location share requests
+  useEffect(() => {
+    function handleCustomShareLocation(e: any) {
+      if (e.detail) {
+        setShareLocationTarget(e.detail);
+      }
+    }
+    window.addEventListener('ica:share-location', handleCustomShareLocation);
+    return () => window.removeEventListener('ica:share-location', handleCustomShareLocation);
+  }, []);
 
   const handleToggleAddMode = useCallback(() => {
     setIsAddMode((prev) => {
@@ -750,6 +811,7 @@ export default function HomePage() {
             }}
             onAddVoice={() => setIsVoiceModalOpen(true)}
             onAddMedia={setPendingMediaUploadFeature}
+            onShareLocation={setShareLocationTarget}
           />
         )}
       </section>
@@ -1157,6 +1219,14 @@ export default function HomePage() {
               };
             });
           }}
+        />
+      )}
+
+      {/* Location Social Share Modal */}
+      {shareLocationTarget && (
+        <LocationShareModal
+          location={shareLocationTarget}
+          onClose={() => setShareLocationTarget(null)}
         />
       )}
     </div>

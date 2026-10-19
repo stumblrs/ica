@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState } from 'react';
 import {
@@ -56,6 +56,7 @@ import { CommunityAuditHistory } from '@/components/governance/CommunityAuditHis
 import type { GovernanceInquiry } from '@/lib/governancePolicy';
 import { MediaGallery } from '@/components/common/MediaGallery';
 import { parseMediaUrl, type MediaItem } from '@/lib/media';
+import { LocationShareModal } from '@/components/common/LocationShareModal';
 
 export interface CommunitySummary {
   id: string;
@@ -356,17 +357,11 @@ export function AtlasOverview(props: AtlasOverviewProps) {
     }
   }
 
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+
   function handleShareLocation() {
     if (!selectedFeature) return;
-    const url = new URL(window.location.href);
-    if (selectedFeature.coordinates) {
-      url.searchParams.set('lng', selectedFeature.coordinates[0].toFixed(4));
-      url.searchParams.set('lat', selectedFeature.coordinates[1].toFixed(4));
-    }
-    url.searchParams.set('name', selectedFeature.name);
-    navigator.clipboard.writeText(url.toString());
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2200);
+    setIsShareModalOpen(true);
   }
 
   return (
@@ -1872,6 +1867,13 @@ export function AtlasOverview(props: AtlasOverviewProps) {
                 .catch(() => {});
             }
           }}
+        />
+      )}
+
+      {isShareModalOpen && selectedFeature && (
+        <LocationShareModal
+          location={selectedFeature}
+          onClose={() => setIsShareModalOpen(false)}
         />
       )}
     </aside>

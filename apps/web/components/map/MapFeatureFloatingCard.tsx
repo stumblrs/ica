@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { X, MapPin, Sparkles, ChevronRight, Waves, MessageSquarePlus, Navigation, Play, Film, Camera } from 'lucide-react';
+import { X, MapPin, Sparkles, ChevronRight, Waves, MessageSquarePlus, Navigation, Play, Film, Camera, Share2 } from 'lucide-react';
 import type { SelectedFeature } from './MapContainer';
 import { AudioPronunciationPlayer } from '@/components/cultural/AudioPronunciationPlayer';
 
@@ -13,6 +13,7 @@ interface MapFeatureFloatingCardProps {
   onViewLore: () => void;
   onAddVoice?: () => void;
   onAddMedia?: (feature: SelectedFeature) => void;
+  onShareLocation?: (feature: SelectedFeature) => void;
 }
 
 export function MapFeatureFloatingCard({
@@ -23,6 +24,7 @@ export function MapFeatureFloatingCard({
   onViewLore,
   onAddVoice,
   onAddMedia,
+  onShareLocation,
 }: MapFeatureFloatingCardProps) {
   const isCommunity = feature.type === 'community';
   const isReference = !isCommunity;
@@ -66,15 +68,28 @@ export function MapFeatureFloatingCard({
           </span>
         </div>
 
-        <button
-          type="button"
-          onClick={onClose}
-          className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 active:scale-95 transition-all"
-          title="Dismiss location card"
-          aria-label="Dismiss location card"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1 shrink-0">
+          {onShareLocation && (
+            <button
+              type="button"
+              onClick={() => onShareLocation(feature)}
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 active:scale-95 transition-all"
+              title="Share this location across social media"
+              aria-label="Share this location across social media"
+            >
+              <Share2 className="w-4 h-4 text-emerald-400/90 hover:text-emerald-300" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 active:scale-95 transition-all"
+            title="Dismiss location card"
+            aria-label="Dismiss location card"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Title & Audio Pronunciation */}
