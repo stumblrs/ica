@@ -38,7 +38,7 @@ import { SE_STATE_CODES, IGBO_IDENTIFIED_LGAS, BEYOND_SOUTHEAST_REGIONS } from '
 import { DIALECT_CLUSTERS, getIgboMarketDay, IGBO_MARKET_DAYS } from '@/lib/cultural';
 import { getOfflineSettlementsList } from '@/lib/offlineStorage';
 
-const MapContainer = dynamic(() => import('@/components/map/MapContainer'), {
+const DynamicMapContainer = dynamic(() => import('@/components/map/MapContainer'), {
   ssr: false,
   loading: () => (
     <div className="map-stage w-full h-full flex flex-col items-center justify-center gap-3">
@@ -47,6 +47,11 @@ const MapContainer = dynamic(() => import('@/components/map/MapContainer'), {
     </div>
   ),
 });
+
+const MapContainer = React.forwardRef<MapContainerHandle, any>((props: any, ref) => {
+  return <DynamicMapContainer {...(props as any)} forwardedRef={ref} />;
+});
+MapContainer.displayName = 'MapContainer';
 
 export default function HomePage() {
   const mapRef = useRef<MapContainerHandle>(null);
@@ -78,7 +83,6 @@ export default function HomePage() {
     name: string;
   } | null>(null);
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
-  const [pendingNavTarget, setPendingNavTarget] = useState<any | null>(null);
   const [pendingMediaUploadFeature, setPendingMediaUploadFeature] = useState<SelectedFeature | null>(null);
   const [shareLocationTarget, setShareLocationTarget] = useState<SelectedFeature | null>(null);
   const [activeInAppVideo, setActiveInAppVideo] = useState<{ url: string; title?: string } | null>(null);
@@ -239,37 +243,32 @@ export default function HomePage() {
     // 1. Switch to Map view on mobile and collapse sidebar on desktop so map is fully visible
     setMobileTab('map');
     setIsSidebarCollapsed(true);
-    setPendingNavTarget(c);
 
     // Requirement: When searching for any location, do NOT open side details.
     // Reveal the location marker on the map with glowing beacon/pin.
     setSelectedFeature(null);
 
-    // 2. Perform map camera flight with slight delay so container unhides and resizes
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        if (mapRef.current) {
-          mapRef.current.resize();
-          mapRef.current.flyToCommunity(c, false);
-        }
-      }, 50);
-    });
-  }, []);
+    // 2. Perform map camera flight and reveal marker via BOTH ref and global event
+    const triggerFlight = () => {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('ica:fly-to-community', {
+            detail: { community: c, triggerSelection: false },
+          })
+        );
+      }
+      if (mapRef.current) {
+        mapRef.current.resize?.();
+        mapRef.current.flyToCommunity?.(c, false);
+      }
+    };
 
-  // Guarantee flight execution when transitioning mobile tabs into 'map'
-  useEffect(() => {
-    if (mobileTab === 'map' && pendingNavTarget) {
-      const target = pendingNavTarget;
-      setPendingNavTarget(null);
-      const timer = setTimeout(() => {
-        if (mapRef.current) {
-          mapRef.current.resize();
-          mapRef.current.flyToCommunity(target, false);
-        }
-      }, 120);
-      return () => clearTimeout(timer);
-    }
-  }, [mobileTab, pendingNavTarget]);
+    // Staged flight executions guarantee flight regardless of layout unhide, CSS transition or dynamic loading delay
+    requestAnimationFrame(() => triggerFlight());
+    setTimeout(triggerFlight, 80);
+    setTimeout(triggerFlight, 250);
+    setTimeout(triggerFlight, 600);
+  }, []);
 
   const handleFlyTo = useCallback((center: [number, number], zoom: number) => {
     setMobileTab('map');
@@ -715,11 +714,11 @@ export default function HomePage() {
           identifiedLgas={identifiedLgas}
           isAddMode={isAddMode}
           setIsAddMode={setIsAddMode}
-          onSelectFeature={(feature) => {
+          onSelectFeature={(feature: SelectedFeature | null) => {
             setSelectedFeature(feature);
           }}
           onCommunityAdded={loadCommunities}
-          onOpenAddModal={(coords, name) => {
+          onOpenAddModal={(coords: { lon: number; lat: number }, name?: string) => {
             setPendingModal({ coords, name: name || '' });
             setIsAddMode(false);
           }}

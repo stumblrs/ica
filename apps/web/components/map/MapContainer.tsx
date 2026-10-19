@@ -101,6 +101,7 @@ interface MapContainerProps {
   isFiltersCollapsed?: boolean;
   onAddMedia?: (feature: SelectedFeature) => void;
   communities?: any[];
+  forwardedRef?: any;
 }
 
 interface HoverInfo {
@@ -156,9 +157,11 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
     isFiltersCollapsed = false,
     onAddMedia,
     communities,
-  },
+    forwardedRef,
+  }: MapContainerProps & { forwardedRef?: any },
   ref
 ) {
+  const actualRef = forwardedRef || ref;
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const onSelectRef = useRef(onSelectFeature);
@@ -855,6 +858,8 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
 
     const el = document.createElement('div');
     el.className = 'ica-search-indicator-wrapper';
+    el.style.zIndex = '9999';
+    el.style.pointerEvents = 'auto';
 
     if (labelName) {
       const badge = document.createElement('div');
@@ -960,210 +965,254 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
     }
   }
 
-  useImperativeHandle(ref, () => ({
-    flyToCommunity(item: any, triggerSelection: boolean = false) {
-      if (!map.current) return;
-      const lon = item.longitude ?? (item.center ? item.center[0] : (item.coordinates ? item.coordinates[0] : null));
-      const lat = item.latitude ?? (item.center ? item.center[1] : (item.coordinates ? item.coordinates[1] : null));
+  const flyToCommunity = useCallback((item: any, triggerSelection: boolean = false) => {
+    if (!map.current) return;
 
-      const isLga = item.type === 'lga';
-      let zoom = 15.2;
-      if (isLga) {
-        zoom = 13.0;
-      } else if (item.type === 'capital' || item.category === 'capital') {
-        zoom = 14.5;
-      } else if (item.type === 'city') {
-        zoom = 14.8;
-      } else if (item.type === 'town') {
-        zoom = 15.0;
-      } else if (item.type === 'market' || item.type === 'marketplace' || item.type === 'landmark') {
-        zoom = 15.3;
-      } else if (item.type === 'village' || item.type === 'community' || item.source === 'community') {
-        zoom = 15.5;
-      }
+    let lon: number | null = null;
+    let lat: number | null = null;
 
-      if (lon != null && lat != null) {
+    if (typeof item?.longitude === 'number' && !isNaN(item.longitude)) lon = item.longitude;
+    else if (typeof item?.lon === 'number' && !isNaN(item.lon)) lon = item.lon;
+    else if (typeof item?.lng === 'number' && !isNaN(item.lng)) lon = item.lng;
+
+    if (typeof item?.latitude === 'number' && !isNaN(item.latitude)) lat = item.latitude;
+    else if (typeof item?.lat === 'number' && !isNaN(item.lat)) lat = item.lat;
+
+    if ((lon == null || lat == null) && Array.isArray(item?.center) && item.center.length >= 2) {
+      lon = Number(item.center[0]);
+      lat = Number(item.center[1]);
+    }
+    if ((lon == null || lat == null) && Array.isArray(item?.coordinates) && item.coordinates.length >= 2) {
+      lon = Number(item.coordinates[0]);
+      lat = Number(item.coordinates[1]);
+    }
+    if ((lon == null || lat == null) && Array.isArray(item?.coords) && item.coords.length >= 2) {
+      lon = Number(item.coords[0]);
+      lat = Number(item.coords[1]);
+    }
+    if ((lon == null || lat == null) && typeof item?.coords === 'object' && item.coords !== null) {
+      lon = Number(item.coords.lon ?? item.coords.lng);
+      lat = Number(item.coords.lat);
+    }
+    if ((lon == null || lat == null) && typeof item?.coordinates === 'object' && item.coordinates !== null) {
+      lon = Number(item.coordinates.lon ?? item.coordinates.lng);
+      lat = Number(item.coordinates.lat);
+    }
+    if (lon != null && isNaN(lon)) lon = null;
+    if (lat != null && isNaN(lat)) lat = null;
+
+    const isLga = item.type === 'lga';
+    let zoom = 15.2;
+    if (isLga) {
+      zoom = 13.0;
+    } else if (item.type === 'capital' || item.category === 'capital') {
+      zoom = 14.5;
+    } else if (item.type === 'city') {
+      zoom = 14.8;
+    } else if (item.type === 'town') {
+      zoom = 15.0;
+    } else if (item.type === 'market' || item.type === 'marketplace' || item.type === 'landmark') {
+      zoom = 15.3;
+    } else if (item.type === 'village' || item.type === 'community' || item.source === 'community') {
+      zoom = 15.5;
+    }
+
+    if (lon != null && lat != null) {
+      try {
+        map.current.resize();
+        map.current.stop();
+        map.current.flyTo({
+          center: [lon, lat],
+          zoom,
+          speed: 1.5,
+          curve: 1.25,
+          essential: true,
+        });
+      } catch {
         try {
-          map.current.resize();
-          map.current.stop();
-          map.current.flyTo({
-            center: [lon, lat],
-            zoom,
-            speed: 1.5,
-            curve: 1.25,
-            essential: true,
-          });
-        } catch {
-          try {
-            map.current.jumpTo({ center: [lon, lat], zoom });
-          } catch {}
-        }
+          map.current.jumpTo({ center: [lon, lat], zoom });
+        } catch {}
       }
+    }
 
-      const lgaCode = item.lgaCode ?? item.lgaId ?? (isLga ? item.code : null);
-      const stateCode = item.stateCode ?? item.stateId;
-      highlightLga(lgaCode ?? null);
-      highlightState(stateCode ?? null);
+    const lgaCode = item.lgaCode ?? item.lgaId ?? (isLga ? item.code : null);
+    const stateCode = item.stateCode ?? item.stateId;
+    highlightLga(lgaCode ?? null);
+    highlightState(stateCode ?? null);
 
-      const isSE = stateCode ? SE_STATE_CODES.includes(stateCode) : false;
-      const isIdentifiedLga = lgaCode ? identifiedRef.current.includes(lgaCode) : false;
-      const isIgboArea = isSE || isIdentifiedLga;
+    const isSE = stateCode ? SE_STATE_CODES.includes(stateCode) : false;
+    const isIdentifiedLga = lgaCode ? identifiedRef.current.includes(lgaCode) : false;
+    const isIgboArea = isSE || isIdentifiedLga;
 
-      const nearestRiver = (lon != null && lat != null) ? calculateNearestWaterway(lon, lat) : undefined;
-      const dialectCluster = isIgboArea ? getDialectForLocation(item.stateName, item.lgaName) : undefined;
+    const nearestRiver = (lon != null && lat != null) ? calculateNearestWaterway(lon, lat) : undefined;
+    const dialectCluster = isIgboArea ? getDialectForLocation(item.stateName, item.lgaName) : undefined;
 
-      const subLabel = [
-        item.wardName && `Ward: ${item.wardName}`,
-        item.lgaName && `${item.lgaName} LGA`,
-        item.stateName && `${item.stateName} State`,
-      ].filter(Boolean).join(', ');
+    const subLabel = [
+      item.wardName && `Ward: ${item.wardName}`,
+      item.lgaName && `${item.lgaName} LGA`,
+      item.stateName && `${item.stateName} State`,
+    ].filter(Boolean).join(', ');
 
-      const attachedMedia = item.media?.length ? item.media : getMediaForLocation(item.name, item.id);
+    const attachedMedia = item.media?.length ? item.media : getMediaForLocation(item.name, item.id);
 
-      if (item.source === 'community' || item.type === 'community') {
-        const isChallenged = item.verificationStatus === 'challenged';
-        const isPending = item.verificationStatus === 'pending';
-        const markerColor = isChallenged ? '#ef4444' : isPending ? '#f59e0b' : '#10b981';
-        if (lon != null && lat != null) {
-          highlightPoint([lon, lat], markerColor, item.name, subLabel || 'Community');
-        }
-        if (triggerSelection) {
-          onSelectRef.current({
-            type: 'community',
-            id: item.id,
-            name: item.name,
-            lgaName: item.lgaName,
-            stateName: item.stateName,
-            code: item.id,
-            coordinates: [lon, lat],
-            parentName: [item.lgaName && `${item.lgaName} LGA`, item.stateName && `${item.stateName} State`].filter(Boolean).join(', '),
-            identityStatus: item.identityStatus,
-            verificationStatus: item.verificationStatus,
-            confirmationsCount: item.confirmationsCount,
-            markerColor,
-            colorLabel: isChallenged ? 'Challenged Submission' : isPending ? 'Pending Community' : 'Verified Community',
-            colorExplanation: isChallenged
-              ? 'Marked in red because this record has active community disputes.'
-              : isPending
-              ? 'Marked in amber awaiting confirmations and verification.'
-              : 'Marked in emerald green matching the Southeast baseline because it is a verified Igbo community.',
-            whyMarked: 'Documented participatory community record submitted to substantiate cultural geography.',
-            nearestRiver,
-            dialectCluster,
-            media: attachedMedia,
-          });
-        }
-      } else if (isLga) {
-        const markerColor = isIgboArea ? '#10b981' : '#64748b';
-        if (lon != null && lat != null) {
-          highlightPoint([lon, lat], markerColor, item.name, subLabel || 'LGA');
-        }
-        if (triggerSelection) {
-          onSelectRef.current({
-            type: 'lga',
-            id: item.id,
-            name: item.name,
-            code: item.lgaCode,
-            coordinates: lon != null && lat != null ? [lon, lat] : undefined,
-            parentName: item.stateName ? `${item.stateName} State` : undefined,
-            zone: isSE ? 'southeast' : isIdentifiedLga ? 'identified' : 'reference',
-            placeType: 'Local Government Area (LGA)',
-            markerColor,
-            colorLabel: isSE ? 'Southeast Igbo Homeland' : isIdentifiedLga ? 'Identified Igbo LGA (Anioma / Rivers)' : 'Regional Administrative LGA',
-            colorExplanation: isSE
-              ? 'Located in the Southeast geopolitical zone.'
-              : isIdentifiedLga
-              ? 'Documented Igbo-identifying LGA outside the Southeast with cultural and linguistic Igbo heritage.'
-              : 'Administrative Local Government Area within Nigeria.',
-            whyMarked: `Administrative LGA boundary in ${item.stateName ? item.stateName + ' State' : 'Nigeria'}.`,
-            nearestRiver,
-            dialectCluster,
-            media: attachedMedia,
-          });
-        }
-      } else if (item.type === 'market' || item.type === 'marketplace' || item.type === 'landmark') {
-        if (lon != null && lat != null) {
-          highlightPoint([lon, lat], '#f59e0b', item.name, subLabel || item.typeLabel || 'Traditional Market');
-        }
-        if (triggerSelection) {
-          onSelectRef.current({
-            type: 'landmark',
-            id: item.id,
-            name: item.name,
-            lgaName: item.lgaName,
-            stateName: item.stateName,
-            parentName: [item.lgaName && `${item.lgaName} LGA`, item.stateName && `${item.stateName} State`].filter(Boolean).join(', '),
-            code: item.id,
-            coordinates: lon != null && lat != null ? [lon, lat] : undefined,
-            placeType: item.typeLabel || 'Traditional Market',
-            markerColor: '#f59e0b',
-            colorLabel: 'Golden Amber (Cultural Marker)',
-            colorExplanation: 'Marked in golden amber to highlight documented traditional markets (e.g. Eke, Orie, Afor, Nkwo four-day market cycle) and civic landmarks.',
-            whyMarked: 'Cultural and civic point of interest catalogued by HOTOSM / OpenStreetMap.',
-            nearestRiver,
-            dialectCluster,
-            media: attachedMedia,
-          });
-        }
-      } else if (item.source === 'canonical' || item.category === 'capital') {
-        const isCapital = item.category === 'capital' || item.type === 'capital';
-        const markerColor = isCapital ? '#f59e0b' : '#10b981';
-        if (lon != null && lat != null) {
-          highlightPoint([lon, lat], markerColor, item.name, subLabel || (isCapital ? 'Capital City' : 'Historic Town'));
-        }
-        if (triggerSelection) {
-          onSelectRef.current({
-            type: 'settlement',
-            id: item.id,
-            name: item.name,
-            lgaName: item.lgaName,
-            stateName: item.stateName,
-            parentName: [item.lgaName && `${item.lgaName} LGA`, item.stateName && `${item.stateName} State`].filter(Boolean).join(', '),
-            code: item.id,
-            coordinates: lon != null && lat != null ? [lon, lat] : undefined,
-            zone: 'southeast',
-            placeType: isCapital ? 'Capital City (Map of Igbo Land)' : 'Historic Town (Map of Igbo Land)',
-            markerColor,
-            colorLabel: isCapital ? 'Golden Square: Regional Capital' : 'Emerald Node: Historic Town',
-            colorExplanation: isCapital
-              ? `Prominent administrative and cultural capital designated on the canonical 'Map of Igbo Land: Communities and Towns'.`
-              : `Documented historic Igbo town and community designated on the canonical 'Map of Igbo Land: Communities and Towns'.`,
-            whyMarked: item.historicalSignificance || `Canonical community from the historical Map of Igbo Land (${item.stateName || 'Igboland'}).`,
-            nearestRiver,
-            dialectCluster,
-            media: attachedMedia,
-          });
-        }
-      } else {
-        const placeType = item.type ? `${item.type.charAt(0).toUpperCase()}${item.type.slice(1)}` : 'Settlement';
-        const markerColor = isIgboArea ? '#10b981' : '#ef4444';
-        if (lon != null && lat != null) {
-          highlightPoint([lon, lat], markerColor, item.name, subLabel || placeType);
-        }
-        if (triggerSelection) {
-          onSelectRef.current({
-            type: 'settlement',
-            id: item.id,
-            name: item.name,
-            lgaName: item.lgaName,
-            stateName: item.stateName,
-            parentName: [item.wardName && `Ward: ${item.wardName}`, item.lgaName && `${item.lgaName} LGA`, item.stateName && `${item.stateName} State`].filter(Boolean).join(', '),
-            code: item.id,
-            coordinates: lon != null && lat != null ? [lon, lat] : undefined,
-            placeType,
-            markerColor,
-            colorLabel: isIgboArea ? 'Emerald Green (Igbo Area)' : 'Crimson Red (Regional Reference)',
-            colorExplanation: isIgboArea
-              ? 'Marked in emerald green matching the Southeast baseline because it is located in an established Igbo homeland state or identified Igbo LGA.'
-              : 'Marked in contrasting red to distinguish non-Igbo regional settlements in surrounding target states as geographic reference points.',
-            whyMarked: `Physical settlement footprint catalogued by GRID3 Nigeria / HOTOSM. Classified as a ${item.type || 'settlement'}.`,
-            nearestRiver,
-            dialectCluster,
-            media: attachedMedia,
-          });
-        }
+    if (item.source === 'community' || item.type === 'community') {
+      const isChallenged = item.verificationStatus === 'challenged';
+      const isPending = item.verificationStatus === 'pending';
+      const markerColor = isChallenged ? '#ef4444' : isPending ? '#f59e0b' : '#10b981';
+      if (lon != null && lat != null) {
+        highlightPoint([lon, lat], markerColor, item.name, subLabel || 'Community');
       }
-    },
+      if (triggerSelection) {
+        onSelectRef.current({
+          type: 'community',
+          id: item.id,
+          name: item.name,
+          lgaName: item.lgaName,
+          stateName: item.stateName,
+          code: item.id,
+          coordinates: lon != null && lat != null ? [lon, lat] : undefined,
+          parentName: [item.lgaName && `${item.lgaName} LGA`, item.stateName && `${item.stateName} State`].filter(Boolean).join(', '),
+          identityStatus: item.identityStatus,
+          verificationStatus: item.verificationStatus,
+          confirmationsCount: item.confirmationsCount,
+          markerColor,
+          colorLabel: isChallenged ? 'Challenged Submission' : isPending ? 'Pending Community' : 'Verified Community',
+          colorExplanation: isChallenged
+            ? 'Marked in red because this record has active community disputes.'
+            : isPending
+            ? 'Marked in amber awaiting confirmations and verification.'
+            : 'Marked in emerald green matching the Southeast baseline because it is a verified Igbo community.',
+          whyMarked: 'Documented participatory community record submitted to substantiate cultural geography.',
+          nearestRiver,
+          dialectCluster,
+          media: attachedMedia,
+        });
+      }
+    } else if (isLga) {
+      const markerColor = isIgboArea ? '#10b981' : '#64748b';
+      if (lon != null && lat != null) {
+        highlightPoint([lon, lat], markerColor, item.name, subLabel || 'LGA');
+      }
+      if (triggerSelection) {
+        onSelectRef.current({
+          type: 'lga',
+          id: item.id,
+          name: item.name,
+          code: item.lgaCode,
+          coordinates: lon != null && lat != null ? [lon, lat] : undefined,
+          parentName: item.stateName ? `${item.stateName} State` : undefined,
+          zone: isSE ? 'southeast' : isIdentifiedLga ? 'identified' : 'reference',
+          placeType: 'Local Government Area (LGA)',
+          markerColor,
+          colorLabel: isSE ? 'Southeast Igbo Homeland' : isIdentifiedLga ? 'Identified Igbo LGA (Anioma / Rivers)' : 'Regional Administrative LGA',
+          colorExplanation: isSE
+            ? 'Located in the Southeast geopolitical zone.'
+            : isIdentifiedLga
+            ? 'Documented Igbo-identifying LGA outside the Southeast with cultural and linguistic Igbo heritage.'
+            : 'Administrative Local Government Area within Nigeria.',
+          whyMarked: `Administrative LGA boundary in ${item.stateName ? item.stateName + ' State' : 'Nigeria'}.`,
+          nearestRiver,
+          dialectCluster,
+          media: attachedMedia,
+        });
+      }
+    } else if (item.type === 'market' || item.type === 'marketplace' || item.type === 'landmark') {
+      if (lon != null && lat != null) {
+        highlightPoint([lon, lat], '#f59e0b', item.name, subLabel || item.typeLabel || 'Traditional Market');
+      }
+      if (triggerSelection) {
+        onSelectRef.current({
+          type: 'landmark',
+          id: item.id,
+          name: item.name,
+          lgaName: item.lgaName,
+          stateName: item.stateName,
+          parentName: [item.lgaName && `${item.lgaName} LGA`, item.stateName && `${item.stateName} State`].filter(Boolean).join(', '),
+          code: item.id,
+          coordinates: lon != null && lat != null ? [lon, lat] : undefined,
+          placeType: item.typeLabel || 'Traditional Market',
+          markerColor: '#f59e0b',
+          colorLabel: 'Golden Amber (Cultural Marker)',
+          colorExplanation: 'Marked in golden amber to highlight documented traditional markets (e.g. Eke, Orie, Afor, Nkwo four-day market cycle) and civic landmarks.',
+          whyMarked: 'Cultural and civic point of interest catalogued by HOTOSM / OpenStreetMap.',
+          nearestRiver,
+          dialectCluster,
+          media: attachedMedia,
+        });
+      }
+    } else if (item.source === 'canonical' || item.category === 'capital') {
+      const isCapital = item.category === 'capital' || item.type === 'capital';
+      const markerColor = isCapital ? '#f59e0b' : '#10b981';
+      if (lon != null && lat != null) {
+        highlightPoint([lon, lat], markerColor, item.name, subLabel || (isCapital ? 'Capital City' : 'Historic Town'));
+      }
+      if (triggerSelection) {
+        onSelectRef.current({
+          type: 'settlement',
+          id: item.id,
+          name: item.name,
+          lgaName: item.lgaName,
+          stateName: item.stateName,
+          parentName: [item.lgaName && `${item.lgaName} LGA`, item.stateName && `${item.stateName} State`].filter(Boolean).join(', '),
+          code: item.id,
+          coordinates: lon != null && lat != null ? [lon, lat] : undefined,
+          zone: 'southeast',
+          placeType: isCapital ? 'Capital City (Map of Igbo Land)' : 'Historic Town (Map of Igbo Land)',
+          markerColor,
+          colorLabel: isCapital ? 'Golden Square: Regional Capital' : 'Emerald Node: Historic Town',
+          colorExplanation: isCapital
+            ? `Prominent administrative and cultural capital designated on the canonical 'Map of Igbo Land: Communities and Towns'.`
+            : `Documented historic Igbo town and community designated on the canonical 'Map of Igbo Land: Communities and Towns'.`,
+          whyMarked: item.historicalSignificance || `Canonical community from the historical Map of Igbo Land (${item.stateName || 'Igboland'}).`,
+          nearestRiver,
+          dialectCluster,
+          media: attachedMedia,
+        });
+      }
+    } else {
+      const placeType = item.type ? `${item.type.charAt(0).toUpperCase()}${item.type.slice(1)}` : 'Settlement';
+      const markerColor = isIgboArea ? '#10b981' : '#ef4444';
+      if (lon != null && lat != null) {
+        highlightPoint([lon, lat], markerColor, item.name, subLabel || placeType);
+      }
+      if (triggerSelection) {
+        onSelectRef.current({
+          type: 'settlement',
+          id: item.id,
+          name: item.name,
+          lgaName: item.lgaName,
+          stateName: item.stateName,
+          parentName: [item.wardName && `Ward: ${item.wardName}`, item.lgaName && `${item.lgaName} LGA`, item.stateName && `${item.stateName} State`].filter(Boolean).join(', '),
+          code: item.id,
+          coordinates: lon != null && lat != null ? [lon, lat] : undefined,
+          placeType,
+          markerColor,
+          colorLabel: isIgboArea ? 'Emerald Green (Igbo Area)' : 'Crimson Red (Regional Reference)',
+          colorExplanation: isIgboArea
+            ? 'Marked in emerald green matching the Southeast baseline because it is located in an established Igbo homeland state or identified Igbo LGA.'
+            : 'Marked in contrasting red to distinguish non-Igbo regional settlements in surrounding target states as geographic reference points.',
+          whyMarked: `Physical settlement footprint catalogued by GRID3 Nigeria / HOTOSM. Classified as a ${item.type || 'settlement'}.`,
+          nearestRiver,
+          dialectCluster,
+          media: attachedMedia,
+        });
+      }
+    }
+  }, []);
+
+  // Global event listener for ica:fly-to-community
+  useEffect(() => {
+    function handleGlobalFlyTo(e: any) {
+      if (e.detail?.community) {
+        flyToCommunity(e.detail.community, e.detail.triggerSelection ?? false);
+      }
+    }
+    window.addEventListener('ica:fly-to-community', handleGlobalFlyTo);
+    return () => window.removeEventListener('ica:fly-to-community', handleGlobalFlyTo);
+  }, [flyToCommunity]);
+
+  useImperativeHandle<MapContainerHandle, MapContainerHandle>(actualRef, () => ({
+    flyToCommunity,
     flyTo(center, zoom) {
       map.current?.flyTo({ center, zoom, essential: true });
     },
