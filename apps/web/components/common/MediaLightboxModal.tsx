@@ -58,8 +58,9 @@ export function MediaLightboxModal({ media, onClose }: MediaLightboxModalProps) 
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-              title="Close (Esc)"
+              className="w-9 h-9 rounded-xl bg-white/[0.08] hover:bg-rose-500/25 border border-white/[0.15] hover:border-rose-500/40 text-slate-300 hover:text-rose-300 flex items-center justify-center transition-all active:scale-95 shadow-md"
+              title="Close and return to app (Esc)"
+              aria-label="Close and return to app"
             >
               <X className="w-5 h-5" />
             </button>
@@ -71,10 +72,10 @@ export function MediaLightboxModal({ media, onClose }: MediaLightboxModalProps) 
           {media.type === 'video' ? (
             media.embedUrl ? (
               <iframe
-                src={media.embedUrl}
+                src={media.embedUrl.includes('autoplay=') ? media.embedUrl : `${media.embedUrl}${media.embedUrl.includes('?') ? '&' : '?'}autoplay=1`}
                 title={media.caption || 'Video presentation'}
                 className="w-full h-full min-h-[360px] aspect-video border-0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowFullScreen
               />
             ) : (
@@ -82,6 +83,7 @@ export function MediaLightboxModal({ media, onClose }: MediaLightboxModalProps) 
                 src={media.url}
                 controls
                 autoPlay
+                playsInline
                 className="max-h-[68vh] max-w-full rounded"
               >
                 Your browser does not support HTML5 video.

@@ -52,6 +52,14 @@ export function isDirectVideoUrl(url: string): boolean {
 }
 
 /**
+ * Checks if a URL is a playable video (YouTube, Vimeo, or direct video file)
+ */
+export function isVideoUrl(url: string): boolean {
+  if (!url) return false;
+  return Boolean(extractYouTubeId(url) || extractVimeoId(url) || isDirectVideoUrl(url));
+}
+
+/**
  * Checks if a URL points to an image
  */
 export function isLikelyImageUrl(url: string): boolean {

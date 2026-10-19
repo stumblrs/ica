@@ -4,6 +4,8 @@ import React from 'react';
 import { X, MapPin, Sparkles, ChevronRight, Waves, MessageSquarePlus, Navigation, Play, Film, Camera, Share2 } from 'lucide-react';
 import type { SelectedFeature } from './MapContainer';
 import { AudioPronunciationPlayer } from '@/components/cultural/AudioPronunciationPlayer';
+import { openInAppVideo } from '@/components/common/VideoPlayerModal';
+import { isVideoUrl } from '@/lib/media';
 
 interface MapFeatureFloatingCardProps {
   feature: SelectedFeature;
@@ -138,9 +140,16 @@ export function MapFeatureFloatingCard({
           {feature.media.slice(0, 4).map((m: any, idx: number) => (
             <div
               key={m.id || idx}
-              onClick={onViewLore}
+              onClick={(e) => {
+                if (m.type === 'video' || isVideoUrl(m.url)) {
+                  e.stopPropagation();
+                  openInAppVideo(m.url, m.caption || feature.name);
+                } else {
+                  onViewLore();
+                }
+              }}
               className="relative w-12 h-10 rounded-lg overflow-hidden bg-black/60 border border-white/10 shrink-0 cursor-pointer hover:border-emerald-400 transition-colors"
-              title={m.caption || 'Attached visual record'}
+              title={m.caption || (m.type === 'video' ? 'Play video' : 'Attached visual record')}
             >
               {m.thumbnailUrl || m.url ? (
                 <img

@@ -33,6 +33,7 @@ import { TwitterVoiceModal } from '@/components/community/TwitterVoiceModal';
 import { MapFeatureFloatingCard } from '@/components/map/MapFeatureFloatingCard';
 import { QuickMediaUploadModal } from '@/components/common/QuickMediaUploadModal';
 import { LocationShareModal } from '@/components/common/LocationShareModal';
+import { VideoPlayerModal } from '@/components/common/VideoPlayerModal';
 import { SE_STATE_CODES, IGBO_IDENTIFIED_LGAS, BEYOND_SOUTHEAST_REGIONS } from '@/lib/geo';
 import { DIALECT_CLUSTERS, getIgboMarketDay, IGBO_MARKET_DAYS } from '@/lib/cultural';
 import { getOfflineSettlementsList } from '@/lib/offlineStorage';
@@ -80,6 +81,7 @@ export default function HomePage() {
   const [pendingNavTarget, setPendingNavTarget] = useState<any | null>(null);
   const [pendingMediaUploadFeature, setPendingMediaUploadFeature] = useState<SelectedFeature | null>(null);
   const [shareLocationTarget, setShareLocationTarget] = useState<SelectedFeature | null>(null);
+  const [activeInAppVideo, setActiveInAppVideo] = useState<{ url: string; title?: string } | null>(null);
 
   const loadCommunities = useCallback(async () => {
     try {
@@ -199,6 +201,20 @@ export default function HomePage() {
     return () => window.removeEventListener('ica:share-location', handleCustomShareLocation);
   }, []);
 
+  // Event listener for global in-app video playback
+  useEffect(() => {
+    function handleCustomPlayVideo(e: any) {
+      if (e.detail?.url) {
+        setActiveInAppVideo({
+          url: e.detail.url,
+          title: e.detail.title,
+        });
+      }
+    }
+    window.addEventListener('ica:play-video', handleCustomPlayVideo);
+    return () => window.removeEventListener('ica:play-video', handleCustomPlayVideo);
+  }, []);
+
   const handleToggleAddMode = useCallback(() => {
     setIsAddMode((prev) => {
       const next = !prev;
@@ -225,66 +241,16 @@ export default function HomePage() {
     setIsSidebarCollapsed(true);
     setPendingNavTarget(c);
 
-    const lon = c.longitude ?? (c.center ? c.center[0] : (c.coordinates ? c.coordinates[0] : null));
-    const lat = c.latitude ?? (c.center ? c.center[1] : (c.coordinates ? c.coordinates[1] : null));
-    const coords = lon != null && lat != null ? ([lon, lat] as [number, number]) : undefined;
-
-    // Resolve attached media from community list or client store if search item had none
-    let attachedMedia = c.media || [];
-    if (!attachedMedia || attachedMedia.length === 0) {
-      const matchName = (c.name || '').trim().toLowerCase();
-      const matched = communities.find((com) => (com.name || '').trim().toLowerCase() === matchName);
-      if (matched && matched.evidence && matched.evidence.length > 0) {
-        attachedMedia = matched.evidence;
-      } else if (typeof window !== 'undefined') {
-        try {
-          const raw = localStorage.getItem('ica_local_media_store');
-          if (raw) {
-            const localStore = JSON.parse(raw);
-            const found = localStore.find((it: any) => (it.name || '').trim().toLowerCase() === matchName);
-            if (found && Array.isArray(found.media)) attachedMedia = found.media;
-          }
-        } catch {}
-      }
-    }
-
-    // Immediately switch the floating card and inspection context to the exact settlement clicked
-    const targetFeature: SelectedFeature = {
-      type:
-        c.type === 'lga'
-          ? 'lga'
-          : c.type === 'community' || c.source === 'community'
-          ? 'community'
-          : c.type === 'landmark' || c.type === 'market' || c.type === 'marketplace'
-          ? 'landmark'
-          : 'settlement',
-      id: c.id,
-      name: c.name,
-      code: c.id,
-      coordinates: coords,
-      lgaName: c.lgaName,
-      stateName: c.stateName,
-      parentName: [
-        c.wardName && `Ward: ${c.wardName}`,
-        c.lgaName && `${c.lgaName} LGA`,
-        c.stateName && `${c.stateName} State`,
-      ]
-        .filter(Boolean)
-        .join(', '),
-      zone: 'southeast',
-      placeType: c.typeLabel || (c.type ? `${c.type.charAt(0).toUpperCase()}${c.type.slice(1)}` : 'Settlement'),
-      colorLabel: 'Selected Location',
-      markerColor: '#10b981',
-      media: attachedMedia,
-    };
-    setSelectedFeature(targetFeature);
+    // Requirement: When searching for any location, do NOT open side details.
+    // Reveal the location marker on the map with glowing beacon/pin.
+    setSelectedFeature(null);
 
     // 2. Perform map camera flight with slight delay so container unhides and resizes
     requestAnimationFrame(() => {
       setTimeout(() => {
         if (mapRef.current) {
           mapRef.current.resize();
-          mapRef.current.flyToCommunity(c);
+          mapRef.current.flyToCommunity(c, false);
         }
       }, 50);
     });
@@ -298,7 +264,7 @@ export default function HomePage() {
       const timer = setTimeout(() => {
         if (mapRef.current) {
           mapRef.current.resize();
-          mapRef.current.flyToCommunity(target);
+          mapRef.current.flyToCommunity(target, false);
         }
       }, 120);
       return () => clearTimeout(timer);
@@ -1227,6 +1193,15 @@ export default function HomePage() {
         <LocationShareModal
           location={shareLocationTarget}
           onClose={() => setShareLocationTarget(null)}
+        />
+      )}
+
+      {/* Global In-App Video Player Modal */}
+      {activeInAppVideo && (
+        <VideoPlayerModal
+          url={activeInAppVideo.url}
+          title={activeInAppVideo.title}
+          onClose={() => setActiveInAppVideo(null)}
         />
       )}
     </div>

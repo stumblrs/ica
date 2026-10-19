@@ -21,12 +21,15 @@ import {
   Loader2,
   ChevronDown,
   Quote,
+  Play,
+  Film,
 } from 'lucide-react';
 import type { EnrichedComment } from '@/app/api/comments/route';
 import type { CommunitySummary } from '@/components/map/AtlasOverview';
 import type { SelectedFeature } from '@/components/map/MapContainer';
 import { MediaGallery } from '@/components/common/MediaGallery';
-import { extractMediaFromText } from '@/lib/media';
+import { extractMediaFromText, isVideoUrl } from '@/lib/media';
+import { openInAppVideo } from '@/components/common/VideoPlayerModal';
 import { getUserProfile, type UserProfile } from '@/lib/user-profile';
 import { getOrCreateDeviceId, getDeviceFingerprintSync } from '@/lib/device';
 import { supabase } from '@/lib/supabase';
@@ -61,6 +64,56 @@ function timeAgo(dateString: string): string {
   } catch {
     return 'Recent';
   }
+}
+
+function renderCommentBody(text: string, authorName: string) {
+  if (!text) return null;
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+
+  return parts.map((part, index) => {
+    if (part.match(urlRegex)) {
+      const cleanUrl = part.replace(/[.,;:!?)\]]+$/, '');
+      const trailing = part.slice(cleanUrl.length);
+
+      if (isVideoUrl(cleanUrl)) {
+        return (
+          <React.Fragment key={index}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                openInAppVideo(cleanUrl, `Video Testimony from ${authorName}`);
+              }}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 my-1 mx-1 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/35 text-cyan-300 font-semibold text-xs transition-all active:scale-95 group shadow-sm align-middle"
+              title="Play video inside app"
+            >
+              <Play className="w-3 h-3 text-cyan-400 fill-cyan-400 group-hover:scale-110 transition-transform" />
+              <span>Watch Video</span>
+              <Film className="w-3 h-3 text-cyan-400/80" />
+            </button>
+            {trailing}
+          </React.Fragment>
+        );
+      }
+
+      return (
+        <React.Fragment key={index}>
+          <a
+            href={cleanUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-emerald-400 hover:text-emerald-300 underline underline-offset-2 break-all"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {cleanUrl}
+          </a>
+          {trailing}
+        </React.Fragment>
+      );
+    }
+    return part;
+  });
 }
 
 const LOCAL_CITES_MAP_KEY = 'ica_local_cites_map_v2';
@@ -726,7 +779,7 @@ export function CommunityVoicesTab(_props: CommunityVoicesTabProps) {
                   return (
                     <div className="space-y-2">
                       <p className="text-xs sm:text-[13px] text-slate-200 leading-relaxed whitespace-pre-wrap pl-2 border-l-2 border-emerald-500/40">
-                        {cleanText}
+                        {renderCommentBody(cleanText, cmt.authorName)}
                       </p>
                       {media.length > 0 && (
                         <div className="pl-2">
