@@ -50,6 +50,8 @@ export function getStoreCandidatePaths(): string[] {
       path.resolve(cwd, '../.data/communities_store.json'),
       path.resolve(__dirname, '../../.data/communities_store.json'),
       path.resolve(__dirname, '../../../.data/communities_store.json'),
+      '/tmp/communities_store.json',
+      path.resolve(cwd, 'communities_store.json'),
     ])
   );
 }
@@ -97,23 +99,25 @@ export function readCommunityStore(): StoredCommunity[] {
 }
 
 export function writeCommunityStore(records: StoredCommunity[]): boolean {
-  // On serverless / Vercel production, local filesystem is read-only.
-  if (process.env.NODE_ENV === 'production') {
-    return false;
-  }
-
   const cwd = process.cwd();
   const existingPath = findExistingStorePath();
-  const target = existingPath || path.resolve(cwd, '.data/communities_store.json');
+  const candidates = [
+    existingPath,
+    path.resolve(cwd, 'apps/web/.data/communities_store.json'),
+    path.resolve(cwd, '.data/communities_store.json'),
+    '/tmp/communities_store.json',
+  ].filter(Boolean) as string[];
 
-  try {
-    fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.writeFileSync(target, JSON.stringify(records, null, 2), 'utf8');
-    return true;
-  } catch (err: any) {
-    console.warn(`[CommunityStore] Local write disabled:`, err.message);
-    return false;
+  for (const target of candidates) {
+    try {
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, JSON.stringify(records, null, 2), 'utf8');
+      return true;
+    } catch {
+      // Try next candidate
+    }
   }
+  return false;
 }
 
 export function saveMediaToStore(params: {

@@ -232,6 +232,44 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
       .catch(() => {});
   }, [updateMediaIndex]);
 
+  // Real-time synchronization whenever any media is uploaded or added
+  useEffect(() => {
+    function handleMediaUpdated(e: Event) {
+      const customEvent = e as CustomEvent;
+      const detail = customEvent.detail;
+      if (!detail) return;
+      const { name, code, mediaItem } = detail;
+      if (!mediaItem) return;
+
+      const mapStore = mediaIndexRef.current;
+      const addUnderKey = (k?: string) => {
+        if (!k) return;
+        const norm = k.trim().toLowerCase();
+        const existing = mapStore.get(norm) || [];
+        const deduped = [mediaItem, ...existing.filter((m: any) => m.url !== mediaItem.url)];
+        mapStore.set(norm, deduped);
+      };
+
+      if (name) {
+        addUnderKey(name);
+        addUnderKey(name.replace(/^(ref-|settlement-|comm-|canonical-)/, ''));
+      }
+      if (code) {
+        addUnderKey(code);
+      }
+
+      // Re-trigger visual refresh
+      try {
+        if (typeof (actualRef as any)?.current?.refreshCommunities === 'function') {
+          (actualRef as any).current.refreshCommunities();
+        }
+      } catch {}
+    }
+
+    window.addEventListener('ica:media-updated', handleMediaUpdated);
+    return () => window.removeEventListener('ica:media-updated', handleMediaUpdated);
+  }, [actualRef]);
+
   const getMediaForLocation = useCallback((name?: string, id?: string): any[] => {
     const mapStore = mediaIndexRef.current;
     if (name) {
@@ -245,14 +283,16 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
       if (mapStore.has(i)) return mapStore.get(i)!;
     }
     // Direct localStorage fallback check
-    if (typeof window !== 'undefined' && name) {
+    if (typeof window !== 'undefined') {
       try {
         const raw = localStorage.getItem('ica_local_media_store');
         if (raw) {
           const localStore = JSON.parse(raw);
           if (Array.isArray(localStore)) {
             const found = localStore.find(
-              (it: any) => (it.name || '').trim().toLowerCase() === name.trim().toLowerCase()
+              (it: any) =>
+                (name && (it.name || '').trim().toLowerCase() === name.trim().toLowerCase()) ||
+                (id && (it.code || it.id || '').trim().toLowerCase() === id.trim().toLowerCase())
             );
             if (found && Array.isArray(found.media)) return found.media;
           }

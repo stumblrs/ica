@@ -110,6 +110,36 @@ export async function GET(req: NextRequest) {
         evidence: c.evidenceJson ? (typeof c.evidenceJson === 'string' ? JSON.parse(c.evidenceJson) : c.evidenceJson) : [],
       }));
 
+      // Merge local store evidence items so any offline-saved photos/videos are also present
+      try {
+        const store = readCommunityStore();
+        if (store.length > 0) {
+          const commMap = new Map<string, any>();
+          for (const c of parsed) {
+            if (c.name) commMap.set(c.name.trim().toLowerCase(), c);
+            if (c.id) commMap.set(c.id.toLowerCase(), c);
+          }
+          for (const loc of store) {
+            const key = (loc.name || '').trim().toLowerCase();
+            const target = commMap.get(key) || (loc.id ? commMap.get(loc.id.toLowerCase()) : null);
+            if (target) {
+              const locEv = Array.isArray(loc.evidence) ? loc.evidence : [];
+              const existingEv = Array.isArray(target.evidence) ? target.evidence : [];
+              const seenUrls = new Set(existingEv.map((e: any) => e.url));
+              for (const item of locEv) {
+                if (item?.url && !seenUrls.has(item.url)) {
+                  existingEv.push(item);
+                  seenUrls.add(item.url);
+                }
+              }
+              target.evidence = existingEv;
+            } else if (loc.name) {
+              parsed.unshift(loc);
+            }
+          }
+        }
+      } catch {}
+
       return NextResponse.json(parsed);
     }
 
@@ -320,6 +350,25 @@ export async function POST(req: NextRequest) {
     try {
       if (body && body.name && body.latitude != null && body.longitude != null) {
         const store = readCommunityStore();
+        let fallbackEvidence: any[] = [];
+        if (Array.isArray(body.evidence)) {
+          fallbackEvidence = body.evidence;
+        } else if (body.evidence && typeof body.evidence === 'object') {
+          fallbackEvidence = [
+            {
+              id: 'ev-' + Date.now(),
+              sourceType: body.evidence.sourceType || 'community_submission',
+              description: body.evidence.description || 'Community evidence',
+              citationOrUrl: body.evidence.citationOrUrl || null,
+              media: Array.isArray(body.evidence.media) ? body.evidence.media : [],
+            },
+            ...(Array.isArray(body.evidence.media) ? body.evidence.media : []),
+          ];
+        }
+        if (Array.isArray(body.media)) {
+          fallbackEvidence = [...fallbackEvidence, ...body.media];
+        }
+
         const newRecord: any = {
           id: 'comm-' + Date.now(),
           name: (body.name || '').trim(),
@@ -337,7 +386,8 @@ export async function POST(req: NextRequest) {
           verificationStatus: 'verified',
           lifecycleStatus: 'ACTIVE',
           confidence: 0.85,
-          evidence: Array.isArray(body.evidence) ? body.evidence : [],
+          evidence: fallbackEvidence,
+          evidenceJson: JSON.stringify(fallbackEvidence),
           confirmationsCount: 1,
           challengesCount: 0,
           createdAt: new Date().toISOString(),

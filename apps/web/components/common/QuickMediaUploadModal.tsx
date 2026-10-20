@@ -89,6 +89,7 @@ export function QuickMediaUploadModal({
       }
 
       const data = await res.json();
+      const finalMediaItem = data.mediaItem || mediaItem;
 
       // Immediate client-side offline persistence cache
       try {
@@ -99,21 +100,37 @@ export function QuickMediaUploadModal({
             (item) => (item.name || '').trim().toLowerCase() === feature.name.trim().toLowerCase()
           );
           if (idx !== -1) {
-            localStore[idx].media = [data.mediaItem || mediaItem, ...(localStore[idx].media || [])];
+            const existingMedia = localStore[idx].media || [];
+            const deduped = [finalMediaItem, ...existingMedia.filter((m: any) => m.url !== finalMediaItem.url)];
+            localStore[idx].media = deduped;
+            if (feature.code) localStore[idx].code = feature.code;
           } else {
             localStore.unshift({
               name: feature.name,
+              code: feature.code,
               coordinates: feature.coordinates,
               lgaName,
               stateName,
-              media: [data.mediaItem || mediaItem],
+              media: [finalMediaItem],
             });
           }
           localStorage.setItem('ica_local_media_store', JSON.stringify(localStore));
+
+          // Notify all active map and UI listeners of newly persisted media
+          window.dispatchEvent(
+            new CustomEvent('ica:media-updated', {
+              detail: {
+                name: feature.name,
+                code: feature.code,
+                mediaItem: finalMediaItem,
+                community: data.community,
+              },
+            })
+          );
         }
       } catch {}
 
-      onSuccess(data.community, data.mediaItem || mediaItem);
+      onSuccess(data.community, finalMediaItem);
       onClose();
     } catch (err: any) {
       setError(err.message || 'Error uploading media URL.');
