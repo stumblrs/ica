@@ -6,14 +6,9 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspace=apps/web",
-    "dev:web": "npm run dev --workspace=apps/web",
-    "dev:curator": "npm run dev --workspace=apps/curator-admin",
     "build": "npm run build --workspace=apps/web",
-    "build:curator": "npm run build --workspace=apps/curator-admin",
     "start": "npm run start --workspace=apps/web",
-    "start:curator": "npm run start --workspace=apps/curator-admin",
     "lint": "npm run lint --workspace=apps/web",
-    "lint:curator": "npm run lint --workspace=apps/curator-admin",
     "validate:data": "node scripts/validate-geojson.mjs",
     "normalize:data": "node scripts/normalize-geojson.mjs"
   },
