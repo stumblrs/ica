@@ -59,9 +59,13 @@ interface HeritageProfile {
   updatedBy?: string;
 }
 
-const API_BASE = (process.env.NEXT_PUBLIC_ICA_API_URL || 'http://localhost:3000').replace(/\/$/, '');
+const DEFAULT_API_BASE = (process.env.NEXT_PUBLIC_ICA_API_URL || 'https://ica-alpha.vercel.app').replace(/\/$/, '');
 
 export default function CuratorAdminDashboard() {
+  // Target API Backend (defaults to live Vercel deployment)
+  const [apiBase, setApiBase] = useState<string>(DEFAULT_API_BASE);
+  const [showCustomApi, setShowCustomApi] = useState(false);
+
   // Authentication State
   const [passcode, setPasscode] = useState('');
   const [authenticated, setAuthenticated] = useState(false);
@@ -118,6 +122,10 @@ export default function CuratorAdminDashboard() {
 
   // 1. Check local session storage on mount
   useEffect(() => {
+    const savedApi = localStorage.getItem('ica_curator_api_base');
+    if (savedApi) {
+      setApiBase(savedApi);
+    }
     const savedKey = sessionStorage.getItem('ica_curator_key');
     if (savedKey) {
       handleLogin(savedKey);
@@ -135,7 +143,8 @@ export default function CuratorAdminDashboard() {
       setAuthLoading(true);
       setAuthError(null);
 
-      const res = await fetch(`${API_BASE}/api/curator/auth`, {
+      const targetEndpoint = `${apiBase}/api/curator/auth`;
+      const res = await fetch(targetEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ passcode: key }),
@@ -146,7 +155,6 @@ export default function CuratorAdminDashboard() {
         throw new Error(data.error || 'Invalid passcode');
       }
 
-
       setAuthenticated(true);
       setAuthRole(data.role || 'curator');
       setAuthLabel(data.label || 'Curator Session');
@@ -156,7 +164,11 @@ export default function CuratorAdminDashboard() {
       // Load initial data
       loadAllData(key);
     } catch (err: any) {
-      setAuthError(err.message || 'Authentication failed');
+      if (err.name === 'TypeError' || (err.message && err.message.toLowerCase().includes('fetch'))) {
+        setAuthError(`Cannot connect to ICA Backend at ${apiBase}. Verify the deployment URL.`);
+      } else {
+        setAuthError(err.message || 'Authentication failed');
+      }
       sessionStorage.removeItem('ica_curator_key');
       setAuthenticated(false);
     } finally {
@@ -181,7 +193,7 @@ export default function CuratorAdminDashboard() {
 
   const fetchSettings = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/curator/settings`);
+      const res = await fetch(`${apiBase}/api/curator/settings`);
       if (res.ok) {
         const data = await res.json();
         setSettings(data);
@@ -192,7 +204,7 @@ export default function CuratorAdminDashboard() {
   const fetchPasscodes = async (activeKey: string) => {
     try {
       setLoadingPasscodes(true);
-      const res = await fetch(`${API_BASE}/api/curator/passcodes`, {
+      const res = await fetch(`${apiBase}/api/curator/passcodes`, {
         headers: { 'x-curator-key': activeKey },
       });
       if (res.ok) {
@@ -208,7 +220,7 @@ export default function CuratorAdminDashboard() {
   const fetchProfiles = async () => {
     try {
       setLoadingProfiles(true);
-      const res = await fetch(`${API_BASE}/api/curator/profiles`);
+      const res = await fetch(`${apiBase}/api/curator/profiles`);
       if (res.ok) {
         const data = await res.json();
         setProfiles(data.profiles || []);
@@ -226,7 +238,7 @@ export default function CuratorAdminDashboard() {
       setSettingsSuccess(false);
 
       const activeKey = sessionStorage.getItem('ica_curator_key') || passcode;
-      const res = await fetch(`${API_BASE}/api/curator/settings`, {
+      const res = await fetch(`${apiBase}/api/curator/settings`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -252,7 +264,7 @@ export default function CuratorAdminDashboard() {
     e.preventDefault();
     try {
       const activeKey = sessionStorage.getItem('ica_curator_key') || passcode;
-      const res = await fetch(`${API_BASE}/api/curator/passcodes`, {
+      const res = await fetch(`${apiBase}/api/curator/passcodes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -283,7 +295,7 @@ export default function CuratorAdminDashboard() {
     if (!confirm('Are you sure you want to revoke this passcode? It will immediately stop working.')) return;
     try {
       const activeKey = sessionStorage.getItem('ica_curator_key') || passcode;
-      const res = await fetch(`${API_BASE}/api/curator/passcodes?id=${encodeURIComponent(id)}`, {
+      const res = await fetch(`${apiBase}/api/curator/passcodes?id=${encodeURIComponent(id)}`, {
         method: 'DELETE',
         headers: { 'x-curator-key': activeKey },
       });
@@ -344,7 +356,7 @@ export default function CuratorAdminDashboard() {
         .map((k) => k.trim())
         .filter(Boolean);
 
-      const res = await fetch(`${API_BASE}/api/curator/profiles`, {
+      const res = await fetch(`${apiBase}/api/curator/profiles`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -465,6 +477,66 @@ export default function CuratorAdminDashboard() {
               </div>
             </div>
 
+            {/* Target Backend API Selector */}
+            <div className="p-2.5 rounded-xl bg-black/40 border border-white/10 space-y-1.5 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-slate-400 font-mono">Target Atlas Backend:</span>
+                <button
+                  type="button"
+                  onClick={() => setShowCustomApi(!showCustomApi)}
+                  className="text-amber-400 hover:text-amber-300 text-[10px] underline font-mono"
+                >
+                  {showCustomApi ? 'Done' : 'Change Server'}
+                </button>
+              </div>
+              {!showCustomApi ? (
+                <div className="flex items-center justify-between text-[11px] font-mono text-emerald-300">
+                  <span className="truncate">{apiBase}</span>
+                  <span className="text-[10px] text-slate-500 shrink-0 ml-2">
+                    {apiBase.includes('vercel.app') ? '● Live Vercel' : '● Local Server'}
+                  </span>
+                </div>
+              ) : (
+                <div className="space-y-1.5 pt-1">
+                  <input
+                    type="text"
+                    value={apiBase}
+                    onChange={(e) => {
+                      const val = e.target.value.trim();
+                      setApiBase(val);
+                      localStorage.setItem('ica_curator_api_base', val);
+                    }}
+                    placeholder="https://ica-alpha.vercel.app"
+                    className="w-full px-2.5 py-1.5 bg-black/70 border border-amber-500/40 rounded-lg text-xs font-mono text-white focus:outline-none"
+                  />
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setApiBase('https://ica-alpha.vercel.app');
+                        localStorage.setItem('ica_curator_api_base', 'https://ica-alpha.vercel.app');
+                        setShowCustomApi(false);
+                      }}
+                      className="px-2 py-0.5 rounded bg-white/[0.08] hover:bg-white/[0.15] text-[10px] text-emerald-300 font-mono"
+                    >
+                      Use Vercel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setApiBase('http://localhost:3000');
+                        localStorage.setItem('ica_curator_api_base', 'http://localhost:3000');
+                        setShowCustomApi(false);
+                      }}
+                      className="px-2 py-0.5 rounded bg-white/[0.08] hover:bg-white/[0.15] text-[10px] text-slate-300 font-mono"
+                    >
+                      Use Localhost:3000
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {authError && (
               <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/25 text-red-300 text-xs flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
@@ -488,7 +560,7 @@ export default function CuratorAdminDashboard() {
 
           <div className="pt-3 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-500 font-mono">
             <span>Stand-alone Module</span>
-            <a href={API_BASE} className="text-slate-400 hover:text-white underline">
+            <a href={apiBase} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white underline">
               Return to Public Atlas
             </a>
           </div>
@@ -517,15 +589,17 @@ export default function CuratorAdminDashboard() {
                 {authRole}
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 truncate">
-              Authoritative Heritage Knowledge & Governance Dashboard
-            </p>
+            <div className="flex items-center gap-2 text-[11px] text-slate-400 truncate">
+              <span>Authoritative Heritage Knowledge & Governance</span>
+              <span className="text-slate-600">•</span>
+              <span className="text-emerald-400 font-mono text-[10px]">Connected: {apiBase.replace(/^https?:\/\//, '')}</span>
+            </div>
           </div>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
           <a
-            href={API_BASE}
+            href={apiBase}
             target="_blank"
             rel="noopener noreferrer"
             className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-xs font-semibold text-slate-300 transition-colors"
