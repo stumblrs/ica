@@ -103,3 +103,8 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to revoke passcode: ' + err.message }, { status: 500 });
   }
 }
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 200 });
+}
+

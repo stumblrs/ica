@@ -59,6 +59,8 @@ interface HeritageProfile {
   updatedBy?: string;
 }
 
+const API_BASE = (process.env.NEXT_PUBLIC_ICA_API_URL || 'http://localhost:3000').replace(/\/$/, '');
+
 export default function CuratorAdminDashboard() {
   // Authentication State
   const [passcode, setPasscode] = useState('');
@@ -133,7 +135,7 @@ export default function CuratorAdminDashboard() {
       setAuthLoading(true);
       setAuthError(null);
 
-      const res = await fetch('/api/curator/auth', {
+      const res = await fetch(`${API_BASE}/api/curator/auth`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ passcode: key }),
@@ -143,6 +145,7 @@ export default function CuratorAdminDashboard() {
       if (!res.ok) {
         throw new Error(data.error || 'Invalid passcode');
       }
+
 
       setAuthenticated(true);
       setAuthRole(data.role || 'curator');
@@ -178,7 +181,7 @@ export default function CuratorAdminDashboard() {
 
   const fetchSettings = async () => {
     try {
-      const res = await fetch('/api/curator/settings');
+      const res = await fetch(`${API_BASE}/api/curator/settings`);
       if (res.ok) {
         const data = await res.json();
         setSettings(data);
@@ -189,7 +192,7 @@ export default function CuratorAdminDashboard() {
   const fetchPasscodes = async (activeKey: string) => {
     try {
       setLoadingPasscodes(true);
-      const res = await fetch('/api/curator/passcodes', {
+      const res = await fetch(`${API_BASE}/api/curator/passcodes`, {
         headers: { 'x-curator-key': activeKey },
       });
       if (res.ok) {
@@ -205,7 +208,7 @@ export default function CuratorAdminDashboard() {
   const fetchProfiles = async () => {
     try {
       setLoadingProfiles(true);
-      const res = await fetch('/api/curator/profiles');
+      const res = await fetch(`${API_BASE}/api/curator/profiles`);
       if (res.ok) {
         const data = await res.json();
         setProfiles(data.profiles || []);
@@ -223,7 +226,7 @@ export default function CuratorAdminDashboard() {
       setSettingsSuccess(false);
 
       const activeKey = sessionStorage.getItem('ica_curator_key') || passcode;
-      const res = await fetch('/api/curator/settings', {
+      const res = await fetch(`${API_BASE}/api/curator/settings`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -249,7 +252,7 @@ export default function CuratorAdminDashboard() {
     e.preventDefault();
     try {
       const activeKey = sessionStorage.getItem('ica_curator_key') || passcode;
-      const res = await fetch('/api/curator/passcodes', {
+      const res = await fetch(`${API_BASE}/api/curator/passcodes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -280,7 +283,7 @@ export default function CuratorAdminDashboard() {
     if (!confirm('Are you sure you want to revoke this passcode? It will immediately stop working.')) return;
     try {
       const activeKey = sessionStorage.getItem('ica_curator_key') || passcode;
-      const res = await fetch(`/api/curator/passcodes?id=${encodeURIComponent(id)}`, {
+      const res = await fetch(`${API_BASE}/api/curator/passcodes?id=${encodeURIComponent(id)}`, {
         method: 'DELETE',
         headers: { 'x-curator-key': activeKey },
       });
@@ -341,7 +344,7 @@ export default function CuratorAdminDashboard() {
         .map((k) => k.trim())
         .filter(Boolean);
 
-      const res = await fetch('/api/curator/profiles', {
+      const res = await fetch(`${API_BASE}/api/curator/profiles`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -485,7 +488,7 @@ export default function CuratorAdminDashboard() {
 
           <div className="pt-3 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-500 font-mono">
             <span>Stand-alone Module</span>
-            <a href="/" className="text-slate-400 hover:text-white underline">
+            <a href={API_BASE} className="text-slate-400 hover:text-white underline">
               Return to Public Atlas
             </a>
           </div>
@@ -522,7 +525,7 @@ export default function CuratorAdminDashboard() {
 
         <div className="flex items-center gap-2 shrink-0">
           <a
-            href="/"
+            href={API_BASE}
             target="_blank"
             rel="noopener noreferrer"
             className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-xs font-semibold text-slate-300 transition-colors"

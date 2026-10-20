@@ -31,3 +31,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Auth failed: ' + err.message }, { status: 500 });
   }
 }
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 200 });
+}
+
+

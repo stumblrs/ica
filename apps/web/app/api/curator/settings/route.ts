@@ -57,3 +57,8 @@ export async function PUT(req: NextRequest) {
 export async function POST(req: NextRequest) {
   return PUT(req);
 }
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 200 });
+}
+
