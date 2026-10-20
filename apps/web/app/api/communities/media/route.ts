@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { revalidateAtlasData } from '@/lib/revalidation';
 import { parseMediaUrl } from '@/lib/media';
 import { saveMediaToStore } from '@/lib/community-store';
+import { readCuratorSettings, verifyCuratorPasscode } from '@/lib/curator-store';
 import { Pool } from 'pg';
 
 export const dynamic = 'force-dynamic';
@@ -29,6 +30,18 @@ function getPgPool(): Pool {
  */
 export async function POST(req: NextRequest) {
   try {
+    // Check curator kill switch
+    const curatorSettings = readCuratorSettings();
+    if (!curatorSettings.publicSubmissionsEnabled) {
+      const curatorKey = req.headers.get('x-curator-key') || req.headers.get('authorization')?.replace('Bearer ', '');
+      const auth = verifyCuratorPasscode(curatorKey || '');
+      if (!auth.valid) {
+        return NextResponse.json({
+          error: curatorSettings.curatorOnlyModeNotice || 'Contributions are currently locked for curatorial verification.',
+        }, { status: 403 });
+      }
+    }
+
     const body = await req.json();
     const {
       communityId,

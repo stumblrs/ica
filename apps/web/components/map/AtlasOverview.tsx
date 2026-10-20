@@ -57,6 +57,7 @@ import type { GovernanceInquiry } from '@/lib/governancePolicy';
 import { MediaGallery } from '@/components/common/MediaGallery';
 import { parseMediaUrl, type MediaItem } from '@/lib/media';
 import { LocationShareModal } from '@/components/common/LocationShareModal';
+import { useSettlementHeritageProfile, useCuratorSettings } from '@/lib/curator-client';
 
 export interface CommunitySummary {
   id: string;
@@ -221,6 +222,8 @@ export function AtlasOverview(props: AtlasOverviewProps) {
   const [showDelistModal, setShowDelistModal] = useState(false);
   const [showReinstateModal, setShowReinstateModal] = useState(false);
   const [activeInquiry, setActiveInquiry] = useState<GovernanceInquiry | null>(null);
+  const heritageProfile = useSettlementHeritageProfile(selectedFeature);
+  const curatorSettings = useCuratorSettings();
 
   React.useEffect(() => {
     if (selectedFeature?.code && selectedFeature.type === 'community') {
@@ -477,6 +480,80 @@ export function AtlasOverview(props: AtlasOverviewProps) {
                     <p className="text-[11px] font-mono text-emerald-400/90 mt-0.5">{selectedFeature.subtitle}</p>
                   )}
 
+                  {/* Unique Curated Settlement Heritage Card (Adopted automatically via Match Keys) */}
+                  {heritageProfile && (
+                    <div className="mt-2.5 p-3 rounded-xl bg-gradient-to-br from-amber-950/40 via-[#0d1326] to-transparent border border-amber-500/35 shadow-lg space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-mono font-bold tracking-wider text-amber-300 flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                          Curator Heritage Record
+                        </span>
+                        {heritageProfile.marketDay && (
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-200 border border-amber-500/30 font-semibold">
+                            🧺 Market: {heritageProfile.marketDay}
+                          </span>
+                        )}
+                      </div>
+
+                      {heritageProfile.nativeName && (
+                        <div className="text-xs font-mono text-emerald-300 font-semibold">
+                          Traditional Name: {heritageProfile.nativeName}
+                        </div>
+                      )}
+
+                      {heritageProfile.traditionalRulerTitle && (
+                        <div className="text-xs text-white font-medium flex items-center gap-1.5">
+                          <span className="text-amber-400">👑</span>
+                          <span>{heritageProfile.traditionalRulerTitle}</span>
+                        </div>
+                      )}
+
+                      {heritageProfile.clanLineage && (
+                        <div className="text-[11px] text-slate-300 leading-relaxed">
+                          <strong className="text-slate-400 font-medium">Ancestral Lineage:</strong> {heritageProfile.clanLineage}
+                        </div>
+                      )}
+
+                      {heritageProfile.festivals && heritageProfile.festivals.length > 0 && (
+                        <div className="text-[11px] text-amber-200/90 flex items-center gap-1.5 flex-wrap">
+                          <span className="text-slate-400 font-medium">Festivals:</span>
+                          {heritageProfile.festivals.map((fest, idx) => (
+                            <span key={idx} className="px-1.5 py-0.5 rounded bg-black/40 border border-amber-500/20 text-[10px]">
+                              {fest}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {heritageProfile.sacredLandmarks && heritageProfile.sacredLandmarks.length > 0 && (
+                        <div className="text-[11px] text-cyan-200/90 flex items-center gap-1.5 flex-wrap">
+                          <span className="text-slate-400 font-medium">Sacred Landmarks:</span>
+                          {heritageProfile.sacredLandmarks.map((lm, idx) => (
+                            <span key={idx} className="px-1.5 py-0.5 rounded bg-black/40 border border-cyan-500/20 text-[10px]">
+                              {lm}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {heritageProfile.historicalSummary && (
+                        <p className="text-[11px] text-slate-300 italic leading-relaxed pt-1 border-t border-white/[0.08]">
+                          &ldquo;{heritageProfile.historicalSummary}&rdquo;
+                        </p>
+                      )}
+
+                      {heritageProfile.customAttributes && Object.keys(heritageProfile.customAttributes).length > 0 && (
+                        <div className="pt-1.5 border-t border-white/[0.08] grid grid-cols-1 gap-1">
+                          {Object.entries(heritageProfile.customAttributes).map(([k, v]) => (
+                            <div key={k} className="text-[10px] text-slate-300">
+                              <strong className="text-amber-300/90 font-mono">{k}:</strong> {v}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Waterway Proximity Metric / Context */}
                   {(selectedFeature.nearestRiver || selectedFeature.waterwayContext) && (
                     <div className="mt-2 px-2.5 py-1.5 rounded-lg bg-sky-500/10 border border-sky-500/20 text-[11px] text-sky-200 flex items-center justify-between">
@@ -526,56 +603,81 @@ export function AtlasOverview(props: AtlasOverviewProps) {
 
                   {/* Archival Records & Colonial Intelligence Reports */}
                   {(() => {
-                    const matchedDocs = getArchivalDocumentsForFeature({
+                    const allDocs = getArchivalDocumentsForFeature({
                       stateName: selectedFeature.parentName || selectedFeature.name,
                       lgaCode: selectedFeature.code,
                       regionId: selectedFeature.regionId,
                       territory: selectedFeature.name,
                     });
-                    if (matchedDocs.length === 0) return null;
+                    if (allDocs.length === 0) return null;
+
+                    const targetName = (selectedFeature.name || '').toLowerCase();
+                    const localDocs = allDocs.filter((d) =>
+                      d.settlements?.some((s) => s.toLowerCase().includes(targetName) || targetName.includes(s.toLowerCase())) ||
+                      (d.lgas && selectedFeature.code && d.lgas.includes(selectedFeature.code))
+                    );
+                    const generalDocs = allDocs.filter((d) => !localDocs.some((ld) => ld.id === d.id));
+                    const sortedDocs = [...localDocs, ...generalDocs];
 
                     return (
                       <div className="mt-2.5 p-2.5 rounded-lg bg-amber-950/20 border border-amber-500/30 text-[11px] space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="font-bold text-[10px] uppercase font-mono text-amber-300 flex items-center gap-1.5">
                             <FileCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                            Archival Evidence ({matchedDocs.length})
+                            Archival Evidence ({allDocs.length})
                           </span>
-                          <span className="text-[9px] font-mono text-amber-400/80">Colonial & Precolonial</span>
+                          <span className="text-[9px] font-mono text-amber-400/80">
+                            {localDocs.length > 0 ? `${localDocs.length} Local · ${generalDocs.length} Regional` : 'Colonial & Precolonial'}
+                          </span>
                         </div>
                         <div className="space-y-1.5">
-                          {matchedDocs.slice(0, 3).map((doc) => (
-                            <div key={doc.id} className="p-2 rounded bg-black/40 border border-amber-500/20 space-y-1">
-                              <div className="flex items-start justify-between gap-1.5">
-                                <span className="font-semibold text-white leading-tight text-[11px]">{doc.title}</span>
-                                <span className="text-[9px] font-mono px-1 rounded bg-amber-500/20 text-amber-300 shrink-0">
-                                  {doc.year}
-                                </span>
-                              </div>
-                              <p className="text-[10px] text-slate-300 line-clamp-2 leading-relaxed">{doc.significance}</p>
-                              {doc.keyFindings && doc.keyFindings.length > 0 && (
-                                <ul className="text-[9px] text-amber-200/90 list-disc list-inside space-y-0.5 pt-0.5">
-                                  {doc.keyFindings.slice(0, 2).map((finding, idx) => (
-                                    <li key={idx} className="line-clamp-1">{finding}</li>
-                                  ))}
-                                </ul>
-                              )}
-                              <div className="pt-1 flex items-center justify-between text-[9px] font-mono text-slate-400">
-                                <span className="truncate max-w-[170px]" title={doc.archiveReference}>🏛 {doc.archiveReference}</span>
-                                {doc.digitalUrl && (
-                                  <a
-                                    href={doc.digitalUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-amber-300 hover:text-amber-200 flex items-center gap-0.5 underline shrink-0"
-                                  >
-                                    <span>Source</span>
-                                    <ExternalLink className="w-2.5 h-2.5" />
-                                  </a>
+                          {sortedDocs.slice(0, 3).map((doc) => {
+                            const isLocal = localDocs.some((ld) => ld.id === doc.id);
+                            return (
+                              <div
+                                key={doc.id}
+                                className={`p-2 rounded bg-black/40 border space-y-1 ${
+                                  isLocal ? 'border-amber-400/50 shadow-sm' : 'border-amber-500/20'
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-1.5">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    {isLocal && (
+                                      <span className="text-[8px] uppercase font-mono font-bold px-1 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                        Town Specific
+                                      </span>
+                                    )}
+                                    <span className="font-semibold text-white leading-tight text-[11px]">{doc.title}</span>
+                                  </div>
+                                  <span className="text-[9px] font-mono px-1 rounded bg-amber-500/20 text-amber-300 shrink-0">
+                                    {doc.year}
+                                  </span>
+                                </div>
+                                <p className="text-[10px] text-slate-300 line-clamp-2 leading-relaxed">{doc.significance}</p>
+                                {doc.keyFindings && doc.keyFindings.length > 0 && (
+                                  <ul className="text-[9px] text-amber-200/90 list-disc list-inside space-y-0.5 pt-0.5">
+                                    {doc.keyFindings.slice(0, 2).map((finding, idx) => (
+                                      <li key={idx} className="line-clamp-1">{finding}</li>
+                                    ))}
+                                  </ul>
                                 )}
+                                <div className="pt-1 flex items-center justify-between text-[9px] font-mono text-slate-400">
+                                  <span className="truncate max-w-[170px]" title={doc.archiveReference}>🏛 {doc.archiveReference}</span>
+                                  {doc.digitalUrl && (
+                                    <a
+                                      href={doc.digitalUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-amber-300 hover:text-amber-200 flex items-center gap-0.5 underline shrink-0"
+                                    >
+                                      <span>Source</span>
+                                      <ExternalLink className="w-2.5 h-2.5" />
+                                    </a>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     );
@@ -633,15 +735,21 @@ export function AtlasOverview(props: AtlasOverviewProps) {
 
               {/* Quick Upload / Link Media Action Button */}
               {onAddMedia && (
-                <button
-                  type="button"
-                  onClick={() => onAddMedia(selectedFeature)}
-                  className="w-full mt-2.5 py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-cyan-500/20 hover:from-emerald-500/35 hover:to-teal-500/35 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95"
-                  title={`Upload or link photos and videos for ${selectedFeature.name}`}
-                >
-                  <Camera className="w-4 h-4 text-emerald-400" />
-                  <span>+ Upload Photo / Video to {selectedFeature.name}</span>
-                </button>
+                curatorSettings.publicSubmissionsEnabled ? (
+                  <button
+                    type="button"
+                    onClick={() => onAddMedia(selectedFeature)}
+                    className="w-full mt-2.5 py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-cyan-500/20 hover:from-emerald-500/35 hover:to-teal-500/35 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95"
+                    title={`Upload or link photos and videos for ${selectedFeature.name}`}
+                  >
+                    <Camera className="w-4 h-4 text-emerald-400" />
+                    <span>+ Upload Photo / Video to {selectedFeature.name}</span>
+                  </button>
+                ) : (
+                  <div className="w-full mt-2.5 py-2 px-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300/80 text-[11px] text-center font-medium flex items-center justify-center gap-1.5">
+                    <span>🔒 Contributions paused for curatorial verification</span>
+                  </div>
+                )
               )}
 
               {selectedFeature.type === 'community' ? (

@@ -68,9 +68,14 @@ export function QuickMediaUploadModal({
       setSubmitting(true);
       setError(null);
 
+      const curatorKey = typeof window !== 'undefined' ? sessionStorage.getItem('ica_curator_key') : null;
+
       const res = await fetch('/api/communities/media', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(curatorKey ? { 'x-curator-key': curatorKey } : {}),
+        },
         body: JSON.stringify({
           communityId: feature.code?.startsWith('comm-') ? feature.code : undefined,
           name: feature.name,
