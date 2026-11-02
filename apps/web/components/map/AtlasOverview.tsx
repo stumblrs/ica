@@ -254,10 +254,13 @@ export function AtlasOverview(props: AtlasOverviewProps) {
     }
 
     // 2. Find matching community in `communities` prop
+    const normName = selectedFeature.name?.trim().toLowerCase();
+    const cleanName = normName?.replace(/\s*\([^)]*\)/g, '').trim();
     const match = communities.find(
       (c) =>
-        (selectedFeature.code && c.id === selectedFeature.code) ||
-        (selectedFeature.name && c.name.toLowerCase() === selectedFeature.name.toLowerCase())
+        (selectedFeature.code && (c.id === selectedFeature.code || c.id?.toLowerCase() === selectedFeature.code.toLowerCase())) ||
+        (normName && c.name && c.name.trim().toLowerCase() === normName) ||
+        (cleanName && c.name && c.name.trim().toLowerCase() === cleanName)
     );
 
     if (match) {
@@ -273,10 +276,16 @@ export function AtlasOverview(props: AtlasOverviewProps) {
 
       if (Array.isArray(match.evidence)) {
         for (const ev of match.evidence) {
-          if (ev.sourceType === 'media_link' && ev.url) {
-            if (!items.some((existing) => existing.url === ev.url)) {
-              const parsed = parseMediaUrl(ev.url, ev.caption, ev.credit);
+          if (!ev) continue;
+          const mediaUrl =
+            ev.url ||
+            (ev.citationOrUrl && (ev.citationOrUrl.startsWith('http://') || ev.citationOrUrl.startsWith('https://')) ? ev.citationOrUrl : null);
+
+          if (mediaUrl) {
+            if (!items.some((existing) => existing.url === mediaUrl)) {
+              const parsed = parseMediaUrl(mediaUrl, ev.caption || ev.description, ev.credit || ev.contributor);
               if (parsed) items.push(parsed);
+              else items.push({ id: ev.id || `media-${Date.now()}`, type: ev.type || 'video', url: mediaUrl, provider: ev.provider || 'video', caption: ev.caption || ev.description });
             }
           } else if (ev.citationOrUrl) {
             const parsed = parseMediaUrl(ev.citationOrUrl, ev.description);

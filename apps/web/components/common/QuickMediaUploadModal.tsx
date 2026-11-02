@@ -77,7 +77,7 @@ export function QuickMediaUploadModal({
           ...(curatorKey ? { 'x-curator-key': curatorKey } : {}),
         },
         body: JSON.stringify({
-          communityId: feature.code?.startsWith('comm-') ? feature.code : undefined,
+          communityId: feature.code || undefined,
           name: feature.name,
           latitude: feature.coordinates ? feature.coordinates[1] : undefined,
           longitude: feature.coordinates ? feature.coordinates[0] : undefined,

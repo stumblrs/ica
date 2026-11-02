@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 import { getCommunitiesStoreGeoJSON } from '@/lib/community-store';
 
 export const dynamic = 'force-dynamic';
@@ -11,25 +12,42 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(req: NextRequest) {
   try {
-    const communities = await prisma.community.findMany({
-      select: {
-        id: true,
-        name: true,
-        type: true,
-        stateName: true,
-        lgaName: true,
-        identityStatus: true,
-        verificationStatus: true,
-        lifecycleStatus: true,
-        confidence: true,
-        confirmationsCount: true,
-        challengesCount: true,
-        description: true,
-        longitude: true,
-        latitude: true,
-        evidenceJson: true,
-      },
-    });
+    let communities: any[] | null = null;
+
+    // 1. Try Supabase direct HTTPS query first (guaranteed in serverless)
+    try {
+      const { data, error } = await supabase
+        .from('Community')
+        .select('id, name, type, stateName, lgaName, identityStatus, verificationStatus, lifecycleStatus, confidence, confirmationsCount, challengesCount, description, longitude, latitude, evidenceJson');
+      if (!error && Array.isArray(data) && data.length > 0) {
+        communities = data;
+      }
+    } catch {}
+
+    // 2. Secondary fallback to Prisma
+    if (!communities || communities.length === 0) {
+      try {
+        communities = await prisma.community.findMany({
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            stateName: true,
+            lgaName: true,
+            identityStatus: true,
+            verificationStatus: true,
+            lifecycleStatus: true,
+            confidence: true,
+            confirmationsCount: true,
+            challengesCount: true,
+            description: true,
+            longitude: true,
+            latitude: true,
+            evidenceJson: true,
+          },
+        });
+      } catch {}
+    }
 
     if (!communities || communities.length === 0) {
       // If DB returned empty, use file store

@@ -105,10 +105,23 @@ export async function GET(req: NextRequest) {
     }
 
     if (communities && communities.length > 0) {
-      const parsed = communities.map((c) => ({
-        ...c,
-        evidence: c.evidenceJson ? (typeof c.evidenceJson === 'string' ? JSON.parse(c.evidenceJson) : c.evidenceJson) : [],
-      }));
+      const parsed = communities.map((c) => {
+        let evidence: any[] = [];
+        try {
+          if (c.evidenceJson) {
+            evidence = typeof c.evidenceJson === 'string' ? JSON.parse(c.evidenceJson) : c.evidenceJson;
+          }
+        } catch {
+          evidence = [];
+        }
+        if (!Array.isArray(evidence)) evidence = [];
+        const media = evidence.filter((e: any) => e && (e.url || e.embedUrl || e.type === 'video' || e.type === 'image' || e.sourceType === 'media_link'));
+        return {
+          ...c,
+          evidence,
+          media,
+        };
+      });
 
       // Merge local store evidence items so any offline-saved photos/videos are also present
       try {

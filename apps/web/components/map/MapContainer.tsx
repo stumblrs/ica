@@ -9,6 +9,7 @@ import { KindredMicroMappingModal } from './KindredMicroMappingModal';
 import { getKindredLandmarksOffline, getOfflineCommunitiesGeoJSON, type KindredLandmarkItem } from '@/lib/offlineStorage';
 import { SE_STATE_CODES, SE_STATES, ANIOMA_LGAS, IGBO_IDENTIFIED_LGAS, NIGERIA_BOUNDS, BEYOND_SOUTHEAST_REGIONS } from '@/lib/geo';
 import { calculateNearestWaterway, getDialectForLocation, type DialectCluster, ANCESTRAL_MIGRATION_ARCS, WATERWAY_TRADE_CORRIDORS } from '@/lib/cultural';
+import { parseMediaUrl } from '@/lib/media';
 
 export interface SelectedFeature {
   type: 'state' | 'lga' | 'community' | 'settlement' | 'landmark' | 'migration' | 'region';
@@ -178,15 +179,38 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
     const nextMap = new Map<string, any[]>();
     if (Array.isArray(comms)) {
       for (const c of comms) {
-        let ev = Array.isArray(c.evidence) ? c.evidence : [];
-        if (ev.length === 0 && typeof c.evidenceJson === 'string') {
+        let rawEv = Array.isArray(c.evidence) ? c.evidence : [];
+        if (rawEv.length === 0 && typeof c.evidenceJson === 'string') {
           try {
-            ev = JSON.parse(c.evidenceJson);
+            rawEv = JSON.parse(c.evidenceJson);
           } catch {}
         }
-        if (ev.length > 0) {
-          if (c.name) nextMap.set(c.name.trim().toLowerCase(), ev);
-          if (c.id) nextMap.set(c.id.trim().toLowerCase(), ev);
+        if (Array.isArray(c.media) && c.media.length > 0) {
+          rawEv = [...c.media, ...rawEv];
+        }
+        if (rawEv.length > 0) {
+          // Normalize media items with parseMediaUrl
+          const validMedia: any[] = [];
+          const seen = new Set<string>();
+          for (const item of rawEv) {
+            if (!item) continue;
+            const url = item.url || (item.citationOrUrl && (item.citationOrUrl.startsWith('http://') || item.citationOrUrl.startsWith('https://')) ? item.citationOrUrl : null);
+            if (!url) continue;
+            if (seen.has(url)) continue;
+            seen.add(url);
+            const parsed = parseMediaUrl(url, item.caption || item.description, item.credit || item.contributor);
+            validMedia.push(parsed || item);
+          }
+
+          if (validMedia.length > 0) {
+            if (c.name) {
+              const n = c.name.trim().toLowerCase();
+              nextMap.set(n, validMedia);
+              const clean = n.replace(/\s*\([^)]*\)/g, '').trim();
+              if (clean !== n) nextMap.set(clean, validMedia);
+            }
+            if (c.id) nextMap.set(c.id.trim().toLowerCase(), validMedia);
+          }
         }
       }
     }
@@ -275,8 +299,12 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
     if (name) {
       const n = name.trim().toLowerCase();
       if (mapStore.has(n)) return mapStore.get(n)!;
+      const clean = n.replace(/\s*\([^)]*\)/g, '').trim();
+      if (mapStore.has(clean)) return mapStore.get(clean)!;
       const stripped = n.replace(/^(ref-|settlement-|comm-|canonical-)/, '');
       if (mapStore.has(stripped)) return mapStore.get(stripped)!;
+      const strippedClean = clean.replace(/^(ref-|settlement-|comm-|canonical-)/, '');
+      if (mapStore.has(strippedClean)) return mapStore.get(strippedClean)!;
     }
     if (id) {
       const i = id.trim().toLowerCase();
