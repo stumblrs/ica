@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabase';
 import { getCommunitiesStoreGeoJSON } from '@/lib/community-store';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 
 /**
  * GET /api/map/communities.geojson

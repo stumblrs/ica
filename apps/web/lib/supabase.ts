@@ -36,6 +36,9 @@ export function getSupabase(): SupabaseClient {
         persistSession: typeof window !== 'undefined',
         autoRefreshToken: true,
       },
+      global: {
+        fetch: (url, options = {}) => fetch(url, { ...options, cache: 'no-store' }),
+      },
       realtime: {
         params: {
           eventsPerSecond: 10,
