@@ -253,15 +253,30 @@ export function AtlasOverview(props: AtlasOverviewProps) {
       }
     }
 
-    // 2. Find matching community in `communities` prop
-    const normName = selectedFeature.name?.trim().toLowerCase();
-    const cleanName = normName?.replace(/\s*\([^)]*\)/g, '').trim();
-    const match = communities.find(
-      (c) =>
-        (selectedFeature.code && (c.id === selectedFeature.code || c.id?.toLowerCase() === selectedFeature.code.toLowerCase())) ||
-        (normName && c.name && c.name.trim().toLowerCase() === normName) ||
-        (cleanName && c.name && c.name.trim().toLowerCase() === cleanName)
-    );
+    // 2. Find matching community in `communities` prop with fuzzy alias and prefix matching
+    const normalizeLoc = (s?: string) =>
+      (s || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s*\([^)]*\)/g, '')
+        .replace(/[-_]/g, ' ')
+        .replace(/\s+(town|village|community|city|urban|rural)$/i, '')
+        .replace(/^(ref-|settlement-|comm-|canonical-|town-)/i, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const targetNorm = normalizeLoc(selectedFeature.name);
+    const targetCode = (selectedFeature.code || '').trim().toLowerCase();
+    const strippedCode = targetCode.replace(/^(comm-|settlement-|ref-|town-|canonical-)/i, '');
+
+    const match = communities.find((c) => {
+      if (!c) return false;
+      const cId = (c.id || '').trim().toLowerCase();
+      if (targetCode && (cId === targetCode || cId.replace(/^(comm-|settlement-|ref-|town-|canonical-)/i, '') === strippedCode)) return true;
+      const cNorm = normalizeLoc(c.name);
+      if (targetNorm && cNorm && (cNorm === targetNorm || cNorm.startsWith(targetNorm) || targetNorm.startsWith(cNorm))) return true;
+      return false;
+    });
 
     if (match) {
       if (Array.isArray(match.media)) {
@@ -303,6 +318,38 @@ export function AtlasOverview(props: AtlasOverviewProps) {
           }
         }
       }
+    }
+
+    // 3. Fallback to client localStorage cache if no media items found yet
+    if (items.length === 0 && typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('ica_local_media_store');
+        if (raw) {
+          const localStore = JSON.parse(raw);
+          if (Array.isArray(localStore)) {
+            const found = localStore.find((it: any) => {
+              if (targetCode) {
+                const itCode = (it.code || it.id || '').trim().toLowerCase();
+                if (itCode === targetCode || itCode.replace(/^(comm-|settlement-|ref-|town-|canonical-)/i, '') === strippedCode) return true;
+              }
+              if (targetNorm && it.name) {
+                const itNorm = normalizeLoc(it.name);
+                if (itNorm === targetNorm || itNorm.startsWith(targetNorm) || targetNorm.startsWith(itNorm)) return true;
+              }
+              return false;
+            });
+            if (found && Array.isArray(found.media)) {
+              for (const m of found.media) {
+                if (m?.url && !items.some((existing) => existing.url === m.url)) {
+                  const parsed = parseMediaUrl(m.url, m.caption, m.credit);
+                  if (parsed) items.push(parsed);
+                  else items.push(m);
+                }
+              }
+            }
+          }
+        }
+      } catch {}
     }
 
     return items;

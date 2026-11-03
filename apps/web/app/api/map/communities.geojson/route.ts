@@ -62,12 +62,52 @@ export async function GET(req: NextRequest) {
         let evidence: any[] = [];
         try {
           if (c.evidenceJson) {
-            evidence = JSON.parse(c.evidenceJson);
+            evidence = typeof c.evidenceJson === 'string' ? JSON.parse(c.evidenceJson) : c.evidenceJson;
           }
         } catch {
           evidence = [];
         }
-        const hasMedia = Array.isArray(evidence) && evidence.length > 0;
+        if (!Array.isArray(evidence)) evidence = [];
+
+        // Distinguish genuine media links (photos & videos) from purely textual book citations
+        const validMedia = evidence.filter((e: any) =>
+          Boolean(e && (e.url || e.embedUrl || (e.citationOrUrl && (e.citationOrUrl.startsWith('http://') || e.citationOrUrl.startsWith('https://')))))
+        );
+
+        const hasVideo = validMedia.some((e: any) => {
+          const u = (e.url || e.embedUrl || e.citationOrUrl || '').toLowerCase();
+          return (
+            e.type === 'video' ||
+            u.includes('youtube') ||
+            u.includes('youtu.be') ||
+            u.includes('vimeo') ||
+            u.includes('tiktok') ||
+            u.endsWith('.mp4') ||
+            u.endsWith('.webm')
+          );
+        });
+
+        const hasPhoto = validMedia.some((e: any) => {
+          const u = (e.url || e.embedUrl || e.citationOrUrl || '').toLowerCase();
+          return (
+            e.type === 'image' ||
+            u.includes('unsplash') ||
+            u.includes('imgur') ||
+            u.includes('wikimedia') ||
+            u.includes('postimg') ||
+            u.endsWith('.jpg') ||
+            u.endsWith('.jpeg') ||
+            u.endsWith('.png') ||
+            u.endsWith('.webp')
+          );
+        });
+
+        const hasMedia = validMedia.length > 0;
+        const videoCount = validMedia.filter((e: any) => {
+          const u = (e.url || e.embedUrl || e.citationOrUrl || '').toLowerCase();
+          return e.type === 'video' || u.includes('youtube') || u.includes('youtu.be') || u.includes('vimeo') || u.includes('tiktok') || u.endsWith('.mp4');
+        }).length;
+
         return {
           type: 'Feature',
           id: c.id,
@@ -93,10 +133,17 @@ export async function GET(req: NextRequest) {
             description: c.description,
             hasMedia,
             has_media: hasMedia,
-            mediaCount: evidence.length,
-            media_count: evidence.length,
+            hasVideo,
+            has_video: hasVideo,
+            hasPhoto,
+            has_photo: hasPhoto,
+            videoCount,
+            video_count: videoCount,
+            mediaCount: validMedia.length,
+            media_count: validMedia.length,
+            mediaJson: JSON.stringify(validMedia),
             evidence,
-            media: evidence,
+            media: validMedia,
           },
           geometry: {
             type: 'Point',

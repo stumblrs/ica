@@ -204,12 +204,25 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
 
           if (validMedia.length > 0) {
             if (c.name) {
-              const n = c.name.trim().toLowerCase();
-              nextMap.set(n, validMedia);
-              const clean = n.replace(/\s*\([^)]*\)/g, '').trim();
-              if (clean !== n) nextMap.set(clean, validMedia);
+              const base = c.name.trim().toLowerCase();
+              nextMap.set(base, validMedia);
+              const noParen = base.replace(/\s*\([^)]*\)/g, '').trim();
+              if (noParen) nextMap.set(noParen, validMedia);
+              const noPunct = base.replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+              if (noPunct) nextMap.set(noPunct, validMedia);
+              const noParenNoPunct = noParen.replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+              if (noParenNoPunct) nextMap.set(noParenNoPunct, validMedia);
+              const noSuffix = noParenNoPunct.replace(/\s+(town|village|community|city|urban|rural)$/i, '').trim();
+              if (noSuffix) nextMap.set(noSuffix, validMedia);
+              const noPrefix = noSuffix.replace(/^(ref-|settlement-|comm-|canonical-|town-)/i, '').trim();
+              if (noPrefix) nextMap.set(noPrefix, validMedia);
             }
-            if (c.id) nextMap.set(c.id.trim().toLowerCase(), validMedia);
+            if (c.id) {
+              const idRaw = c.id.trim().toLowerCase();
+              nextMap.set(idRaw, validMedia);
+              const idStripped = idRaw.replace(/^(ref-|settlement-|comm-|canonical-|town-)/i, '').trim();
+              if (idStripped) nextMap.set(idStripped, validMedia);
+            }
           }
         }
       }
@@ -275,11 +288,24 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
       };
 
       if (name) {
-        addUnderKey(name);
-        addUnderKey(name.replace(/^(ref-|settlement-|comm-|canonical-)/, ''));
+        const base = name.trim().toLowerCase();
+        addUnderKey(base);
+        const noParen = base.replace(/\s*\([^)]*\)/g, '').trim();
+        if (noParen) addUnderKey(noParen);
+        const noPunct = base.replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+        if (noPunct) addUnderKey(noPunct);
+        const noParenNoPunct = noParen.replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+        if (noParenNoPunct) addUnderKey(noParenNoPunct);
+        const noSuffix = noParenNoPunct.replace(/\s+(town|village|community|city|urban|rural)$/i, '').trim();
+        if (noSuffix) addUnderKey(noSuffix);
+        const noPrefix = noSuffix.replace(/^(ref-|settlement-|comm-|canonical-|town-)/i, '').trim();
+        if (noPrefix) addUnderKey(noPrefix);
       }
       if (code) {
-        addUnderKey(code);
+        const codeRaw = code.trim().toLowerCase();
+        addUnderKey(codeRaw);
+        const codeStripped = codeRaw.replace(/^(ref-|settlement-|comm-|canonical-|town-)/i, '').trim();
+        if (codeStripped) addUnderKey(codeStripped);
       }
 
       // Re-trigger visual refresh
@@ -296,19 +322,36 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
 
   const getMediaForLocation = useCallback((name?: string, id?: string): any[] => {
     const mapStore = mediaIndexRef.current;
-    if (name) {
-      const n = name.trim().toLowerCase();
-      if (mapStore.has(n)) return mapStore.get(n)!;
-      const clean = n.replace(/\s*\([^)]*\)/g, '').trim();
-      if (mapStore.has(clean)) return mapStore.get(clean)!;
-      const stripped = n.replace(/^(ref-|settlement-|comm-|canonical-)/, '');
-      if (mapStore.has(stripped)) return mapStore.get(stripped)!;
-      const strippedClean = clean.replace(/^(ref-|settlement-|comm-|canonical-)/, '');
-      if (mapStore.has(strippedClean)) return mapStore.get(strippedClean)!;
-    }
     if (id) {
       const i = id.trim().toLowerCase();
       if (mapStore.has(i)) return mapStore.get(i)!;
+      const strippedId = i.replace(/^(comm-|settlement-|ref-|town-|canonical-)/i, '').trim();
+      if (strippedId && mapStore.has(strippedId)) return mapStore.get(strippedId)!;
+    }
+    if (name) {
+      const base = name.trim().toLowerCase();
+      const noParen = base.replace(/\s*\([^)]*\)/g, '').trim();
+      const noPunct = base.replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+      const noParenNoPunct = noParen.replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+      const noSuffix = noParenNoPunct.replace(/\s+(town|village|community|city|urban|rural)$/i, '').trim();
+      const noPrefix = noSuffix.replace(/^(ref-|settlement-|comm-|canonical-|town-)/i, '').trim();
+
+      const candidates = [base, noParen, noPunct, noParenNoPunct, noSuffix, noPrefix].filter(Boolean);
+      for (const cand of candidates) {
+        if (mapStore.has(cand)) return mapStore.get(cand)!;
+      }
+
+      // Substring / prefix fallback for terms with length >= 3
+      const root = noPrefix || noSuffix || noParen || base;
+      if (root && root.length >= 3) {
+        let foundVal: any[] | null = null;
+        mapStore.forEach((val, key) => {
+          if (!foundVal && (key === root || key.startsWith(root) || root.startsWith(key))) {
+            foundVal = val;
+          }
+        });
+        if (foundVal) return foundVal;
+      }
     }
     // Direct localStorage fallback check
     if (typeof window !== 'undefined') {
@@ -317,11 +360,18 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         if (raw) {
           const localStore = JSON.parse(raw);
           if (Array.isArray(localStore)) {
-            const found = localStore.find(
-              (it: any) =>
-                (name && (it.name || '').trim().toLowerCase() === name.trim().toLowerCase()) ||
-                (id && (it.code || it.id || '').trim().toLowerCase() === id.trim().toLowerCase())
-            );
+            const found = localStore.find((it: any) => {
+              if (id) {
+                const targetId = (it.code || it.id || '').trim().toLowerCase();
+                if (targetId === id.trim().toLowerCase()) return true;
+              }
+              if (name && it.name) {
+                const normTarget = it.name.trim().toLowerCase().replace(/\s+(town|village|community|city)$/i, '').trim();
+                const normQuery = name.trim().toLowerCase().replace(/\s+(town|village|community|city)$/i, '').trim();
+                if (normTarget === normQuery || normTarget.startsWith(normQuery) || normQuery.startsWith(normTarget)) return true;
+              }
+              return false;
+            });
             if (found && Array.isArray(found.media)) return found.media;
           }
         }
@@ -2151,10 +2201,21 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         source: 'communities-source',
         filter: ['==', ['get', 'hasMedia'], true],
         paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 4, 12, 8, 18, 12, 26],
-          'circle-color': '#10b981',
-          'circle-opacity': 0.38,
-          'circle-blur': 0.75,
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 4, 10, 8, 16, 12, 24],
+          'circle-color': [
+            'case',
+            ['==', ['get', 'hasVideo'], true], '#06b6d4',
+            '#a855f7'
+          ],
+          'circle-opacity': 0.65,
+          'circle-blur': 0.35,
+          'circle-stroke-width': 2.5,
+          'circle-stroke-color': [
+            'case',
+            ['==', ['get', 'hasVideo'], true], '#38bdf8',
+            '#c084fc'
+          ],
+          'circle-stroke-opacity': 0.9,
         },
       });
 
@@ -2163,17 +2224,27 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         type: 'symbol',
         source: 'communities-source',
         filter: ['==', ['get', 'hasMedia'], true],
-        minzoom: 7.5,
+        minzoom: 5.0,
         layout: {
-          'text-field': '📷',
-          'text-size': ['interpolate', ['linear'], ['zoom'], 7.5, 11, 10, 14, 13, 17],
-          'text-offset': [0.95, -0.95],
+          'text-field': [
+            'case',
+            ['==', ['get', 'hasVideo'], true], '▶ Video',
+            '📷 Photo'
+          ],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 5.0, 9, 8, 11, 12, 14],
+          'text-offset': [0, -1.6],
+          'text-anchor': 'bottom',
           'text-allow-overlap': true,
           'text-ignore-placement': true,
         },
         paint: {
+          'text-color': [
+            'case',
+            ['==', ['get', 'hasVideo'], true], '#38bdf8',
+            '#e879f9'
+          ],
           'text-halo-color': '#020617',
-          'text-halo-width': 2.0,
+          'text-halo-width': 2.5,
         },
       });
 
@@ -2996,6 +3067,8 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         const layers = [
           'communities-points',
           'communities-labels',
+          'communities-media-badge',
+          'communities-media-pulse',
           'kindred-landmarks-points',
           'reference-settlements-points',
           'reference-settlements-labels',
@@ -3019,7 +3092,13 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
         ];
         const feats = mapInstance.queryRenderedFeatures(tapBox, { layers });
 
-        const community = feats.find((f) => f.layer.id === 'communities-points' || f.layer.id === 'communities-labels');
+        const community = feats.find(
+          (f) =>
+            f.layer.id === 'communities-points' ||
+            f.layer.id === 'communities-labels' ||
+            f.layer.id === 'communities-media-badge' ||
+            f.layer.id === 'communities-media-pulse'
+        );
         const kindred = feats.find((f) => f.layer.id === 'kindred-landmarks-points');
         const referenceSettlement = feats.find((f) => f.layer.id === 'reference-settlements-points' || f.layer.id === 'reference-settlements-labels');
         const settlement = feats.find((f) => f.layer.id === 'settlements-points' || f.layer.id === 'settlements-labels');
@@ -3073,6 +3152,19 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
           const nearestRiver = coords ? calculateNearestWaterway(coords[0], coords[1]) : undefined;
           const dialectCluster = getDialectForLocation(p.state_name, p.lga_name);
 
+          let communityMedia = getMediaForLocation(p.name, p.id);
+          if (communityMedia.length === 0) {
+            const raw = p.mediaJson || p.evidenceJson || p.media || p.evidence;
+            if (raw) {
+              try {
+                const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                if (Array.isArray(parsed)) {
+                  communityMedia = parsed.filter((m: any) => m && (m.url || m.embedUrl || m.citationOrUrl));
+                }
+              } catch {}
+            }
+          }
+
           onSelectRef.current({
             type: 'community',
             name: p.name,
@@ -3089,7 +3181,7 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
             whyMarked: 'Documented participatory community record submitted to substantiate cultural geography.',
             nearestRiver,
             dialectCluster,
-            media: getMediaForLocation(p.name, p.id),
+            media: communityMedia,
           });
           return;
         }
@@ -3551,6 +3643,8 @@ export const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(fu
       'communities-glow',
       'communities-points',
       'communities-labels',
+      'communities-media-pulse',
+      'communities-media-badge',
       'igboland-canonical-capitals-glow',
       'igboland-canonical-capitals-symbol',
       'igboland-canonical-towns-glow',
